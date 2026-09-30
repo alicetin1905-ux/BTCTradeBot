@@ -28,7 +28,7 @@ function check({ lastRun, wd, now }) {
       message: {
         title: 'BTC bot is not running',
         message: `No hourly run for ${hours}h (last ${new Date(lastRun).toISOString().slice(0, 16).replace('T', ' ')} UTC). ` +
-          'Check that the Mac is on and awake. An open position keeps its stop on Bybit, but the stop does not trail and exits do not fire.',
+          'Check the Actions tab of the repo (or the Mac, if it runs there). An open position keeps its stop on the exchange, but the stop does not trail and exits do not fire.',
         tags: ['warning'], priority: 4,
       },
       wd: { down: true, alertedAt: now, since: wd.since || lastRun },

@@ -139,6 +139,12 @@ function createClient({ apiKey, apiSecret, passphrase, base = DEFAULT_BASE, fetc
     name: 'okx-demo',
     label: 'OKX',
 
+    // Account and position mode, read-only (scripts/okx-check.js).
+    async accountInfo() {
+      const c = (await request('GET', '/api/v5/account/config'))[0] || {};
+      return { acctLv: c.acctLv, posMode: c.posMode };
+    },
+
     // USDT equity / available balance of the trading account.
     async getWallet() {
       const acct = (await request('GET', '/api/v5/account/balance', { ccy: 'USDT' }))[0];

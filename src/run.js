@@ -178,11 +178,15 @@ async function run() {
     }),
   };
   const daily = summary.due(st);
+  // Status push once per due hour, however many runs that hour has.
+  const hour = Math.floor(now / 3600000);
+  const status = !daily && config.NOTIFY.HOURLY_STATUS && summary.statusDue(now) && st.meta.lastStatusHour !== hour;
+  if (status) st.meta = { ...st.meta, lastStatusHour: hour };
   saveState(st, { fullRun: true });
   printSummary(events, st);
   await notify.send(events, st);
   if (daily) await notify.push([daily]);
-  else if (config.NOTIFY.HOURLY_STATUS && summary.statusDue()) await notify.push([summary.status(st)]);
+  else if (status) await notify.push([summary.status(st)]);
 }
 
 // Quick reconcile between hourly runs: books fills and notices a stop-out.

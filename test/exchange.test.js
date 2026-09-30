@@ -565,3 +565,21 @@ test('OKX: realized P&L per closing order from fills, net of its fee and its sha
   assert.deepEqual(r.map(x => [x.orderId, x.qty, x.exit, +x.pnl.toFixed(2), x.at]), [['tp', 0.01, 101000, 8.95, 2000], ['sl', 0.01, 102000, 18.85, 3000]]);
   assert.deepEqual(await c.getFundingFees(0), [{ id: 'b1', symbol: 'BTCUSDT', amount: -0.35, at: 2500 }]);
 });
+
+test('Actions failure alerts: on the first failure, every 6h while failing, all-clear once', () => {
+  const { decide } = require('../scripts/actions-alert');
+  const t0 = Date.UTC(2026, 9, 1);
+  let r = decide({ ok: true, prev: { failing: false }, now: t0 });
+  assert.equal(r.message, null);
+  r = decide({ ok: false, prev: r.state, now: t0, lastLines: 'OKX 50110: IP' });
+  assert.equal(r.message.title, 'BTC bot run failed');
+  assert.match(r.message.message, /50110/);
+  r = decide({ ok: false, prev: r.state, now: t0 + 30 * 60000 });
+  assert.equal(r.message, null);
+  r = decide({ ok: false, prev: r.state, now: t0 + 6 * H + 60000 });
+  assert.equal(r.message.title, 'BTC bot run failed');
+  assert.equal(r.state.since, t0);
+  r = decide({ ok: true, prev: r.state, now: t0 + 7 * H });
+  assert.equal(r.message.title, 'BTC bot runs work again');
+  assert.deepEqual(r.state, { failing: false });
+});

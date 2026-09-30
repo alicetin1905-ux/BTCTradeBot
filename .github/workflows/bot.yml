@@ -1,0 +1,62 @@
+name: BTC bot
+
+# Runs the bot on GitHub's servers — no Mac needed (scripts/actions-run.sh).
+#   :03 and :33  full run: exits, trailing stop, new entries after a 4H close
+#   :18 and :48  sync: books fills / stop-outs for the dashboard
+# Two full runs an hour so a late or skipped scheduled start (GitHub delays
+# them under load) still enters well inside the 60-minute window after a
+# 4H close. The stop itself lives on OKX and doesn't depend on these runs.
+#
+# Keys: repository Settings → Secrets and variables → Actions →
+# OKX_API_KEY, OKX_API_SECRET, OKX_API_PASSPHRASE. Until they exist, runs
+# only check the connection to OKX. "Run workflow" with action = check tests
+# the keys without trading.
+#
+# Use this OR the Mac's cron (scripts/setup-mac.sh), not both.
+
+on:
+  schedule:
+    - cron: '3,33 * * * *'
+    - cron: '18,48 * * * *'
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'run = full run, sync = fills only, check = test OKX connection and keys (no trading)'
+        type: choice
+        options: [check, run, sync]
+        default: check
+
+permissions:
+  contents: write
+
+# One run at a time, never cancelled halfway through an order.
+concurrency:
+  group: btc-bot
+  cancel-in-progress: false
+
+jobs:
+  bot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Run the bot
+        env:
+          EXCHANGE: okx
+          OKX_API_KEY: ${{ secrets.OKX_API_KEY }}
+          OKX_API_SECRET: ${{ secrets.OKX_API_SECRET }}
+          OKX_API_PASSPHRASE: ${{ secrets.OKX_API_PASSPHRASE }}
+          OKX_API_BASE: ${{ secrets.OKX_API_BASE }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          TRADEBOT_HALT: ${{ vars.TRADEBOT_HALT }}
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then MODE="${{ inputs.action }}";
+          elif [ "${{ github.event.schedule }}" = "18,48 * * * *" ]; then MODE=sync;
+          else MODE=run; fi
+          echo "mode: $MODE"
+          bash scripts/actions-run.sh "$MODE"

@@ -101,9 +101,46 @@ npm run research             # backtest/RESEARCH.md + DONCHIAN.md
 
 It needs Node 18+ and no dependencies. Keys come from `.env` (see `.env.example`).
 
+## Setup from your phone (GitHub Actions, no Mac)
+
+The bot can run on GitHub's servers: `.github/workflows/bot.yml` does a full
+run at :03 and :33 every hour and a sync at :18 and :48. It commits
+`state/demo/` back to the repo after each run. Everything below works in a
+phone browser.
+
+1. **Create the OKX demo API key** on okx.com (desktop view in the phone
+   browser if the app hides it):
+   - Go to Trade → Demo trading, then profile → Demo Trading API → Create API key.
+   - Permissions: **Read + Trade**, never Withdraw.
+   - **No IP binding**, because GitHub's servers change addresses.
+   - Write down the key, the secret and your passphrase.
+2. **Add them as repository secrets.** On GitHub, open this repo → Settings →
+   Secrets and variables → Actions → New repository secret, and create:
+   - `OKX_API_KEY`
+   - `OKX_API_SECRET`
+   - `OKX_API_PASSPHRASE`
+   - optionally `OKX_API_BASE` (regional OKX site) and `NTFY_TOPIC`
+3. **Test without trading.** Go to Actions → BTC bot → Run workflow, action
+   `check`. The log shows whether OKX accepts the keys from GitHub, your demo
+   equity and the account mode (it must not be Spot mode). A red run explains
+   what's wrong.
+4. **Done.** From the next :03 or :33 the bot trades. Also turn on the
+   dashboard (Settings → Pages → branch `main`, folder `/`) and subscribe to
+   the ntfy topic for alerts. If runs start failing you get a push, repeated
+   every 6h, and an all-clear when they recover.
+
+To pause new entries, add a repository **variable** (not a secret)
+`TRADEBOT_HALT` = `1`. Settings and remote commands work as described below,
+by editing the files on GitHub.
+
+Use GitHub Actions **or** the Mac, never both: two copies would trade the
+same account. GitHub may start scheduled runs late, or skip one when it's
+busy. That's why there are two full runs an hour, and the stop sits on OKX
+either way.
+
 ## Setup on the Mac
 
-The bot runs on your Mac (or any always-on machine) from cron.
+Alternatively, the bot runs on your Mac (or any always-on machine) from cron.
 
 1. **Get an OKX demo API key.**
    - Log in at <https://www.okx.com> and open **Trade → Demo trading**.
@@ -217,6 +254,8 @@ the next breakout. `reset` also restarts the tracking from 2000 USDT.
 | `src/bybit.js` | Bybit v5 client (Demo Trading only) |
 | `state/demo/*.json` | the bot's memory, read by the dashboard |
 | `index.html` | the dashboard (GitHub Pages) |
+| `.github/workflows/bot.yml`, `scripts/actions-run.sh` | the bot on GitHub Actions |
+| `scripts/okx-check.js` | read-only OKX connection / key / account check |
 | `scripts/backtest.js`, `scripts/research.js` | backtest of the live rules, strategy research |
 
 Demo funds only: every number here is a rehearsal of the strategy, not
