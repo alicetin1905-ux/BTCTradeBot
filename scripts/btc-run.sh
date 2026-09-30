@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Bot runs for cron on the Mac (see README / scripts/setup-mac.sh).
-#   scripts/btc-run.sh            full hourly run on Bybit Demo Trading
+#   scripts/btc-run.sh            full hourly run on the demo account (OKX or Bybit, .env EXCHANGE)
 #   scripts/btc-run.sh sync       quick sync of the position/fills only
 # Pulls the latest code, runs the bot, and — if PUSH_STATE=1 — commits
 # state/demo/ back to GitHub for the dashboard. Logs: logs/demo.log.
@@ -37,7 +37,7 @@ trap 'rm -rf "$LOCK"' EXIT
   if [ "${PUSH_STATE:-0}" = "1" ]; then
     git add state/demo/
     if ! git diff --cached --quiet; then
-      git commit -q -m "Bybit demo ${ARGS[*]:-run} $(date -u +%Y-%m-%dT%H:%M:%SZ)"
+      git commit -q -m "Demo ${ARGS[*]:-run} $(date -u +%Y-%m-%dT%H:%M:%SZ)"
       git push -q || { git pull --rebase -q && git push -q; }
     fi
   fi

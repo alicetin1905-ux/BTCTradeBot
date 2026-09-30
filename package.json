@@ -2,7 +2,7 @@
   "name": "btctradebot",
   "version": "1.0.0",
   "private": true,
-  "description": "BTC-only bot on Bybit Demo Trading: 4H Donchian breakout, ATR trailing stop, 2% risk per trade.",
+  "description": "BTC-only bot on OKX (or Bybit) Demo Trading: 4H Donchian breakout, ATR trailing stop, 2% risk per trade.",
   "main": "src/run.js",
   "scripts": {
     "start": "node src/run.js",

@@ -18,7 +18,7 @@ CRED_FILE="$HOME/.btctradebot-git-credentials"
 echo "BTCTradeBot setup in $REPO_DIR"
 
 if [ ! -f .env ]; then
-  echo "No .env here — create it first (cp .env.example .env, then add your Bybit key)." >&2
+  echo "No .env here — create it first (cp .env.example .env, then add your OKX (or Bybit) demo key)." >&2
   exit 1
 fi
 
@@ -52,7 +52,7 @@ if [ ! -f state/demo/account.json ]; then
 fi
 git add state/demo/ 2>/dev/null || true
 if ! git diff --cached --quiet; then
-  git commit -q -m "Bybit demo state (setup)"
+  git commit -q -m "Demo state (setup)"
 fi
 if git push -q; then
   echo "✓ Upload to GitHub works."

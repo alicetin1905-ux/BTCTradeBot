@@ -93,7 +93,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
 </head>
 <body>
 <header class="top">
-  <div class="mark"><img src="icons/icon-192.png" alt=""><h1>BTCTRADEBOT</h1><span>Bybit demo · BTCUSDT · 4H breakout</span></div>
+  <div class="mark"><img src="icons/icon-192.png" alt=""><h1>BTCTRADEBOT</h1><span id="subtitle">demo · BTC perp · 4H breakout</span></div>
   <div class="live"><small id="liveSrc">BTC</small><b id="livePx">—</b><small id="liveChg"></small></div>
 </header>
 
@@ -134,7 +134,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
 </main>
 
 <footer>
-  Demo funds on Bybit Demo Trading — a rehearsal of the strategy, not investment advice.
+  Demo funds on a demo trading account (OKX or Bybit) — a rehearsal of the strategy, not investment advice.
   Long when a 4H close breaks the previous 20-candle high; initial stop 2×ATR, trailed to the best close − 3×ATR after every 4H close; out on a close below the 20-candle low.
   Backtest: <a href="https://github.com/alicetin1905-ux/BTCTradeBot/blob/main/backtest/REPORT.md" target="_blank" rel="noopener">backtest/REPORT.md</a>.
   State refreshes every minute from the repo; the live price every 10 s.
@@ -174,19 +174,25 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     } catch (e) { return null; }
   }
 
-  // Live price: Bybit's public ticker, OKX if Bybit is blocked where the phone is.
-  async function livePrice() {
-    try {
-      var d = await (await fetch('https://api.bybit.com/v5/market/tickers?category=linear&symbol=BTCUSDT', { cache: 'no-store' })).json();
-      var t = d.result.list[0];
-      return { px: +t.lastPrice, chg: +t.price24hPcnt * 100, src: 'Bybit' };
-    } catch (e) {
-      try {
-        var o = (await (await fetch('https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT-SWAP', { cache: 'no-store' })).json()).data[0];
-        return { px: +o.last, chg: (+o.last / +o.sodUtc0 - 1) * 100, src: 'OKX' };
-      } catch (e2) { return null; }
-    }
+  // Live price from the exchange the bot trades on, the other one if that
+  // fails (Bybit is blocked in some countries).
+  async function bybitPrice() {
+    var d = await (await fetch('https://api.bybit.com/v5/market/tickers?category=linear&symbol=BTCUSDT', { cache: 'no-store' })).json();
+    var t = d.result.list[0];
+    return { px: +t.lastPrice, chg: +t.price24hPcnt * 100, src: 'Bybit' };
   }
+  async function okxPrice() {
+    var o = (await (await fetch('https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT-SWAP', { cache: 'no-store' })).json()).data[0];
+    return { px: +o.last, chg: (+o.last / +o.open24h - 1) * 100, src: 'OKX' };
+  }
+  async function livePrice() {
+    var order = S.account && S.account.exchange === 'bybit' ? [bybitPrice, okxPrice] : [okxPrice, bybitPrice];
+    for (var i = 0; i < order.length; i++) {
+      try { var r = await order[i](); if (r && r.px) return r; } catch (e) { /* next */ }
+    }
+    return null;
+  }
+  var EXCHANGE_NAME = { okx: 'OKX', bybit: 'Bybit' };
 
   /* ---------------- rendering ---------------- */
 
@@ -259,7 +265,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       '<dt>Risk when opened</dt><dd>' + esc(usd(p.riskAmt)) + '</dd>' +
       (p.funding ? '<dt>Funding so far</dt><dd class="' + cls(p.funding) + '">' + esc(signed(p.funding)) + '</dd>' : '') +
       '</dl>' +
-      '<div class="note">The stop sits on Bybit and trails after every 4H close; the bot also exits on a 4H close below the ' + esc(S.account.settings ? S.account.settings.EXIT_N : 20) + '-candle low.</div>';
+      '<div class="note">The stop sits on ' + esc(EXCHANGE_NAME[S.account.exchange] || 'the exchange') + ' and trails after every 4H close; the bot also exits on a 4H close below the ' + esc(S.account.settings ? S.account.settings.EXIT_N : 20) + '-candle low.</div>';
   }
 
   function renderSignal() {
@@ -286,7 +292,8 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
         '<div class="note" style="margin-top:2px">20-candle low → breakout level</div>';
     }
     if (s.wait && !S.position) html += '<div class="note">Waiting: ' + esc(s.wait) + '</div>';
-    if (s.source && s.source !== 'bybit') html += '<div class="note">Candles from ' + esc(s.source) + ' (Bybit failed).</div>';
+    var a = S.account || {}, want = (a.settings && a.settings.MARKET_DATA) || a.exchange;
+    if (s.source && want && s.source !== want) html += '<div class="note">Candles from ' + esc(EXCHANGE_NAME[s.source] || s.source) + ' (' + esc(EXCHANGE_NAME[want] || want) + ' failed).</div>';
     el.innerHTML = html;
   }
 
@@ -474,7 +481,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     STOP_ATR: ['Initial stop', function (v) { return v + ' × ATR'; }],
     TRAIL_ATR: ['Trailing stop', function (v) { return v + ' × ATR'; }],
     ENTRY_FRESH_MIN: ['Entry window after a close', function (v) { return v == null ? 'any time' : v + ' min'; }],
-    MARKET_DATA: ['Candles from', function (v) { return v; }],
+    MARKET_DATA: ['Candles from', function (v) { return v ? EXCHANGE_NAME[v] || v : 'the exchange it trades on'; }],
     STATUS_EVERY_H: ['Status push', function (v) { return 'every ' + v + 'h'; }],
   };
   function renderSettings() {
@@ -498,6 +505,8 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
   }
 
   function renderAll() {
+    var ex = S.account && EXCHANGE_NAME[S.account.exchange];
+    $('subtitle').textContent = (ex ? ex + ' ' : '') + 'demo · BTC perp · 4H breakout';
     renderTiles(); renderPosition(); renderSignal(); renderPriceChart(); renderEquity(); renderTrades(); renderSettings(); renderLive();
   }
 

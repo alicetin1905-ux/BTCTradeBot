@@ -1,7 +1,8 @@
-// BTC candles for the signal: Bybit public market data (mainnet api.bybit.com,
-// linear USDT perps — the prices the bot actually trades at), falling back to
-// OKX's BTC-USDT-SWAP when Bybit fails. Unsigned reads only: no API key is sent.
-// The set is never mixed between the two exchanges.
+// BTC candles for the signal, from the exchange the bot trades on (the prices
+// it actually trades at; config.MARKET_DATA can pick the other one): Bybit
+// linear BTCUSDT or OKX BTC-USDT-SWAP, falling back to the other exchange when
+// the first fails. Public mainnet reads only: no API key is sent. The set is
+// never mixed between the two exchanges.
 'use strict';
 
 const config = require('../config');
@@ -42,16 +43,21 @@ async function okxKlines(symbol, tf, limit) {
   return out.slice(0, limit).reverse();
 }
 
+function primary() { return config.MARKET_DATA || config.EXCHANGE || 'bybit'; }
+
 // Closed candles only (the still-forming one is dropped), oldest first.
-// Returns { candles, source, note } — note says why Bybit wasn't used.
+// Returns { candles, source, note } — note says why the first choice wasn't used.
 async function closedCandles(symbol = config.SYMBOL, tf = config.ENTRY_TF, limit = 500, now = Date.now()) {
-  let rows, source = config.MARKET_DATA === 'okx' ? 'okx' : 'bybit', note = null;
-  if (source === 'bybit') {
-    try { rows = await bybitKlines(symbol, tf, limit + 1); } catch (err) { note = err.message; source = 'okx'; }
+  const load = { bybit: bybitKlines, okx: okxKlines };
+  const first = primary(), second = first === 'okx' ? 'bybit' : 'okx';
+  let rows, source = first, note = null;
+  try { rows = await load[first](symbol, tf, limit + 1); } catch (err) {
+    note = err.message;
+    source = second;
+    rows = await load[second](symbol, tf, limit + 1);
   }
-  if (!rows) rows = await okxKlines(symbol, tf, limit + 1);
   const candles = rows.filter(k => k.t + TF_MS[tf] <= now);
   return { candles, source, note };
 }
 
-module.exports = { closedCandles, bybitKlines, okxKlines, setFetch, TF_MS };
+module.exports = { closedCandles, bybitKlines, okxKlines, setFetch, primary, TF_MS };

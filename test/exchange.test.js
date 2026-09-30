@@ -347,8 +347,10 @@ test('request signing matches Bybit v5; the client only knows Demo Trading', asy
   assert.throws(() => createClient({ apiKey: 'k', apiSecret: 's', env: 'live' }), /only supports demo/);
 });
 
-test('market data: closed candles only, Bybit first, OKX when Bybit fails', async () => {
+test('market data: closed candles only, from the trading exchange first, the other when it fails', async () => {
   const market = require('../src/market');
+  const savedEx = config.EXCHANGE;
+  config.EXCHANGE = 'bybit';
   const now = Date.UTC(2026, 8, 30, 9, 1);
   const open = Date.UTC(2026, 8, 30, 8); // the forming 08:00 candle
   const bybitRows = [open, open - TF, open - 2 * TF].map((t, i) => [String(t), '1', '2', '0.5', String(100 + i), '10', '0']);
@@ -364,6 +366,14 @@ test('market data: closed candles only, Bybit first, OKX when Bybit fails', asyn
   assert.equal(r.source, 'okx');
   assert.match(r.note, /HTTP 403/);
   assert.deepEqual(r.candles.map(c => c.t), [open - TF]);
+  // Trading on OKX: OKX candles first, no Bybit call at all.
+  config.EXCHANGE = 'okx';
+  const urls = [];
+  market.setFetch(async (url) => { urls.push(url); return { status: 200, text: async () => JSON.stringify({ code: '0', data: [open, open - TF].map(t => [String(t), '1', '2', '0.5', '1.5', '0', '10']) }) }; });
+  r = await market.closedCandles('BTCUSDT', '240', 2, now);
+  assert.equal(r.source, 'okx');
+  assert.ok(urls.every(u => u.startsWith('https://www.okx.com/api/v5/market/candles?instId=BTC-USDT-SWAP&bar=4H')));
+  config.EXCHANGE = savedEx;
 });
 
 test('ntfy alerts: entry, exit and a quiet trailed-stop note; holds and placeholders are left out', () => {
@@ -445,4 +455,113 @@ test('back-to-back trades keep their own fills: a quick second close is not clai
     await exchange.runExchange({ client, st, events: [], now: t1 + 30000 });
     assert.deepEqual(st.trades.map(t => [t.bias, t.reason.split(':')[0]]), [[1, 'exit signal'], [-1, 'stop']]);
   } finally { config.DIRECTION = saved; }
+});
+
+/* ---------------- OKX demo client ---------------- */
+
+// A minimal stand-in for OKX's v5 REST API: records every request and
+// answers by path. state.posMode switches net / long-short mode.
+function fakeOkx(state = {}) {
+  const S = { posMode: 'net_mode', positions: [], algos: [], fills: [], bills: [], calls: [], seq: 0, ...state };
+  const ok = (data) => ({ status: 200, text: async () => JSON.stringify({ code: '0', msg: '', data }) });
+  const fetchImpl = async (url, opts = {}) => {
+    const u = new URL(url), path = u.pathname, body = opts.body ? JSON.parse(opts.body) : null;
+    S.calls.push({ method: opts.method, path, query: Object.fromEntries(u.searchParams), body, headers: opts.headers || {} });
+    switch (path) {
+      case '/api/v5/public/instruments': return ok([{ instId: 'BTC-USDT-SWAP', ctVal: '0.01', lotSz: '0.01', minSz: '0.01', tickSz: '0.1' }]);
+      case '/api/v5/public/mark-price': return ok([{ markPx: String(S.mark || 100000) }]);
+      case '/api/v5/account/config': return ok([{ posMode: S.posMode, acctLv: S.acctLv || '2' }]);
+      case '/api/v5/account/balance': return ok([{ totalEq: '5000', details: [{ ccy: 'USDT', eq: '5000.5', availEq: '4800' }] }]);
+      case '/api/v5/account/positions': return ok(S.positions);
+      case '/api/v5/account/set-leverage': return ok([{}]);
+      case '/api/v5/trade/order': return ok([{ ordId: 'ord' + (++S.seq), sCode: '0' }]);
+      case '/api/v5/trade/orders-algo-pending': return ok(S.algos.filter(a => a.ordType === u.searchParams.get('ordType')));
+      case '/api/v5/trade/amend-algos': return ok([{ algoId: body.algoId, sCode: '0' }]);
+      case '/api/v5/trade/order-algo': return ok([{ algoId: 'alg' + (++S.seq), sCode: '0' }]);
+      case '/api/v5/trade/cancel-algos': return ok(body.map(x => ({ algoId: x.algoId, sCode: '0' })));
+      case '/api/v5/trade/orders-pending': return ok([]);
+      case '/api/v5/trade/fills-history': return ok(S.fills.slice().reverse());
+      case '/api/v5/account/bills': return ok(S.bills);
+      default: return { status: 404, text: async () => 'not found' };
+    }
+  };
+  return { S, fetchImpl };
+}
+const okxClient = (f) => require('../src/okx').createClient({ apiKey: 'k', apiSecret: 's', passphrase: 'p', fetchImpl: f.fetchImpl });
+
+test('OKX: signed like v5 (base64 HMAC of ts+method+path+body), always demo, keys required', async () => {
+  const { sign } = require('../src/okx');
+  assert.equal(sign('s', '2026-10-01T00:00:00.000Z', 'GET', '/api/v5/account/balance?ccy=USDT', ''),
+    crypto.createHmac('sha256', 's').update('2026-10-01T00:00:00.000ZGET/api/v5/account/balance?ccy=USDT').digest('base64'));
+  const f = fakeOkx();
+  assert.deepEqual(await okxClient(f).getWallet(), { equity: 5000.5, available: 4800 });
+  const h = f.S.calls[0].headers;
+  assert.equal(h['x-simulated-trading'], '1');
+  assert.equal(h['OK-ACCESS-PASSPHRASE'], 'p');
+  assert.equal(h['OK-ACCESS-SIGN'], sign('s', h['OK-ACCESS-TIMESTAMP'], 'GET', '/api/v5/account/balance?ccy=USDT', ''));
+  assert.throws(() => require('../src/okx').createClient({ apiKey: 'k', apiSecret: 's' }), /OKX_API_PASSPHRASE/);
+});
+
+test('OKX: sizes in BTC become contracts; the entry carries its stop-loss; long/short mode adds posSide', async () => {
+  const f = fakeOkx();
+  const c = okxClient(f);
+  assert.deepEqual(await c.getInstrument('BTCUSDT'), { qtyStep: 0.0001, minOrderQty: 0.0001, minNotional: 0, tickSize: 0.1 });
+  await c.setLeverage('BTCUSDT', 5);
+  await c.openMarket({ symbol: 'BTCUSDT', bias: 1, qty: 0.0234, stopLoss: 98000 });
+  const order = f.S.calls.find(x => x.path === '/api/v5/trade/order').body;
+  assert.deepEqual(order, { instId: 'BTC-USDT-SWAP', tdMode: 'cross', side: 'buy', ordType: 'market', sz: '2.34',
+    attachAlgoOrds: [{ slTriggerPx: '98000', slOrdPx: '-1', slTriggerPxType: 'mark' }] });
+  assert.deepEqual(f.S.calls.find(x => x.path === '/api/v5/account/set-leverage').body, { instId: 'BTC-USDT-SWAP', lever: '5', mgnMode: 'cross' });
+
+  const g = fakeOkx({ posMode: 'long_short_mode' });
+  await okxClient(g).closeMarket({ symbol: 'BTCUSDT', bias: -1, qty: 0.03 });
+  const close = g.S.calls.find(x => x.path === '/api/v5/trade/order').body;
+  assert.deepEqual([close.side, close.posSide, close.sz, close.reduceOnly], ['buy', 'short', '3', true]);
+  await assert.rejects(okxClient(fakeOkx({ acctLv: '1' })).setLeverage('BTCUSDT', 5), /Spot mode/);
+});
+
+test('OKX: positions keyed like Bybit, size in BTC, stop read from the stop-loss algo', async () => {
+  const f = fakeOkx({
+    positions: [
+      { instId: 'BTC-USDT-SWAP', pos: '-3', posSide: 'net', avgPx: '100000', markPx: '99000', upl: '30' },
+      { instId: 'SOL-USDT-SWAP', pos: '5', posSide: 'net', avgPx: '200', markPx: '201', upl: '5' },
+    ],
+    algos: [{ ordType: 'conditional', algoId: 'a1', instId: 'BTC-USDT-SWAP', slTriggerPx: '102000' }],
+  });
+  const p = await okxClient(f).getPositions();
+  assert.deepEqual(p.BTCUSDT, { symbol: 'BTCUSDT', bias: -1, size: 0.03, avgPrice: 100000, markPrice: 99000, unrealisedPnl: 30, stopLoss: 102000 });
+  assert.equal(p.SOLUSDT.bias, 1);
+});
+
+test('OKX: moving the stop amends the stop-loss algo; wrong side of the mark is refused', async () => {
+  const f = fakeOkx({
+    mark: 106000,
+    positions: [{ instId: 'BTC-USDT-SWAP', pos: '2', posSide: 'net', avgPx: '100000', markPx: '106000', upl: '120' }],
+    algos: [{ ordType: 'conditional', algoId: 'a1', instId: 'BTC-USDT-SWAP', slTriggerPx: '98000' }],
+  });
+  const c = okxClient(f);
+  await c.setStopLoss('BTCUSDT', 103000);
+  assert.deepEqual(f.S.calls.find(x => x.path === '/api/v5/trade/amend-algos').body,
+    { instId: 'BTC-USDT-SWAP', algoId: 'a1', newSlTriggerPx: '103000', newSlOrdPx: '-1', newSlTriggerPxType: 'mark' });
+  await assert.rejects(c.setStopLoss('BTCUSDT', 107000), /wrong side/);
+  // No stop algo at all: a whole-position stop is placed.
+  f.S.algos = [];
+  await c.setStopLoss('BTCUSDT', 103500);
+  const placed = f.S.calls.find(x => x.path === '/api/v5/trade/order-algo').body;
+  assert.deepEqual([placed.side, placed.ordType, placed.slTriggerPx, placed.closeFraction, placed.reduceOnly], ['sell', 'conditional', '103500', '1', true]);
+});
+
+test('OKX: realized P&L per closing order from fills, net of its fee and its share of the entry fee', async () => {
+  const f = fakeOkx({
+    fills: [
+      { billId: '1', ordId: 'open', side: 'buy', fillSz: '2', fillPx: '100000', fee: '-1.1', fillPnl: '0', ts: '1000' },
+      { billId: '2', ordId: 'tp', side: 'sell', fillSz: '1', fillPx: '101000', fee: '-0.5', fillPnl: '10', ts: '2000' },
+      { billId: '3', ordId: 'sl', side: 'sell', fillSz: '1', fillPx: '102000', fee: '-0.6', fillPnl: '20', ts: '3000' },
+    ],
+    bills: [{ billId: 'b1', instId: 'BTC-USDT-SWAP', balChg: '-0.35', ts: '2500' }],
+  });
+  const c = okxClient(f);
+  const r = await c.getClosedPnl('BTCUSDT', 0);
+  assert.deepEqual(r.map(x => [x.orderId, x.qty, x.exit, +x.pnl.toFixed(2), x.at]), [['tp', 0.01, 101000, 8.95, 2000], ['sl', 0.01, 102000, 18.85, 3000]]);
+  assert.deepEqual(await c.getFundingFees(0), [{ id: 'b1', symbol: 'BTCUSDT', amount: -0.35, at: 2500 }]);
 });

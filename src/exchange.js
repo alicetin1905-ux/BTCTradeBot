@@ -1,13 +1,14 @@
-// Exchange executor — turns the signal into real orders on a Bybit Demo
-// Trading account (see bybit.js). One BTCUSDT position at a time.
+// Exchange executor — turns the signal into real orders on a demo account:
+// OKX Demo Trading (okx.js) or Bybit Demo Trading (bybit.js), both behind the
+// same client interface. One BTC position at a time.
 //
 // Per run:
-//   1. Reconcile the tracked position with Bybit: book realized P&L
-//      (closed-pnl, net of fees) and notice when the exchange stop closed it.
+//   1. Reconcile the tracked position with the exchange: book realized P&L
+//      (net of fees) and notice when the exchange stop closed it.
 //   2. Full runs only (with fresh 4H candles):
 //      - exit signal (a 4H close through the exit channel) -> close at market
 //      - trail the stop: best close since entry -/+ TRAIL_ATR x ATR, moved on
-//        Bybit only when it tightens
+//        the exchange only when it tightens
 //      - no position and a fresh breakout -> market entry with the stop
 //        attached in the same order
 //
@@ -196,14 +197,14 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
   let notional = notionalFor(base, stopDist);
   const maxByMargin = wallet.available * 0.95 * P.LEVERAGE;
   if (notional > maxByMargin) {
-    events.push({ type: 'info', reason: `size cut to what Bybit's free margin allows ($${maxByMargin.toFixed(0)} of $${notional.toFixed(0)})` });
+    events.push({ type: 'info', reason: `size cut to what ${client.label || 'the exchange'}'s free margin allows ($${maxByMargin.toFixed(0)} of $${notional.toFixed(0)})` });
     notional = maxByMargin;
   }
   const inst = await client.getInstrument(SYMBOL);
   const mark = await client.getMarkPrice(SYMBOL);
   const qty = fixStep(floorStep(notional / mark, inst.qtyStep), inst.qtyStep);
   if (qty < inst.minOrderQty || qty * mark < (inst.minNotional || 0)) {
-    events.push({ type: 'hold', reason: `size ${qty} BTC is below Bybit's minimum order` });
+    events.push({ type: 'hold', reason: `size ${qty} BTC is below ${client.label || 'the exchange'}'s minimum order` });
     return;
   }
   const stopLoss = stopRound(mark * (1 - bias * stopDist), inst.tickSize, bias);
@@ -217,7 +218,7 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
 
   const entry = pos.avgPrice;
   st.position = {
-    symbol: SYMBOL, bias, entry, qty: pos.size, qtyTotal: pos.size,
+    symbol: SYMBOL, exchange: config.EXCHANGE, bias, entry, qty: pos.size, qtyTotal: pos.size,
     stop: stopLoss, initialStop: stopLoss, ext: s.close, trailed: false,
     entryCandleT: s.t, lastExitCheckT: s.t, openedAt: now, orders: { entry: entryId }, tickSize: inst.tickSize,
     notional: pos.size * entry, margin: (pos.size * entry) / P.LEVERAGE, riskAmt: pos.size * Math.abs(entry - stopLoss),

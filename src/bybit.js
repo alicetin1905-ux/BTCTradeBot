@@ -83,6 +83,7 @@ function createClient({ apiKey, apiSecret, env = 'demo', fetchImpl = fetch }) {
 
   return {
     name: 'bybit-' + env,
+    label: 'Bybit',
 
     // USDT equity / available balance of the unified trading account.
     async getWallet() {

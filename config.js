@@ -2,8 +2,14 @@
 // control/settings.json can override the adjustable ones (src/settings.js)
 // without touching this file — these are the defaults.
 const config = module.exports = {
-  // The only coin this bot trades (Bybit USDT perpetual).
+  // The only coin this bot trades (USDT perpetual: BTCUSDT on Bybit,
+  // BTC-USDT-SWAP on OKX).
   SYMBOL: 'BTCUSDT',
+
+  // Where it trades, always in demo mode: 'okx' (OKX Demo Trading) or
+  // 'bybit' (Bybit Demo Trading). EXCHANGE in .env overrides this; the keys
+  // for it go in .env too (.env.example).
+  EXCHANGE: 'okx',
 
   // Signal timeframe: closed 4H candles (UTC-aligned: 00/04/08/12/16/20).
   // backtest/RESEARCH.md: 1D breakouts were much weaker on BTC.
@@ -13,9 +19,9 @@ const config = module.exports = {
   // chased. Stops and exits still update on any run.
   ENTRY_FRESH_MIN: 60,
 
-  // Where the candles come from: 'bybit' (where the bot trades; OKX as a
-  // fallback) or 'okx'.
-  MARKET_DATA: 'bybit',
+  // Where the candles come from: null = the exchange it trades on (the
+  // other one as a fallback), or 'bybit' / 'okx'.
+  MARKET_DATA: null,
 
   // The signal (src/signal.js): 4H Donchian channel breakout.
   CHANNEL_N: 20,       // enter when a 4H close breaks the high (low) of the previous 20 candles
@@ -26,7 +32,7 @@ const config = module.exports = {
   // long+short did better only in the 2022 bear market.
   DIRECTION: 'long',
 
-  // Stops, in ATRs of the 4H candles. Both live on Bybit as the position's
+  // Stops, in ATRs of the 4H candles. Both live on the exchange as the position's
   // stop-loss, so they work while the machine running the bot is off.
   STOP_ATR: 2,         // initial stop: entry -/+ 2 x ATR
   TRAIL_ATR: 3,        // after each 4H close: best close since entry -/+ 3 x ATR (never loosens)
@@ -36,10 +42,10 @@ const config = module.exports = {
     STARTING_BALANCE: 2000, // USDT — the bot's allocation; it trades like a 2000 USDT account
     RISK_PCT: 2,            // loss at the initial stop per trade, % of the balance
     MAX_POSITION_X: 2,      // position value at most this many x the balance (caps size on tight stops)
-    LEVERAGE: 5,            // Bybit leverage; margin = position value / leverage
+    LEVERAGE: 5,            // exchange leverage (cross margin); margin = position value / leverage
   },
 
-  // Bybit execution safety limits.
+  // Execution safety limits.
   EXECUTION: {
     // No new entries for the rest of the UTC day once today's realized loss
     // reaches this % of the day's starting balance. Open positions keep

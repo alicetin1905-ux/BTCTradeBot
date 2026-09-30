@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Start the bot over from 2000 USDT, then upload it.
-#   scripts/reset.sh                   close the BTC position on Bybit Demo + reset the bot
+#   scripts/reset.sh                   close the BTC position on the demo account + reset the bot
 #   scripts/reset.sh --clear-history   ...and also wipe the trade history
 # Holds the same lock as the scheduled runs, so none of them can run mid-reset.
 # Only BTCUSDT is closed; other positions on the account are left alone.
@@ -20,7 +20,7 @@ trap 'rm -rf "$LOCK"' EXIT
 
 git pull -q --rebase --autostash || echo "git pull failed — resetting the current checkout"
 
-echo "Closing the BTC position and cancelling its orders on Bybit demo…"
+echo "Closing the BTC position and cancelling its orders on the demo account…"
 TRADEBOT_MODE=demo node src/run.js --close-all
 TRADEBOT_MODE=demo node src/run.js --reset
 if [ "$CLEAR" = "--clear-history" ]; then

@@ -1,19 +1,20 @@
 #!/usr/bin/env node
-// BTCTradeBot — trades BTCUSDT only, on Bybit Demo Trading
-// (api-demo.bybit.com: mainnet prices, demo funds) via src/exchange.js.
+// BTCTradeBot — trades BTC only, on a demo account: OKX Demo Trading
+// (x-simulated-trading) or Bybit Demo Trading (api-demo.bybit.com) — mainnet
+// prices, demo funds — via src/exchange.js. config.EXCHANGE / EXCHANGE in .env.
 // Signal: 4H Donchian breakout with an ATR trailing stop (src/signal.js).
 //
-// State lives in state/demo/*.json. Must run on a machine Bybit doesn't
-// geo-block (README); keys come from .env.
+// State lives in state/demo/*.json. Keys come from .env. (Bybit geo-blocks
+// many cloud regions, GitHub Actions included; OKX is less strict — README.)
 //
-//   node src/run.js              one full run: sync with Bybit, read the 4H
+//   node src/run.js              one full run: sync with the exchange, read the 4H
 //                                candles, exit / trail / enter
 //   node src/run.js --sync       sync the position and fills only — no market
 //                                data, no new entries; state is written only
 //                                if something changed
-//   node src/run.js --close-all  cancel orders + close the BTC position on Bybit
+//   node src/run.js --close-all  cancel orders + close the BTC position on the exchange
 //   node src/run.js --reset      back to the starting balance (tracking only,
-//                                doesn't touch Bybit; scripts/reset.sh does both)
+//                                doesn't touch the exchange; scripts/reset.sh does both)
 'use strict';
 
 const fs = require('fs');
@@ -30,7 +31,12 @@ loadEnv();
 // TRADEBOT_MODE is optional; 'demo' is the only mode.
 const MODE = (process.env.TRADEBOT_MODE || 'demo').toLowerCase();
 if (MODE !== 'demo') {
-  console.error(`Unknown TRADEBOT_MODE "${MODE}" — BTCTradeBot only trades Bybit demo (TRADEBOT_MODE=demo).`);
+  console.error(`Unknown TRADEBOT_MODE "${MODE}" — BTCTradeBot only trades demo accounts (TRADEBOT_MODE=demo).`);
+  process.exit(1);
+}
+if (process.env.EXCHANGE) config.EXCHANGE = process.env.EXCHANGE.trim().toLowerCase();
+if (!['okx', 'bybit'].includes(config.EXCHANGE)) {
+  console.error(`Unknown EXCHANGE "${config.EXCHANGE}" — use okx or bybit.`);
   process.exit(1);
 }
 
@@ -71,6 +77,7 @@ function saveState(st, { fullRun = false } = {}) {
   st.account.settingsDefaults = config.SETTINGS_DEFAULTS;
   st.account.settingsErrors = config.SETTINGS_ERRORS;
   st.account.mode = MODE;
+  st.account.exchange = config.EXCHANGE;
   st.account.updatedAt = Date.now();
   if (fullRun) st.account.lastRunAt = Date.now(); // the watchdog checks full runs, not syncs
   for (const k of FILES) writeJson(k, st[k]);
@@ -79,8 +86,22 @@ function saveState(st, { fullRun = false } = {}) {
 /* ---------------- one run ---------------- */
 
 function exchangeClient() {
-  const { createClient } = require('./bybit');
-  return createClient({ env: MODE, apiKey: process.env.BYBIT_API_KEY, apiSecret: process.env.BYBIT_API_SECRET });
+  if (config.EXCHANGE === 'okx') {
+    return require('./okx').createClient({
+      apiKey: process.env.OKX_API_KEY, apiSecret: process.env.OKX_API_SECRET,
+      passphrase: process.env.OKX_API_PASSPHRASE, base: process.env.OKX_API_BASE,
+    });
+  }
+  return require('./bybit').createClient({ env: MODE, apiKey: process.env.BYBIT_API_KEY, apiSecret: process.env.BYBIT_API_SECRET });
+}
+
+// The tracked position lives on one exchange: switching EXCHANGE while it's
+// open would lose track of it (and its stop), so that's refused.
+function checkExchange(st) {
+  const on = st.position && st.position.exchange;
+  if (on && on !== config.EXCHANGE) {
+    throw new Error(`the open position is on ${on}, but EXCHANGE is ${config.EXCHANGE} — close it first (EXCHANGE=${on} node src/run.js --close-all) or switch back`);
+  }
 }
 
 // Remote commands: control/commands.json (committed to the repo, pulled by the
@@ -135,12 +156,13 @@ const sigParams = () => ({ channelN: config.CHANNEL_N, exitN: config.EXIT_N, atr
 async function run() {
   const client = exchangeClient(); // fail fast on missing keys
   const st = loadState();
+  checkExchange(st);
   const events = [];
   await runCommands(client, st, events);
 
   const now = Date.now();
   const { candles, source, note } = await market.closedCandles(config.SYMBOL, config.ENTRY_TF, 500, now);
-  if (source !== (config.MARKET_DATA === 'okx' ? 'okx' : 'bybit')) console.log(`candles from ${source}${note ? ` (Bybit failed: ${note})` : ''}`);
+  if (note) console.log(`candles from ${source} (${market.primary()} failed: ${note})`);
   const sig = signal.series(candles, sigParams());
   const halt = /^(1|true|yes)$/i.test(process.env.TRADEBOT_HALT || '');
   await exchange.runExchange({ client, st, sig, events, halt, now });
@@ -168,6 +190,7 @@ async function run() {
 async function syncOnExchange() {
   const client = exchangeClient();
   const st = loadState();
+  checkExchange(st);
   // Live mark/P&L fields change constantly; only real changes (fills,
   // closes, stop moves) trigger a save and upload.
   const snapshot = () => JSON.stringify([st.position, st.trades, st.closing, st.account.balance],
@@ -188,6 +211,7 @@ async function syncOnExchange() {
 
 async function closeAllOnExchange() {
   const st = loadState();
+  checkExchange(st);
   const events = [];
   await exchange.closeAll({ client: exchangeClient(), st, events });
   saveState(st);
@@ -204,13 +228,13 @@ function reset() {
   st.closing = [];
   st.meta = {};
   saveState(st); // trade history is kept
-  console.log(`Tracking reset to ${P.STARTING_BALANCE} USDT (this step alone doesn't touch Bybit; scripts/reset.sh also closes the position there).`);
+  console.log(`Tracking reset to ${P.STARTING_BALANCE} USDT (this step alone doesn't touch the exchange; scripts/reset.sh also closes the position there).`);
 }
 
 /* ---------------- output ---------------- */
 
 function printSummary(events, st) {
-  console.log(`\n=== BTCTradeBot [${MODE}] (${P.STARTING_BALANCE} USDT, ${P.RISK_PCT}% risk, ${config.DIRECTION === 'both' ? 'long+short' : 'long-only'}) @ ${new Date().toISOString()} ===\n`);
+  console.log(`\n=== BTCTradeBot [${config.EXCHANGE} ${MODE}] (${P.STARTING_BALANCE} USDT, ${P.RISK_PCT}% risk, ${config.DIRECTION === 'both' ? 'long+short' : 'long-only'}) @ ${new Date().toISOString()} ===\n`);
   for (const ev of events) {
     if (ev.type === 'enter') {
       console.log(`ENTER ${ev.bias === 1 ? 'LONG' : 'SHORT'} ${ev.qty} BTC @ ${px(ev.entry)} | breakout ${px(ev.breakout)} | SL ${px(ev.stop)} | value $${fmt(ev.notional)} risk $${fmt(ev.riskAmt)}`);
