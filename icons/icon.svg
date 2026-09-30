@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- BTCTradeBot app icon: price ranging inside a channel, then breaking
+       out above it, with a Bitcoin-orange ₿ mark. Full-bleed square — iOS rounds it. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#121a17"/>
+      <stop offset="1" stop-color="#070a09"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#f7931a" stop-opacity="0"/>
+      <stop offset="1" stop-color="#f7931a" stop-opacity="0.2"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <rect width="512" height="512" fill="url(#glow)"/>
+  <!-- the channel -->
+  <g stroke="#4a5852" stroke-width="8" stroke-dasharray="22 16" stroke-linecap="round">
+    <line x1="56" y1="290" x2="330" y2="290"/>
+    <line x1="56" y1="420" x2="330" y2="420"/>
+  </g>
+  <!-- price: chops inside the channel, then breaks out -->
+  <polyline points="60,380 104,330 146,396 190,318 232,372 276,308 318,352 372,236 420,250 462,150"
+    fill="none" stroke="#35ffb0" stroke-width="18" stroke-linejoin="round" stroke-linecap="round"/>
+  <circle cx="372" cy="236" r="14" fill="#35ffb0"/>
+  <!-- ₿ -->
+  <g transform="translate(76 58)" fill="none" stroke="#f7931a" stroke-width="22" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M28 20 V168 M28 20 H92 a34 34 0 0 1 0 68 H28 M28 88 H100 a40 40 0 0 1 0 80 H28"/>
+    <path d="M50 0 V20 M84 0 V20 M50 168 V190 M84 168 V190" stroke-width="18"/>
+  </g>
+</svg>

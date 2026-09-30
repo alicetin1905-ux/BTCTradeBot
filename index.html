@@ -1,0 +1,521 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#070a09">
+<title>BTCTradeBot</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-32.png">
+<link rel="apple-touch-icon" href="icons/icon-180.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* Same palette + type as ATLAS / TradeBot so the family reads as one system.
+   --btc is this app's accent (Bitcoin orange), used for identity only. */
+:root{
+  --bg:#070a09; --panel:#0e1412; --panel2:#121a17; --line:#1b2320; --line2:#2a3630;
+  --txt:#eef4f0; --dim:#9aaca4; --faint:#5d6c66;
+  --up:#35ffb0; --dn:#ff4d6a; --nt:#ffc857; --blue:#4d9fff; --btc:#f7931a;
+  --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
+  --sans:'Inter',system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{background:var(--bg);color:var(--txt);font-family:var(--sans);-webkit-font-smoothing:antialiased}
+body{padding:0 0 calc(24px + env(safe-area-inset-bottom))}
+.up{color:var(--up)} .dn{color:var(--dn)} .nt{color:var(--nt)} .dim{color:var(--dim)} .faint{color:var(--faint)}
+.num,b{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+header.top{position:sticky;top:0;z-index:20;background:rgba(7,10,9,.92);backdrop-filter:blur(14px);
+  border-bottom:1px solid var(--line);padding:10px 16px;display:flex;flex-wrap:wrap;gap:8px 20px;align-items:center}
+.mark{display:flex;align-items:center;gap:10px}
+.mark img{width:26px;height:26px;border-radius:7px}
+.mark h1{font-size:14px;font-weight:600;letter-spacing:.16em}
+.mark span{font-size:11px;color:var(--faint);font-family:var(--mono)}
+@media(max-width:520px){.mark span{display:none}}
+.live{margin-left:auto;display:flex;align-items:baseline;gap:10px;font-family:var(--mono)}
+.live b{font-size:18px;font-weight:700}
+.live small{font-size:11px;color:var(--faint)}
+
+main{max-width:1080px;margin:0 auto;padding:14px 16px;display:grid;gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:14px 16px;min-width:0}
+.card h2{font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--dim);margin-bottom:10px;display:flex;gap:8px;align-items:center}
+.card h2 .tag{margin-left:auto;letter-spacing:0;text-transform:none;font-weight:500;font-family:var(--mono);color:var(--faint)}
+
+.tiles{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+@media(min-width:760px){.tiles{grid-template-columns:repeat(4,1fr)}}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:12px 14px;min-width:0}
+.tile .k{font-size:11px;color:var(--dim);letter-spacing:.06em}
+.tile .v{font-family:var(--mono);font-size:22px;font-weight:700;margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tile .s{font-family:var(--mono);font-size:11px;color:var(--faint);margin-top:3px}
+
+.grid2{display:grid;gap:14px}
+@media(min-width:860px){.grid2{grid-template-columns:1fr 1fr}}
+
+.state{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.pill{font-family:var(--mono);font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;border:1px solid var(--line2)}
+.pill.long{color:var(--up);border-color:rgba(53,255,176,.35);background:rgba(53,255,176,.07)}
+.pill.short{color:var(--dn);border-color:rgba(255,77,106,.35);background:rgba(255,77,106,.07)}
+.pill.flat{color:var(--dim)}
+dl.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px}
+dl.kv dt{color:var(--dim)}
+dl.kv dd{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
+.note{font-size:12px;color:var(--dim);margin-top:10px;line-height:1.5}
+.meter{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:4px 0 2px}
+.meter i{display:block;height:100%;background:var(--nt);border-radius:3px}
+
+.chartbox{position:relative}
+.chartbox svg{display:block;width:100%;height:auto;touch-action:pan-y}
+.tip{position:absolute;pointer-events:none;background:var(--panel2);border:1px solid var(--line2);border-radius:8px;
+  padding:7px 9px;font-size:11px;line-height:1.5;min-width:130px;opacity:0;transition:opacity .08s;z-index:5}
+.tip .row{display:flex;justify-content:space-between;gap:12px}
+.tip .row b{font-size:12px;color:var(--txt)}
+.tip .row span{color:var(--dim)}
+.tip .key{display:inline-block;width:12px;height:2px;vertical-align:middle;margin-right:6px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:11px;color:var(--dim);margin-top:8px}
+.legend i{display:inline-block;width:14px;height:2px;vertical-align:middle;margin-right:6px}
+
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{font-weight:500;color:var(--faint);text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+td{font-family:var(--mono);text-align:right;padding:7px 8px;border-bottom:1px solid var(--line);white-space:nowrap;font-variant-numeric:tabular-nums}
+th:first-child,td:first-child,th.l,td.l{text-align:left}
+td.l{font-family:var(--sans);color:var(--dim)}
+.scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+.empty{color:var(--faint);font-size:13px;padding:6px 0}
+.err{background:rgba(255,77,106,.08);border:1px solid rgba(255,77,106,.3);color:var(--dn);border-radius:10px;padding:8px 10px;font-size:12px;margin-top:10px;line-height:1.5}
+a{color:var(--blue);text-decoration:none}
+.btn{display:inline-block;font-size:12px;font-weight:600;padding:7px 12px;border-radius:8px;border:1px solid var(--line2);color:var(--txt);background:var(--panel2);margin-top:12px}
+footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(--faint);line-height:1.6}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="mark"><img src="icons/icon-192.png" alt=""><h1>BTCTRADEBOT</h1><span>Bybit demo · BTCUSDT · 4H breakout</span></div>
+  <div class="live"><small id="liveSrc">BTC</small><b id="livePx">—</b><small id="liveChg"></small></div>
+</header>
+
+<main>
+  <section class="tiles">
+    <div class="tile"><div class="k">Equity</div><div class="v" id="tEq">—</div><div class="s" id="tEqS"></div></div>
+    <div class="tile"><div class="k">Realized since start</div><div class="v" id="tPnl">—</div><div class="s" id="tPnlS"></div></div>
+    <div class="tile"><div class="k">Trades</div><div class="v" id="tTr">—</div><div class="s" id="tTrS"></div></div>
+    <div class="tile"><div class="k">Last run</div><div class="v" id="tRun">—</div><div class="s" id="tRunS"></div></div>
+  </section>
+
+  <div class="grid2">
+    <section class="card" id="posCard"><h2>Position <span class="tag" id="posTag"></span></h2><div id="pos"><div class="empty">Loading…</div></div></section>
+    <section class="card"><h2>Signal <span class="tag" id="sigTag"></span></h2><div id="sig"><div class="empty">Loading…</div></div></section>
+  </div>
+
+  <section class="card">
+    <h2>BTC 4H · last 60 candles <span class="tag" id="chartTag"></span></h2>
+    <div class="chartbox" id="pxBox"></div>
+    <div class="legend" id="pxLegend"></div>
+  </section>
+
+  <section class="card">
+    <h2>Balance after each closed trade <span class="tag" id="eqTag"></span></h2>
+    <div class="chartbox" id="eqBox"></div>
+  </section>
+
+  <section class="card">
+    <h2>Closed trades <span class="tag" id="trTag"></span></h2>
+    <div class="scroll" id="trades"><div class="empty">Loading…</div></div>
+  </section>
+
+  <section class="card">
+    <h2>Settings</h2>
+    <div id="settings"><div class="empty">Loading…</div></div>
+    <a class="btn" href="https://github.com/alicetin1905-ux/BTCTradeBot/edit/main/control/settings.json" target="_blank" rel="noopener">Edit settings on GitHub</a>
+  </section>
+</main>
+
+<footer>
+  Demo funds on Bybit Demo Trading — a rehearsal of the strategy, not investment advice.
+  Long when a 4H close breaks the previous 20-candle high; initial stop 2×ATR, trailed to the best close − 3×ATR after every 4H close; out on a close below the 20-candle low.
+  Backtest: <a href="https://github.com/alicetin1905-ux/BTCTradeBot/blob/main/backtest/REPORT.md" target="_blank" rel="noopener">backtest/REPORT.md</a>.
+  State refreshes every minute from the repo; the live price every 10 s.
+</footer>
+
+<script>
+(function () {
+  'use strict';
+  var RAW = 'https://raw.githubusercontent.com/alicetin1905-ux/BTCTradeBot/main/state/demo/';
+  var TF = 4 * 3600000;
+  var S = { account: null, position: null, trades: [], signal: null, live: null };
+
+  var $ = function (id) { return document.getElementById(id); };
+  function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+  function px(x, dp) { return x == null || isNaN(x) ? '—' : (+x).toLocaleString('en-US', { minimumFractionDigits: dp == null ? 1 : dp, maximumFractionDigits: dp == null ? 1 : dp }); }
+  function usd(x) { return x == null || isNaN(x) ? '—' : '$' + (+x).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function signed(x) { return (x < 0 ? '−$' : '+$') + Math.abs(x).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+  function pct(x) { return (x < 0 ? '−' : '+') + Math.abs(x).toFixed(1) + '%'; }
+  function cls(x) { return x > 0 ? 'up' : x < 0 ? 'dn' : 'dim'; }
+  function ago(ms) {
+    var m = Math.round((Date.now() - ms) / 60000);
+    if (m < 1) return 'just now';
+    if (m < 60) return m + ' min ago';
+    var h = Math.floor(m / 60);
+    return h < 48 ? h + 'h ' + (m % 60) + 'm ago' : Math.floor(h / 24) + ' days ago';
+  }
+  function when(ms) {
+    var d = new Date(ms);
+    return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  }
+
+  async function load(name) {
+    try {
+      var res = await fetch(RAW + name + '.json?_=' + Date.now(), { cache: 'no-store' });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) { return null; }
+  }
+
+  // Live price: Bybit's public ticker, OKX if Bybit is blocked where the phone is.
+  async function livePrice() {
+    try {
+      var d = await (await fetch('https://api.bybit.com/v5/market/tickers?category=linear&symbol=BTCUSDT', { cache: 'no-store' })).json();
+      var t = d.result.list[0];
+      return { px: +t.lastPrice, chg: +t.price24hPcnt * 100, src: 'Bybit' };
+    } catch (e) {
+      try {
+        var o = (await (await fetch('https://www.okx.com/api/v5/market/ticker?instId=BTC-USDT-SWAP', { cache: 'no-store' })).json()).data[0];
+        return { px: +o.last, chg: (+o.last / +o.sodUtc0 - 1) * 100, src: 'OKX' };
+      } catch (e2) { return null; }
+    }
+  }
+
+  /* ---------------- rendering ---------------- */
+
+  function positionsFromTrades(trades) {
+    var g = {};
+    trades.forEach(function (t) {
+      var k = t.openedAt;
+      g[k] = g[k] || { bias: t.bias, entry: t.entry, qty: 0, pnl: 0, openedAt: t.openedAt, closedAt: 0, exit: t.exit, reason: t.reason };
+      g[k].pnl += t.pnl; g[k].qty += t.qty;
+      if (t.closedAt >= g[k].closedAt) { g[k].closedAt = t.closedAt; g[k].exit = t.exit; g[k].reason = t.reason; }
+    });
+    return Object.keys(g).map(function (k) { return g[k]; }).sort(function (a, b) { return a.closedAt - b.closedAt; });
+  }
+
+  function livePnl(p) {
+    if (S.live && S.live.px) return (S.live.px - p.entry) * p.bias * p.qty;
+    return p.unrealisedPnl || 0;
+  }
+
+  function renderTiles() {
+    var a = S.account;
+    if (!a) {
+      $('tEq').textContent = '—';
+      $('tEqS').textContent = 'no data yet — appears after the first run';
+      return;
+    }
+    var p = S.position;
+    var u = p ? livePnl(p) : 0;
+    var eq = a.balance + u;
+    $('tEq').textContent = usd(eq);
+    $('tEq').className = 'v';
+    $('tEqS').textContent = pct((eq / a.startingBalance - 1) * 100) + ' vs ' + usd(a.startingBalance) + (p ? ' · open ' + signed(u) : '');
+    var real = a.balance - a.startingBalance;
+    $('tPnl').innerHTML = '<span class="' + cls(real) + '">' + esc(signed(real)) + '</span>';
+    var f = a.funding && a.funding.total ? ' · funding ' + signed(a.funding.total) : '';
+    $('tPnlS').textContent = pct(real / a.startingBalance * 100) + f;
+    var pos = positionsFromTrades(S.trades);
+    var w = pos.filter(function (x) { return x.pnl > 0.005; }).length, l = pos.filter(function (x) { return x.pnl < -0.005; }).length;
+    $('tTr').textContent = pos.length ? w + 'W / ' + l + 'L' : '0';
+    $('tTrS').textContent = pos.length ? Math.round(w / pos.length * 100) + '% winners · most win big, many lose small' : 'waiting for the first breakout';
+    var last = a.lastRunAt || a.updatedAt;
+    $('tRun').textContent = last ? ago(last) : '—';
+    var stale = last && Date.now() - last > 130 * 60000;
+    $('tRun').className = 'v' + (stale ? ' dn' : '');
+    $('tRunS').textContent = stale ? 'the Mac may be off or asleep' : 'hourly at :02 · sync every 5 min';
+  }
+
+  function renderPosition() {
+    var p = S.position, el = $('pos');
+    if (!S.account) { el.innerHTML = '<div class="empty">No data yet — it appears after the first run pushes state/demo/ (see README).</div>'; return; }
+    if (!p) {
+      $('posTag').textContent = '';
+      el.innerHTML = '<div class="state"><span class="pill flat">FLAT</span><span class="dim" style="font-size:13px">No position — the bot waits for the next breakout.</span></div>';
+      return;
+    }
+    var u = livePnl(p), mark = S.live && S.live.px ? S.live.px : p.markPrice;
+    var toStop = mark ? (mark - p.stop) * p.bias / mark * 100 : null;
+    var locked = (p.stop - p.entry) * p.bias * p.qty;
+    $('posTag').textContent = 'opened ' + ago(p.openedAt);
+    el.innerHTML =
+      '<div class="state"><span class="pill ' + (p.bias === 1 ? 'long' : 'short') + '">' + (p.bias === 1 ? 'LONG' : 'SHORT') + '</span>' +
+      '<b class="' + cls(u) + '" style="font-size:20px">' + esc(signed(u)) + '</b><span class="dim num" style="font-size:12px">' + esc(pct(u / p.notional * 100 * 1)) + ' of position</span></div>' +
+      '<dl class="kv">' +
+      '<dt>Size</dt><dd>' + esc(p.qty) + ' BTC · ' + esc(usd(p.qty * p.entry)) + '</dd>' +
+      '<dt>Entry</dt><dd>' + esc(px(p.entry)) + '</dd>' +
+      '<dt>Price now</dt><dd>' + esc(px(mark)) + '</dd>' +
+      '<dt>Stop ' + (p.trailed ? '(trailed)' : '(initial)') + '</dt><dd class="' + (locked >= 0 ? 'up' : 'dn') + '">' + esc(px(p.stop)) + '</dd>' +
+      '<dt>Distance to stop</dt><dd>' + (toStop == null ? '—' : esc(toStop.toFixed(2)) + '%') + '</dd>' +
+      '<dt>At the stop</dt><dd class="' + cls(locked) + '">' + esc(signed(locked)) + (locked >= 0 ? ' locked in' : '') + '</dd>' +
+      '<dt>Risk when opened</dt><dd>' + esc(usd(p.riskAmt)) + '</dd>' +
+      (p.funding ? '<dt>Funding so far</dt><dd class="' + cls(p.funding) + '">' + esc(signed(p.funding)) + '</dd>' : '') +
+      '</dl>' +
+      '<div class="note">The stop sits on Bybit and trails after every 4H close; the bot also exits on a 4H close below the ' + esc(S.account.settings ? S.account.settings.EXIT_N : 20) + '-candle low.</div>';
+  }
+
+  function renderSignal() {
+    var s = S.signal, el = $('sig');
+    if (!s) { el.innerHTML = '<div class="empty">No 4H read yet.</div>'; return; }
+    var set = (S.account && S.account.settings) || {};
+    var nextClose = Math.floor(Date.now() / TF) * TF + TF;
+    var mins = Math.max(0, Math.round((nextClose - Date.now()) / 60000));
+    $('sigTag').textContent = 'next 4H close in ' + Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm';
+    var ref = S.live && S.live.px ? S.live.px : s.close;
+    var away = (s.upper / ref - 1) * 100;
+    // How far price has come from the exit channel toward the breakout level (0..100%).
+    var fill = Math.max(0, Math.min(100, (ref - s.exitLower) / (s.upper - s.exitLower) * 100));
+    var html = '<dl class="kv">' +
+      '<dt>Last 4H close</dt><dd>' + esc(px(s.close)) + ' <span class="faint">' + esc(when(s.closeT)) + '</span></dd>' +
+      '<dt>Long above</dt><dd class="nt">' + esc(px(s.upper)) + '</dd>' +
+      '<dt>Distance</dt><dd>' + (away > 0 ? esc(away.toFixed(2)) + '% higher' : 'above it now') + '</dd>' +
+      (set.DIRECTION === 'both' ? '<dt>Short below</dt><dd>' + esc(px(s.lower)) + '</dd>' : '') +
+      '<dt>Exit channel (' + esc(set.EXIT_N || 20) + ' low)</dt><dd>' + esc(px(s.exitLower)) + '</dd>' +
+      '<dt>ATR (14 × 4H)</dt><dd>' + esc(px(s.atr)) + ' · ' + esc((s.atr / s.close * 100).toFixed(2)) + '%</dd>' +
+      '</dl>';
+    if (!S.position) {
+      html += '<div class="meter" title="price between the exit-channel low and the breakout level"><i style="width:' + fill.toFixed(0) + '%"></i></div>' +
+        '<div class="note" style="margin-top:2px">20-candle low → breakout level</div>';
+    }
+    if (s.wait && !S.position) html += '<div class="note">Waiting: ' + esc(s.wait) + '</div>';
+    if (s.source && s.source !== 'bybit') html += '<div class="note">Candles from ' + esc(s.source) + ' (Bybit failed).</div>';
+    el.innerHTML = html;
+  }
+
+  /* ---- charts: plain SVG, crosshair + tooltip ---- */
+
+  var NS = 'http://www.w3.org/2000/svg';
+  function node(tag, attrs, parent) {
+    var n = document.createElementNS(NS, tag);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(n);
+    return n;
+  }
+  function niceTicks(lo, hi, n) {
+    var span = hi - lo, step = Math.pow(10, Math.floor(Math.log10(span / n)));
+    var err = span / n / step;
+    step *= err >= 7.5 ? 10 : err >= 3.5 ? 5 : err >= 1.5 ? 2 : 1;
+    var out = [];
+    for (var v = Math.ceil(lo / step) * step; v <= hi; v += step) out.push(v);
+    return out;
+  }
+  function tipAt(box, tip, x, y, html) {
+    tip.innerHTML = html;
+    var bw = box.clientWidth, tw = tip.offsetWidth;
+    var left = x + 14 + tw > bw ? x - 14 - tw : x + 14;
+    tip.style.left = Math.max(0, left) + 'px';
+    tip.style.top = Math.max(0, y - 10) + 'px';
+    tip.style.opacity = 1;
+  }
+  function row(label, value, color, dashed) {
+    return '<div class="row"><span>' + (color ? '<i class="key" style="background:' + color + (dashed ? ';opacity:.7' : '') + '"></i>' : '') + esc(label) + '</span><b>' + esc(value) + '</b></div>';
+  }
+
+  function renderPriceChart() {
+    var box = $('pxBox');
+    var s = S.signal;
+    if (!s || !s.chart || !s.chart.length) { box.innerHTML = '<div class="empty">No candles yet.</div>'; $('pxLegend').innerHTML = ''; return; }
+    var rows = s.chart.map(function (r) { return { t: r[0], o: r[1], h: r[2], l: r[3], c: r[4], up: r[5], ex: r[6] }; });
+    var p = S.position;
+    box.innerHTML = '';
+    var W = Math.max(300, box.clientWidth || 1000), Hh = W < 600 ? 280 : 380, m = { l: 4, r: 74, t: 12, b: 26 };
+    var lo = Infinity, hi = -Infinity;
+    rows.forEach(function (r) { lo = Math.min(lo, r.l, r.ex || Infinity); hi = Math.max(hi, r.h, r.up || -Infinity); });
+    if (p) { lo = Math.min(lo, p.stop, p.entry); hi = Math.max(hi, p.stop, p.entry); }
+    var pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
+    var n = rows.length, cw = (W - m.l - m.r) / n;
+    var X = function (i) { return m.l + cw * (i + 0.5); };
+    var Y = function (v) { return m.t + (hi - v) / (hi - lo) * (Hh - m.t - m.b); };
+    var svg = node('svg', { viewBox: '0 0 ' + W + ' ' + Hh, width: W, height: Hh, role: 'img', 'aria-label': 'BTC 4H candles with the breakout and exit channel' }, box);
+    // Level labels (right edge) are placed first so price ticks can make room for them.
+    var p0 = S.position, labelYs = [Y(rows[rows.length - 1].up)].concat(p0 ? [Y(p0.entry), Y(p0.stop)] : []);
+    niceTicks(lo, hi, W < 600 ? 4 : 5).forEach(function (v) {
+      node('line', { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: 'var(--line)', 'stroke-width': 1 }, svg);
+      if (labelYs.some(function (y) { return Math.abs(y - Y(v)) < 14; })) return;
+      var t = node('text', { x: W - m.r + 8, y: Y(v) + 4, fill: 'var(--faint)', 'font-size': 11, 'font-family': 'JetBrains Mono, monospace' }, svg);
+      t.textContent = (v / 1000).toFixed(v % 1000 ? 1 : 0) + 'k';
+    });
+    // Day labels at 00:00 UTC (every other day when narrow).
+    var dayStep = cw * 6 < 46 ? 2 : 1;
+    rows.forEach(function (r, i) {
+      if (r.t % 86400000 !== 0 || i < 2 || Math.round(r.t / 86400000) % dayStep) return;
+      var t = node('text', { x: X(i), y: Hh - 8, fill: 'var(--faint)', 'font-size': 11, 'text-anchor': 'middle', 'font-family': 'Inter, sans-serif' }, svg);
+      t.textContent = new Date(r.t).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', timeZone: 'UTC' });
+    });
+    // Channel: breakout level (upper) and exit level (lower) as steps.
+    function stepPath(key) {
+      var d = '';
+      rows.forEach(function (r, i) { if (r[key] == null) return; var x0 = m.l + cw * i, x1 = x0 + cw; d += (d ? 'L' : 'M') + x0 + ' ' + Y(r[key]) + 'L' + x1 + ' ' + Y(r[key]); });
+      return d;
+    }
+    node('path', { d: stepPath('up'), fill: 'none', stroke: 'var(--nt)', 'stroke-width': 2 }, svg);
+    node('path', { d: stepPath('ex'), fill: 'none', stroke: 'var(--dim)', 'stroke-width': 2, 'stroke-dasharray': '5 4' }, svg);
+    // Candles: 2px surface gap each side.
+    var bw = Math.max(1.5, cw - (cw > 8 ? 4 : 2));
+    rows.forEach(function (r, i) {
+      var col = r.c >= r.o ? 'var(--up)' : 'var(--dn)';
+      node('line', { x1: X(i), x2: X(i), y1: Y(r.h), y2: Y(r.l), stroke: col, 'stroke-width': 1.5 }, svg);
+      var y0 = Y(Math.max(r.o, r.c)), y1 = Y(Math.min(r.o, r.c));
+      node('rect', { x: X(i) - bw / 2, y: y0, width: bw, height: Math.max(1.5, y1 - y0), rx: 1.5, fill: col }, svg);
+    });
+    // Position levels, direct-labelled at the right edge.
+    var labels = [];
+    function level(v, color, text, dash) {
+      node('line', { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: color, 'stroke-width': 2, 'stroke-dasharray': dash || '' }, svg);
+      labels.push({ y: Y(v), text: text, color: color });
+    }
+    if (p) {
+      level(p.entry, 'var(--blue)', 'entry', '');
+      level(p.stop, 'var(--dn)', 'stop', '6 4');
+    }
+    var last = rows[rows.length - 1];
+    labels.push({ y: Y(last.up), text: 'breakout', color: 'var(--nt)' });
+    labels.sort(function (a, b) { return a.y - b.y; });
+    for (var k = 1; k < labels.length; k++) if (labels[k].y - labels[k - 1].y < 15) labels[k].y = labels[k - 1].y + 15;
+    labels.forEach(function (L) {
+      var bg = node('rect', { x: W - m.r + 2, y: L.y - 9, width: m.r - 4, height: 17, rx: 4, fill: 'var(--panel2)', stroke: L.color, 'stroke-width': 1 }, svg);
+      var t = node('text', { x: W - m.r / 2, y: L.y + 4, fill: 'var(--txt)', 'font-size': 11, 'text-anchor': 'middle', 'font-family': 'Inter, sans-serif' }, svg);
+      t.textContent = L.text;
+    });
+    // Hover: crosshair snapped to the nearest candle.
+    var hair = node('line', { y1: m.t, y2: Hh - m.b, stroke: 'var(--line2)', 'stroke-width': 1, opacity: 0 }, svg);
+    var tip = document.createElement('div'); tip.className = 'tip'; box.appendChild(tip);
+    var hit = node('rect', { x: m.l, y: 0, width: W - m.l - m.r, height: Hh, fill: 'transparent' }, svg);
+    function move(ev) {
+      var r = svg.getBoundingClientRect(), sx = W / r.width;
+      var x = (ev.clientX - r.left) * sx;
+      var i = Math.max(0, Math.min(n - 1, Math.floor((x - m.l) / cw)));
+      var c = rows[i];
+      hair.setAttribute('x1', X(i)); hair.setAttribute('x2', X(i)); hair.setAttribute('opacity', 1);
+      tipAt(box, tip, X(i) / sx, (ev.clientY - r.top), '<div class="faint" style="margin-bottom:3px">' + esc(when(c.t)) + ' – ' + esc(new Date(c.t + TF).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })) + '</div>' +
+        row('close', px(c.c)) + row('high / low', px(c.h, 0) + ' / ' + px(c.l, 0)) +
+        (c.up != null ? row('breakout', px(c.up), '#ffc857') : '') + (c.ex != null ? row('exit', px(c.ex), '#9aaca4', true) : ''));
+    }
+    function leave() { hair.setAttribute('opacity', 0); tip.style.opacity = 0; }
+    hit.addEventListener('pointermove', move);
+    hit.addEventListener('pointerdown', move);
+    hit.addEventListener('pointerleave', leave);
+    $('chartTag').textContent = 'UTC';
+    $('pxLegend').innerHTML = '<span><i style="background:var(--nt)"></i>breakout level (' + esc((S.account && S.account.settings && S.account.settings.CHANNEL_N) || 20) + '-candle high)</span>' +
+      '<span><i style="background:var(--dim);opacity:.8"></i>exit level (' + esc((S.account && S.account.settings && S.account.settings.EXIT_N) || 20) + '-candle low)</span>' +
+      (p ? '<span><i style="background:var(--blue)"></i>entry</span><span><i style="background:var(--dn)"></i>stop</span>' : '');
+  }
+
+  function renderEquity() {
+    var box = $('eqBox'), a = S.account;
+    var pos = positionsFromTrades(S.trades);
+    if (!a || !pos.length) { box.innerHTML = '<div class="empty">Appears after the first closed trade.</div>'; $('eqTag').textContent = ''; return; }
+    var pts = [{ t: a.startedAt || pos[0].openedAt, v: a.startingBalance, label: 'start' }];
+    var bal = a.startingBalance;
+    pos.forEach(function (p) { bal += p.pnl; pts.push({ t: p.closedAt, v: bal, pnl: p.pnl, label: p.reason }); });
+    box.innerHTML = '';
+    var W = Math.max(300, box.clientWidth || 1000), Hh = W < 600 ? 170 : 220, m = { l: 6, r: 66, t: 12, b: 12 };
+    var lo = Math.min.apply(null, pts.map(function (p) { return p.v; })), hi = Math.max.apply(null, pts.map(function (p) { return p.v; }));
+    var pad = Math.max((hi - lo) * 0.12, a.startingBalance * 0.01); lo -= pad; hi += pad;
+    var X = function (i) { return m.l + (pts.length === 1 ? 0 : i / (pts.length - 1)) * (W - m.l - m.r); };
+    var Y = function (v) { return m.t + (hi - v) / (hi - lo) * (Hh - m.t - m.b); };
+    var svg = node('svg', { viewBox: '0 0 ' + W + ' ' + Hh, width: W, height: Hh, role: 'img', 'aria-label': 'Balance after each closed trade' }, box);
+    niceTicks(lo, hi, 4).forEach(function (v) {
+      node('line', { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: 'var(--line)', 'stroke-width': 1 }, svg);
+      var t = node('text', { x: W - m.r + 8, y: Y(v) + 4, fill: 'var(--faint)', 'font-size': 11, 'font-family': 'JetBrains Mono, monospace' }, svg);
+      t.textContent = '$' + Math.round(v).toLocaleString('en-US');
+    });
+    node('line', { x1: m.l, x2: W - m.r, y1: Y(a.startingBalance), y2: Y(a.startingBalance), stroke: 'var(--faint)', 'stroke-width': 1, 'stroke-dasharray': '4 4' }, svg);
+    var d = pts.map(function (p, i) { return (i ? 'L' : 'M') + X(i) + ' ' + Y(p.v); }).join('');
+    node('path', { d: d, fill: 'none', stroke: 'var(--btc)', 'stroke-width': 2, 'stroke-linejoin': 'round' }, svg);
+    pts.forEach(function (p, i) { if (i) node('circle', { cx: X(i), cy: Y(p.v), r: 4, fill: p.pnl >= 0 ? 'var(--up)' : 'var(--dn)', stroke: 'var(--panel)', 'stroke-width': 2 }, svg); });
+    var hair = node('line', { y1: m.t, y2: Hh - m.b, stroke: 'var(--line2)', 'stroke-width': 1, opacity: 0 }, svg);
+    var tip = document.createElement('div'); tip.className = 'tip'; box.appendChild(tip);
+    var hit = node('rect', { x: 0, y: 0, width: W - m.r, height: Hh, fill: 'transparent' }, svg);
+    function move(ev) {
+      var r = svg.getBoundingClientRect(), sx = W / r.width, x = (ev.clientX - r.left) * sx;
+      var i = pts.length === 1 ? 0 : Math.round((x - m.l) / (W - m.l - m.r) * (pts.length - 1));
+      i = Math.max(0, Math.min(pts.length - 1, i));
+      var p = pts[i];
+      hair.setAttribute('x1', X(i)); hair.setAttribute('x2', X(i)); hair.setAttribute('opacity', 1);
+      tipAt(box, tip, X(i) / sx, ev.clientY - r.top, '<div class="faint" style="margin-bottom:3px">' + esc(i ? 'trade ' + i + ' · ' + when(p.t) : 'start') + '</div>' +
+        row('balance', usd(p.v), '#f7931a') + (i ? row('trade', signed(p.pnl)) + '<div class="faint">' + esc(p.label) + '</div>' : ''));
+    }
+    hit.addEventListener('pointermove', move);
+    hit.addEventListener('pointerdown', move);
+    hit.addEventListener('pointerleave', function () { hair.setAttribute('opacity', 0); tip.style.opacity = 0; });
+    $('eqTag').textContent = pos.length + ' trade' + (pos.length === 1 ? '' : 's');
+  }
+
+  function renderTrades() {
+    var pos = positionsFromTrades(S.trades).reverse();
+    var el = $('trades');
+    $('trTag').textContent = pos.length ? 'newest first' : '';
+    if (!pos.length) { el.innerHTML = '<div class="empty">No closed trades yet.</div>'; return; }
+    el.innerHTML = '<table><thead><tr><th class="l">Closed</th><th class="l">Side</th><th>Entry</th><th>Exit</th><th>BTC</th><th>P&amp;L</th><th class="l">Why</th></tr></thead><tbody>' +
+      pos.slice(0, 100).map(function (t) {
+        return '<tr><td class="l">' + esc(when(t.closedAt)) + '</td><td class="l ' + (t.bias === 1 ? 'up' : 'dn') + '">' + (t.bias === 1 ? 'long' : 'short') + '</td>' +
+          '<td>' + esc(px(t.entry)) + '</td><td>' + esc(px(t.exit)) + '</td><td>' + esc(+t.qty.toFixed(3)) + '</td>' +
+          '<td class="' + cls(t.pnl) + '">' + esc(signed(t.pnl)) + '</td><td class="l">' + esc(t.reason) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  var LABELS = {
+    RISK_PCT: ['Loss at the initial stop', function (v) { return v + '% of balance'; }],
+    MAX_POSITION_X: ['Max position value', function (v) { return v + '× balance'; }],
+    LEVERAGE: ['Leverage', function (v) { return v + '×'; }],
+    DAILY_LOSS_LIMIT_PCT: ['Daily loss limit', function (v) { return v + '%'; }],
+    DIRECTION: ['Direction', function (v) { return v === 'both' ? 'long + short' : 'long-only'; }],
+    CHANNEL_N: ['Breakout channel', function (v) { return v + ' × 4H'; }],
+    EXIT_N: ['Exit channel', function (v) { return v + ' × 4H'; }],
+    STOP_ATR: ['Initial stop', function (v) { return v + ' × ATR'; }],
+    TRAIL_ATR: ['Trailing stop', function (v) { return v + ' × ATR'; }],
+    ENTRY_FRESH_MIN: ['Entry window after a close', function (v) { return v == null ? 'any time' : v + ' min'; }],
+    MARKET_DATA: ['Candles from', function (v) { return v; }],
+    STATUS_EVERY_H: ['Status push', function (v) { return 'every ' + v + 'h'; }],
+  };
+  function renderSettings() {
+    var a = S.account, el = $('settings');
+    if (!a || !a.settings) { el.innerHTML = '<div class="empty">Shown after the first run.</div>'; return; }
+    var d = a.settingsDefaults || {};
+    var html = '<dl class="kv">' + Object.keys(LABELS).filter(function (k) { return k in a.settings; }).map(function (k) {
+      var v = a.settings[k], changed = JSON.stringify(v) !== JSON.stringify(d[k]) && k in d;
+      return '<dt>' + esc(LABELS[k][0]) + '</dt><dd' + (changed ? ' class="nt" title="changed in control/settings.json"' : '') + '>' + esc(LABELS[k][1](v)) + '</dd>';
+    }).join('') + '</dl>';
+    if (a.settingsErrors && a.settingsErrors.length) html += '<div class="err"><b>Ignored in settings.json:</b><br>' + a.settingsErrors.map(esc).join('<br>') + '</div>';
+    el.innerHTML = html;
+  }
+
+  function renderLive() {
+    var l = S.live;
+    if (!l) return;
+    $('livePx').textContent = px(l.px, 0);
+    $('liveSrc').textContent = 'BTC · ' + l.src;
+    $('liveChg').innerHTML = '<span class="' + cls(l.chg) + '">' + esc(pct(l.chg)) + '</span> 24h';
+  }
+
+  function renderAll() {
+    renderTiles(); renderPosition(); renderSignal(); renderPriceChart(); renderEquity(); renderTrades(); renderSettings(); renderLive();
+  }
+
+  async function refreshState() {
+    var r = await Promise.all(['account', 'position', 'trades', 'signal'].map(load));
+    S.account = r[0]; S.position = r[1]; S.trades = r[2] || []; S.signal = r[3];
+    renderAll();
+  }
+  async function refreshLive() {
+    var l = await livePrice();
+    if (l) { S.live = l; renderLive(); renderTiles(); renderPosition(); }
+  }
+
+  refreshState(); refreshLive();
+  setInterval(refreshState, 60000);
+  setInterval(refreshLive, 10000);
+  var rt; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { renderPriceChart(); renderEquity(); }, 150); });
+})();
+</script>
+</body>
+</html>

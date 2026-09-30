@@ -1,0 +1,241 @@
+#!/usr/bin/env node
+// BTCTradeBot — trades BTCUSDT only, on Bybit Demo Trading
+// (api-demo.bybit.com: mainnet prices, demo funds) via src/exchange.js.
+// Signal: 4H Donchian breakout with an ATR trailing stop (src/signal.js).
+//
+// State lives in state/demo/*.json. Must run on a machine Bybit doesn't
+// geo-block (README); keys come from .env.
+//
+//   node src/run.js              one full run: sync with Bybit, read the 4H
+//                                candles, exit / trail / enter
+//   node src/run.js --sync       sync the position and fills only — no market
+//                                data, no new entries; state is written only
+//                                if something changed
+//   node src/run.js --close-all  cancel orders + close the BTC position on Bybit
+//   node src/run.js --reset      back to the starting balance (tracking only,
+//                                doesn't touch Bybit; scripts/reset.sh does both)
+'use strict';
+
+const fs = require('fs');
+const path = require('path');
+const config = require('../config');
+const market = require('./market');
+const signal = require('./signal');
+const exchange = require('./exchange');
+const notify = require('./notify');
+const summary = require('./summary');
+const { loadEnv } = require('./env');
+
+loadEnv();
+// TRADEBOT_MODE is optional; 'demo' is the only mode.
+const MODE = (process.env.TRADEBOT_MODE || 'demo').toLowerCase();
+if (MODE !== 'demo') {
+  console.error(`Unknown TRADEBOT_MODE "${MODE}" — BTCTradeBot only trades Bybit demo (TRADEBOT_MODE=demo).`);
+  process.exit(1);
+}
+
+const P = config.PORTFOLIO;
+const DIR = path.join(__dirname, '..', 'state', 'demo');
+const FILES = ['account', 'position', 'trades', 'closing', 'signal', 'seenOrderIds', 'summary', 'commandsDone', 'meta'];
+if (Object.keys(config.SETTINGS_APPLIED).length) console.log('settings.json:', JSON.stringify(config.SETTINGS_APPLIED));
+for (const e of config.SETTINGS_ERRORS) console.log('settings.json ignored —', e);
+
+/* ---------------- persistence ---------------- */
+
+function readJson(name, fallback) {
+  try { return JSON.parse(fs.readFileSync(path.join(DIR, name + '.json'), 'utf8')); } catch (e) { return fallback; }
+}
+function writeJson(name, data) {
+  fs.mkdirSync(DIR, { recursive: true });
+  fs.writeFileSync(path.join(DIR, name + '.json'), JSON.stringify(data, null, 2) + '\n');
+}
+function freshAccount() {
+  return { balance: P.STARTING_BALANCE, startingBalance: P.STARTING_BALANCE, fundingSince: Date.now(), funding: { total: 0 }, startedAt: Date.now() };
+}
+function loadState() {
+  return {
+    account: readJson('account', null) || freshAccount(),
+    position: readJson('position', null),
+    trades: readJson('trades', []),
+    closing: readJson('closing', []),           // closed positions awaiting their final P&L record
+    signal: readJson('signal', null),           // last 4H read, for the dashboard
+    seenOrderIds: readJson('seenOrderIds', []), // closed-pnl records / funding rows already booked
+    summary: readJson('summary', null),         // last daily summary { date, balance }
+    commandsDone: readJson('commandsDone', []), // ids of control/commands.json entries already carried out
+    meta: readJson('meta', {}),                 // { lastEntryCandle }
+  };
+}
+function saveState(st, { fullRun = false } = {}) {
+  // Settings are re-stamped every run so the dashboard always shows the live rules.
+  st.account.settings = require('./settings').current(config);
+  st.account.settingsDefaults = config.SETTINGS_DEFAULTS;
+  st.account.settingsErrors = config.SETTINGS_ERRORS;
+  st.account.mode = MODE;
+  st.account.updatedAt = Date.now();
+  if (fullRun) st.account.lastRunAt = Date.now(); // the watchdog checks full runs, not syncs
+  for (const k of FILES) writeJson(k, st[k]);
+}
+
+/* ---------------- one run ---------------- */
+
+function exchangeClient() {
+  const { createClient } = require('./bybit');
+  return createClient({ env: MODE, apiKey: process.env.BYBIT_API_KEY, apiSecret: process.env.BYBIT_API_SECRET });
+}
+
+// Remote commands: control/commands.json (committed to the repo, pulled by the
+// Mac before every run and sync) lists one-off actions, e.g.
+//   [{ "id": "2026-10-01-close", "action": "close-all" }]
+//   [{ "id": "2026-10-01-reset", "action": "reset", "clearHistory": true }]
+// Each id is carried out once and remembered in commandsDone. A command that
+// hits an error isn't marked done, so the next sync retries it. Returns true
+// if anything was carried out.
+async function runCommands(client, st, events) {
+  let cmds = [];
+  try { cmds = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'control', 'commands.json'), 'utf8')); } catch (e) { return false; }
+  let ran = false;
+  for (const c of Array.isArray(cmds) ? cmds : []) {
+    if (!c || !c.id || st.commandsDone.includes(c.id)) continue;
+    if (c.action === 'close-all' || c.action === 'reset') {
+      const evs = [];
+      await exchange.closeAll({ client, st, events: evs });
+      events.push(...evs);
+      const failed = evs.filter(e => e.type === 'error');
+      if (failed.length) {
+        await notify.push([{ title: `BTC ${c.action} failed — retrying`, message: failed.map(e => e.reason).join('\n'), tags: ['warning'] }]);
+        continue; // retried next sync
+      }
+      if (c.action === 'reset') {
+        st.account = freshAccount();
+        st.position = null; st.closing = []; st.summary = null; st.meta = {};
+        if (c.clearHistory) st.trades = [];
+        await notify.push([{
+          title: `BTC bot reset to ${P.STARTING_BALANCE} USDT`,
+          message: `Position closed, tracking restarted${c.clearHistory ? ', trade history cleared' : ''}. Trading continues from the next 4H close.`,
+          tags: ['arrows_counterclockwise'],
+        }]);
+      } else {
+        await notify.push([{
+          title: 'BTC position closed',
+          message: `${evs.some(e => e.type === 'info') ? 'Closed at market' : 'Nothing was open'}; orders cancelled. The bot keeps running and can enter again on the next breakout.`,
+          tags: ['octagonal_sign'],
+        }]);
+      }
+    } else {
+      events.push({ type: 'error', reason: `unknown command ${c.action} (${c.id})` });
+    }
+    st.commandsDone.push(c.id);
+    ran = true;
+  }
+  return ran;
+}
+
+const sigParams = () => ({ channelN: config.CHANNEL_N, exitN: config.EXIT_N, atrLen: config.ATR_LEN });
+
+async function run() {
+  const client = exchangeClient(); // fail fast on missing keys
+  const st = loadState();
+  const events = [];
+  await runCommands(client, st, events);
+
+  const now = Date.now();
+  const { candles, source, note } = await market.closedCandles(config.SYMBOL, config.ENTRY_TF, 500, now);
+  if (source !== (config.MARKET_DATA === 'okx' ? 'okx' : 'bybit')) console.log(`candles from ${source}${note ? ` (Bybit failed: ${note})` : ''}`);
+  const sig = signal.series(candles, sigParams());
+  const halt = /^(1|true|yes)$/i.test(process.env.TRADEBOT_HALT || '');
+  await exchange.runExchange({ client, st, sig, events, halt, now });
+
+  const last = sig[sig.length - 1];
+  st.signal = last && {
+    ...last, closeT: last.t + market.TF_MS[config.ENTRY_TF], source, at: now,
+    wait: exchange.entryBlock(st, last, now, { halt }),
+    // The last 60 closed candles + their channel, for the dashboard chart.
+    chart: candles.slice(-60).map((k, i, a) => {
+      const s = sig[sig.length - a.length + i];
+      return [k.t, k.o, k.h, k.l, k.c, s ? +s.upper.toFixed(1) : null, s ? +s.exitLower.toFixed(1) : null];
+    }),
+  };
+  const daily = summary.due(st);
+  saveState(st, { fullRun: true });
+  printSummary(events, st);
+  await notify.send(events, st);
+  if (daily) await notify.push([daily]);
+  else if (config.NOTIFY.HOURLY_STATUS && summary.statusDue()) await notify.push([summary.status(st)]);
+}
+
+// Quick reconcile between hourly runs: books fills and notices a stop-out.
+// No candles are passed, so it never opens, exits or trails anything.
+async function syncOnExchange() {
+  const client = exchangeClient();
+  const st = loadState();
+  // Live mark/P&L fields change constantly; only real changes (fills,
+  // closes, stop moves) trigger a save and upload.
+  const snapshot = () => JSON.stringify([st.position, st.trades, st.closing, st.account.balance],
+    (k, v) => (k === 'markPrice' || k === 'unrealisedPnl' ? undefined : v));
+  const before = snapshot();
+  const events = [];
+  const ranCommand = await runCommands(client, st, events);
+  await exchange.runExchange({ client, st, events });
+  const settingsChanged = JSON.stringify(require('./settings').current(config)) !== JSON.stringify(st.account.settings)
+    || JSON.stringify(config.SETTINGS_ERRORS) !== JSON.stringify(st.account.settingsErrors || []);
+  if (!ranCommand && !settingsChanged && snapshot() === before) { console.log(`[${MODE}] sync: no changes`); return; }
+  // A stop-out since the last full run changes what the dashboard says it's waiting for.
+  if (st.signal) st.signal.wait = exchange.entryBlock(st, st.signal, Date.now(), { halt: /^(1|true|yes)$/i.test(process.env.TRADEBOT_HALT || '') });
+  saveState(st);
+  printSummary(events, st);
+  await notify.send(events, st);
+}
+
+async function closeAllOnExchange() {
+  const st = loadState();
+  const events = [];
+  await exchange.closeAll({ client: exchangeClient(), st, events });
+  saveState(st);
+  printSummary(events, st);
+  // Non-zero exit if it failed, so scripts/reset.sh stops before wiping the
+  // bot's tracking of a position that's still open.
+  if (events.some(e => e.type === 'error')) process.exitCode = 1;
+}
+
+function reset() {
+  const st = loadState();
+  st.account = freshAccount();
+  st.position = null;
+  st.closing = [];
+  st.meta = {};
+  saveState(st); // trade history is kept
+  console.log(`Tracking reset to ${P.STARTING_BALANCE} USDT (this step alone doesn't touch Bybit; scripts/reset.sh also closes the position there).`);
+}
+
+/* ---------------- output ---------------- */
+
+function printSummary(events, st) {
+  console.log(`\n=== BTCTradeBot [${MODE}] (${P.STARTING_BALANCE} USDT, ${P.RISK_PCT}% risk, ${config.DIRECTION === 'both' ? 'long+short' : 'long-only'}) @ ${new Date().toISOString()} ===\n`);
+  for (const ev of events) {
+    if (ev.type === 'enter') {
+      console.log(`ENTER ${ev.bias === 1 ? 'LONG' : 'SHORT'} ${ev.qty} BTC @ ${px(ev.entry)} | breakout ${px(ev.breakout)} | SL ${px(ev.stop)} | value $${fmt(ev.notional)} risk $${fmt(ev.riskAmt)}`);
+    } else if (ev.type === 'exit') {
+      console.log(`EXIT — ${ev.reason} | pnl ${money(ev.pnl)}${ev.price ? ' @ ' + px(ev.price) : ''}`);
+    } else {
+      console.log(`${ev.type} — ${ev.reason}`);
+    }
+  }
+  const s = st.signal;
+  if (s) console.log(`\n4H close ${px(s.close)} · breakout above ${px(s.upper)}${config.DIRECTION === 'both' ? ` / below ${px(s.lower)}` : ''} · ATR ${px(s.atr)}${s.wait ? ' · ' + s.wait : ''}`);
+  const p = st.position;
+  console.log(`balance $${fmt(st.account.balance)} (started $${fmt(st.account.startingBalance)})` +
+    (p ? ` · ${p.bias === 1 ? 'long' : 'short'} ${p.qty} BTC @ ${px(p.entry)}, stop ${px(p.stop)}` : ' · flat'));
+}
+function fmt(x) { return (Math.round(x * 100) / 100).toLocaleString('en-US'); }
+function px(x) { return (+x).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
+function money(x) { return `${x < 0 ? '-' : '+'}$${fmt(Math.abs(x))}`; }
+
+if (process.argv.includes('--reset')) {
+  reset();
+} else if (process.argv.includes('--sync')) {
+  syncOnExchange().catch((err) => { console.error(err); process.exit(1); });
+} else if (process.argv.includes('--close-all')) {
+  closeAllOnExchange().catch((err) => { console.error(err); process.exit(1); });
+} else {
+  run().catch((err) => { console.error(err); process.exit(1); });
+}

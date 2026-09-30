@@ -1,0 +1,448 @@
+// Exercises the signal and src/exchange.js against an in-memory stand-in for
+// Bybit, so the order flow can be checked without network access or API keys.
+'use strict';
+
+// Tests run on config.js defaults, never on the live control/settings.json.
+process.env.TRADEBOT_SETTINGS = 'off';
+process.env.NTFY_TOPIC = 'off';
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const crypto = require('crypto');
+const config = require('../config');
+const signal = require('../src/signal');
+const exchange = require('../src/exchange');
+const { sign, createClient } = require('../src/bybit');
+
+const H = 3600000, TF = 4 * H;
+const INST = { qtyStep: 0.001, minOrderQty: 0.001, minNotional: 5, tickSize: 0.1 };
+
+function fakeBybit({ equity = 10000, mark = 100000 } = {}) {
+  let seq = 0;
+  const ex = {
+    equity, marks: { BTCUSDT: mark, SOLUSDT: 200 }, positions: {}, closedPnl: [], funding: [], calls: [],
+    id: () => 'o' + (++seq),
+    // Test helper: the exchange stop triggers at its price.
+    hitStop(symbol = 'BTCUSDT', at = Date.now()) {
+      const p = ex.positions[symbol];
+      ex.closedPnl.push({ symbol, orderId: ex.id(), qty: p.size, exit: p.stopLoss, pnl: (p.stopLoss - p.avgPrice) * p.bias * p.size, at });
+      delete ex.positions[symbol];
+    },
+  };
+  const client = {
+    async getWallet() {
+      const im = Object.values(ex.positions).reduce((s, p) => s + p.size * p.avgPrice / 5, 0);
+      return { equity: ex.equity, available: ex.equity - im };
+    },
+    async getPositions() {
+      const out = JSON.parse(JSON.stringify(ex.positions));
+      for (const p of Object.values(out)) p.markPrice = ex.marks[p.symbol];
+      return out;
+    },
+    async getInstrument() { return INST; },
+    async getMarkPrice(s) { return ex.marks[s]; },
+    async setLeverage(s, l) { ex.calls.push(['setLeverage', s, l]); },
+    async openMarket({ symbol, bias, qty, stopLoss }) {
+      ex.calls.push(['openMarket', symbol, bias, qty, stopLoss]);
+      const m = ex.marks[symbol];
+      ex.positions[symbol] = { symbol, bias, size: qty, avgPrice: m, stopLoss, markPrice: m, unrealisedPnl: 0 };
+      return ex.id();
+    },
+    async setStopLoss(symbol, sl) {
+      const p = ex.positions[symbol];
+      if ((ex.marks[symbol] - sl) * p.bias <= 0) throw new Error('SL on wrong side of mark');
+      p.stopLoss = sl;
+      ex.calls.push(['setStopLoss', symbol, sl]);
+    },
+    async closeMarket({ symbol, qty }) {
+      const p = ex.positions[symbol];
+      const id = ex.id();
+      const m = ex.marks[symbol];
+      ex.closedPnl.push({ symbol, orderId: id, qty, exit: m, pnl: (m - p.avgPrice) * p.bias * qty, at: Date.now() });
+      delete ex.positions[symbol];
+      ex.calls.push(['closeMarket', symbol, qty]);
+      return id;
+    },
+    async cancelAll(symbol) { ex.calls.push(['cancelAll', symbol]); },
+    async getClosedPnl(symbol, since) { return ex.closedPnl.filter(r => r.symbol === symbol && r.at >= since); },
+    async getFundingFees() { return ex.funding; },
+  };
+  return { ex, client };
+}
+
+function freshState() {
+  return { account: { balance: 2000, startingBalance: 2000 }, position: null, trades: [], closing: [], seenOrderIds: [], meta: {} };
+}
+
+// A signal candle as signal.series() returns it. t = its open time.
+function S(t, close, o = {}) {
+  return {
+    t, close, atr: 1000, upper: close - 500, lower: close - 5000, exitUpper: close + 5000, exitLower: close - 5000,
+    enter: 0, exitLong: false, exitShort: false, ...o,
+  };
+}
+// A run 2 minutes after the candle opened at t closed.
+const after = (t) => t + TF + 2 * 60000;
+const T0 = Date.UTC(2026, 8, 30, 8); // a 4H candle open time
+
+async function enterLong(client, st, { t = T0, close = 100000 } = {}) {
+  const events = [];
+  await exchange.runExchange({ client, st, sig: [S(t, close, { enter: 1 })], events, now: after(t) });
+  return events;
+}
+
+/* ---------------- signal ---------------- */
+
+test('signal: a 4H close above the previous 20-candle high enters long; a close below the exit channel exits', () => {
+  const flat = Array.from({ length: 30 }, (_, i) => ({ t: i * TF, o: 100, h: 101, l: 99, c: 100 }));
+  const up = [...flat, { t: 30 * TF, o: 100, h: 105.5, l: 100, c: 105 }];
+  const s = signal.latest(up, { channelN: 20, exitN: 20, atrLen: 14 });
+  assert.equal(s.enter, 1);
+  assert.equal(s.upper, 101);
+  assert.equal(s.exitLong, false);
+  // A close exactly at the channel is not a breakout.
+  assert.equal(signal.latest([...flat, { t: 30 * TF, o: 100, h: 101, l: 100, c: 101 }], { channelN: 20, exitN: 20, atrLen: 14 }).enter, 0);
+  const down = [...up, { t: 31 * TF, o: 105, h: 105, l: 94, c: 95 }];
+  const d = signal.latest(down, { channelN: 20, exitN: 20, atrLen: 14 });
+  assert.equal(d.exitLong, true);
+  assert.equal(d.enter, -1);
+  assert.equal(signal.allowed(-1, 'long'), false);
+  assert.equal(signal.allowed(-1, 'both'), true);
+  assert.equal(signal.allowed(1, 'long'), true);
+  // Not enough history -> null.
+  assert.equal(signal.latest(flat.slice(0, 10), { channelN: 20, exitN: 20, atrLen: 14 }), null);
+});
+
+test('trail: best close since entry minus 3 ATR, never loosens', () => {
+  const sig = [S(0, 100000), S(TF, 104000), S(2 * TF, 103000), S(3 * TF, 102000, { atr: 500 })];
+  const r = signal.trail({ bias: 1, stop: 98000, ext: 100000, sig, fromT: TF, trailAtr: 3 });
+  assert.equal(r.ext, 104000);
+  assert.equal(r.stop, 104000 - 3 * 500); // tighter ATR on the last candle tightens it further
+  const s = signal.trail({ bias: -1, stop: 102000, ext: 100000, sig: [S(TF, 97000)], fromT: TF, trailAtr: 3 });
+  assert.deepEqual(s, { stop: 100000, ext: 97000 });
+  // Earlier candles (before fromT) don't count.
+  assert.equal(signal.trail({ bias: 1, stop: 98000, ext: 100000, sig: [S(0, 110000)], fromT: TF, trailAtr: 3 }).stop, 98000);
+});
+
+/* ---------------- entries ---------------- */
+
+test('entry: market buy with the stop attached, sized so the stop loses 2% of the 2000 allocation', async () => {
+  const { ex, client } = fakeBybit({ equity: 50000 }); // a big demo wallet still trades like 2000 USDT
+  const st = freshState();
+  const events = await enterLong(client, st);
+  // stop 2 ATR = 2000 = 2% away; risk $40 -> $2000 position -> 0.02 BTC
+  assert.deepEqual(ex.calls.find(c => c[0] === 'openMarket'), ['openMarket', 'BTCUSDT', 1, 0.02, 98000]);
+  assert.deepEqual(ex.calls.find(c => c[0] === 'setLeverage'), ['setLeverage', 'BTCUSDT', 5]);
+  const p = st.position;
+  assert.equal(p.bias, 1);
+  assert.equal(p.entry, 100000);
+  assert.equal(p.stop, 98000);
+  assert.equal(p.riskAmt, 40);
+  assert.equal(p.entryCandleT, T0);
+  assert.equal(events.find(e => e.type === 'enter').qty, 0.02);
+  assert.equal(st.meta.lastEntryCandle, T0);
+});
+
+test('sizing: a tight stop is capped at 2x the balance; the smaller of allocation and equity is used', async () => {
+  assert.equal(exchange.notionalFor(2000, 0.02), 2000);
+  assert.equal(exchange.notionalFor(2000, 0.005), 4000); // would be 8000 -> capped
+  assert.equal(exchange.sizingBase({ account: { balance: 2000 } }, { equity: 1500 }), 1500);
+  const { ex, client } = fakeBybit({ equity: 1000 });
+  const st = freshState();
+  await enterLong(client, st);
+  assert.equal(ex.calls.find(c => c[0] === 'openMarket')[3], 0.01); // 2% of 1000 equity
+});
+
+test('no entry: stale breakout, short in long-only mode, the same candle twice, halted, untracked BTC position', async () => {
+  const cases = [
+    ['stale', (st, c) => exchange.runExchange({ client: c, st, sig: [S(T0, 100000, { enter: 1 })], events: [], now: T0 + TF + 61 * 60000 }), /min ago/],
+    ['short', (st, c) => exchange.runExchange({ client: c, st, sig: [S(T0, 100000, { enter: -1 })], events: [], now: after(T0) }), /long-only/],
+    ['same candle', (st, c) => { st.meta.lastEntryCandle = T0; return enterLong(c, st); }, /already entered/],
+    ['halt', (st, c) => exchange.runExchange({ client: c, st, sig: [S(T0, 100000, { enter: 1 })], events: [], now: after(T0), halt: true }), /halted/],
+  ];
+  for (const [name, fn, why] of cases) {
+    const { ex, client } = fakeBybit();
+    const st = freshState();
+    await fn(st, client);
+    assert.equal(ex.calls.filter(c => c[0] === 'openMarket').length, 0, name);
+    assert.match(exchange.entryBlock(st, S(T0, 100000, { enter: name === 'short' ? -1 : 1 }), name === 'stale' ? T0 + TF + 61 * 60000 : after(T0), { halt: name === 'halt' }), why, name);
+  }
+  // A BTCUSDT position the bot didn't open: left alone, no entry on top of it.
+  const { ex, client } = fakeBybit();
+  ex.positions.BTCUSDT = { symbol: 'BTCUSDT', bias: 1, size: 0.5, avgPrice: 90000, stopLoss: 0, markPrice: 100000 };
+  const st = freshState();
+  const events = await enterLong(client, st);
+  assert.equal(ex.calls.filter(c => c[0] === 'openMarket' || c[0] === 'closeMarket').length, 0);
+  assert.match(events.find(e => e.type === 'hold').reason, /didn't open/);
+});
+
+test('positions on other coins (e.g. TradeBot\'s) are ignored', async () => {
+  const { ex, client } = fakeBybit();
+  ex.positions.SOLUSDT = { symbol: 'SOLUSDT', bias: -1, size: 10, avgPrice: 200, stopLoss: 210, markPrice: 200 };
+  const st = freshState();
+  await enterLong(client, st);
+  assert.ok(st.position);
+  assert.ok(ex.positions.SOLUSDT);
+  assert.equal(ex.calls.filter(c => c[1] === 'SOLUSDT').length, 0);
+});
+
+test('daily loss limit (10%) blocks new entries for the rest of the UTC day', async () => {
+  const { ex, client } = fakeBybit();
+  const st = freshState();
+  st.account.balance = 1790;
+  st.trades.push({ pnl: -210, closedAt: after(T0) - 60000, openedAt: T0 - TF });
+  const events = await enterLong(client, st);
+  assert.equal(ex.calls.filter(c => c[0] === 'openMarket').length, 0);
+  assert.match(events.find(e => e.type === 'hold').reason, /daily loss limit/);
+});
+
+/* ---------------- managing the position ---------------- */
+
+test('the stop trails on Bybit after 4H closes, only when it tightens; a stop-out is booked as "trailing stop"', async () => {
+  const { ex, client } = fakeBybit();
+  const st = freshState();
+  await enterLong(client, st);
+  const t1 = T0 + TF, t2 = T0 + 2 * TF;
+  ex.marks.BTCUSDT = 106000;
+  let events = [];
+  await exchange.runExchange({ client, st, sig: [S(T0, 100000, { enter: 1 }), S(t1, 106000)], events, now: after(t1) });
+  assert.deepEqual(ex.calls.filter(c => c[0] === 'setStopLoss'), [['setStopLoss', 'BTCUSDT', 103000]]);
+  assert.equal(st.position.stop, 103000);
+  // A lower close doesn't loosen it (and nothing is sent to Bybit).
+  ex.marks.BTCUSDT = 104000;
+  await exchange.runExchange({ client, st, sig: [S(t1, 106000), S(t2, 104000)], events: [], now: after(t2) });
+  assert.equal(ex.calls.filter(c => c[0] === 'setStopLoss').length, 1);
+  // Syncs (no candles) never trail.
+  await exchange.runExchange({ client, st, events: [], now: after(t2) + 5 * 60000 });
+  assert.equal(ex.calls.filter(c => c[0] === 'setStopLoss').length, 1);
+  // Bybit's stop fires; the next sync books it.
+  ex.hitStop('BTCUSDT', after(t2) + 6 * 60000);
+  events = [];
+  await exchange.runExchange({ client, st, events, now: after(t2) + 10 * 60000 });
+  assert.equal(st.position, null);
+  assert.equal(st.trades.length, 1);
+  assert.equal(st.trades[0].reason, 'trailing stop');
+  assert.equal(st.trades[0].pnl, 60); // (103000 - 100000) x 0.02
+  assert.equal(st.account.balance, 2060);
+  assert.equal(events.find(e => e.type === 'exit').pnl, 60);
+});
+
+test('exit signal: a 4H close through the exit channel closes at market and books the P&L', async () => {
+  const { ex, client } = fakeBybit();
+  const st = freshState();
+  await enterLong(client, st);
+  const t1 = T0 + TF;
+  ex.marks.BTCUSDT = 97500;
+  const events = [];
+  await exchange.runExchange({ client, st, sig: [S(t1, 97500, { exitLong: true, exitLower: 97800 })], events, now: after(t1) });
+  assert.ok(ex.calls.some(c => c[0] === 'closeMarket'));
+  assert.equal(st.position, null);
+  assert.match(st.trades[0].reason, /^exit signal/);
+  assert.equal(st.trades[0].pnl, -50);
+  assert.equal(st.account.balance, 1950);
+  // The late closed-pnl record isn't booked twice.
+  await exchange.runExchange({ client, st, events: [], now: after(t1) + 5 * 60000 });
+  assert.equal(st.trades.length, 1);
+});
+
+test('a missed run still exits: any exit signal since the last check counts', async () => {
+  const { ex, client } = fakeBybit();
+  const st = freshState();
+  await enterLong(client, st);
+  const t1 = T0 + TF, t2 = T0 + 2 * TF;
+  ex.marks.BTCUSDT = 99000;
+  await exchange.runExchange({ client, st, sig: [S(t1, 97500, { exitLong: true }), S(t2, 99000)], events: [], now: after(t2) });
+  assert.equal(st.position, null);
+});
+
+test('trailing stop already passed by the price: closes at market instead', async () => {
+  const { ex, client } = fakeBybit();
+  const st = freshState();
+  await enterLong(client, st);
+  const t1 = T0 + TF;
+  ex.marks.BTCUSDT = 102500; // the 4H closed at 106000, price has fallen since
+  await exchange.runExchange({ client, st, sig: [S(t1, 106000)], events: [], now: after(t1) });
+  assert.equal(ex.calls.filter(c => c[0] === 'setStopLoss').length, 0);
+  assert.ok(ex.calls.some(c => c[0] === 'closeMarket'));
+  assert.match(st.trades[0].reason, /trailing stop .* already passed/);
+});
+
+test('long + short: the exit signal closes the long and the short breakout opens in the same run', async () => {
+  const saved = config.DIRECTION;
+  config.DIRECTION = 'both';
+  try {
+    const { ex, client } = fakeBybit();
+    const st = freshState();
+    await enterLong(client, st);
+    const t1 = T0 + TF;
+    ex.marks.BTCUSDT = 95000; // long closes at -$100 -> balance 1900 -> 2% = $38 at a 2000 stop
+    await exchange.runExchange({ client, st, sig: [S(t1, 95000, { exitLong: true, enter: -1 })], events: [], now: after(t1) });
+    assert.equal(st.trades.length, 1);
+    assert.equal(st.position.bias, -1);
+    assert.deepEqual(ex.calls.filter(c => c[0] === 'openMarket').pop(), ['openMarket', 'BTCUSDT', -1, 0.019, 97000]);
+  } finally { config.DIRECTION = saved; }
+});
+
+test('funding fees: BTCUSDT payments booked once into the balance; other coins ignored', async () => {
+  const { ex, client } = fakeBybit();
+  const st = freshState();
+  st.account.fundingSince = T0;
+  await enterLong(client, st);
+  ex.funding = [
+    { id: 'f1', symbol: 'BTCUSDT', amount: -0.4, at: after(T0) + H },
+    { id: 'f2', symbol: 'SOLUSDT', amount: -5, at: after(T0) + H },
+  ];
+  await exchange.runExchange({ client, st, events: [], now: after(T0) + 2 * H });
+  await exchange.runExchange({ client, st, events: [], now: after(T0) + 3 * H });
+  assert.equal(st.account.funding.total, -0.4);
+  assert.equal(st.account.balance, 1999.6);
+  assert.equal(st.position.funding, -0.4);
+});
+
+test('close-all: cancels orders, closes the BTC position, leaves other coins', async () => {
+  const { ex, client } = fakeBybit();
+  const st = freshState();
+  await enterLong(client, st);
+  ex.positions.SOLUSDT = { symbol: 'SOLUSDT', bias: 1, size: 1, avgPrice: 200, markPrice: 200 };
+  const events = [];
+  const now = Date.now(); // the fake exchange stamps the close record with the real clock
+  await exchange.closeAll({ client, st, events, now });
+  assert.equal(ex.positions.BTCUSDT, undefined);
+  assert.ok(ex.positions.SOLUSDT);
+  assert.equal(st.position, null);
+  await exchange.runExchange({ client, st, events: [], now: now + 60000 });
+  assert.equal(st.trades[0].reason, 'closed by close-all');
+});
+
+test('stops round away from the price on Bybit\'s tick', () => {
+  assert.equal(exchange.stopRound(98000.07, 0.1, 1), 98000);
+  assert.equal(exchange.stopRound(101999.93, 0.1, -1), 102000);
+});
+
+/* ---------------- settings, clients, alerts ---------------- */
+
+test('settings.json: valid overrides apply, bad ones keep the default and are reported', () => {
+  const { apply } = require('../src/settings');
+  const cfg = JSON.parse(JSON.stringify({ ...config, SETTINGS_APPLIED: undefined }));
+  const r = apply(cfg, { RISK_PCT: 1.5, DIRECTION: 'both', TRAIL_ATR: 99, SYMBOL: 'ETHUSDT', CHANNEL_N: 30, _note: 'x' });
+  assert.deepEqual(r.applied, { RISK_PCT: 1.5, DIRECTION: 'both', CHANNEL_N: 30 });
+  assert.equal(cfg.PORTFOLIO.RISK_PCT, 1.5);
+  assert.equal(cfg.TRAIL_ATR, 3);
+  assert.equal(r.errors.length, 2);
+  assert.match(r.errors.join('\n'), /TRAIL_ATR: must be between/);
+  assert.match(r.errors.join('\n'), /SYMBOL: unknown setting/);
+  assert.match(apply(cfg, { DIRECTION: 'short' }).errors[0], /must be one of "long", "both"/);
+});
+
+test('request signing matches Bybit v5; the client only knows Demo Trading', async () => {
+  const expected = crypto.createHmac('sha256', 'sec').update('1700000000000' + 'key' + '10000' + 'category=linear').digest('hex');
+  assert.equal(sign('sec', '1700000000000', 'key', 'category=linear'), expected);
+  let seen;
+  const fetchImpl = async (url, opts) => { seen = { url, opts }; return { status: 200, text: async () => JSON.stringify({ retCode: 0, result: { orderId: 'x1' } }) }; };
+  const c = createClient({ env: 'demo', apiKey: 'key', apiSecret: 'sec', fetchImpl });
+  await c.openMarket({ symbol: 'BTCUSDT', bias: 1, qty: 0.02, stopLoss: 98000 });
+  assert.equal(seen.url, 'https://api-demo.bybit.com/v5/order/create');
+  const body = JSON.parse(seen.opts.body);
+  assert.deepEqual([body.side, body.orderType, body.qty, body.stopLoss, body.category], ['Buy', 'Market', '0.02', '98000', 'linear']);
+  assert.equal(seen.opts.headers['X-BAPI-SIGN'], sign('sec', seen.opts.headers['X-BAPI-TIMESTAMP'], 'key', seen.opts.body));
+  assert.throws(() => createClient({ apiKey: 'k', apiSecret: 's', env: 'live' }), /only supports demo/);
+});
+
+test('market data: closed candles only, Bybit first, OKX when Bybit fails', async () => {
+  const market = require('../src/market');
+  const now = Date.UTC(2026, 8, 30, 9, 1);
+  const open = Date.UTC(2026, 8, 30, 8); // the forming 08:00 candle
+  const bybitRows = [open, open - TF, open - 2 * TF].map((t, i) => [String(t), '1', '2', '0.5', String(100 + i), '10', '0']);
+  market.setFetch(async (url) => ({ status: 200, text: async () => JSON.stringify({ retCode: 0, result: { list: bybitRows } }) }));
+  let r = await market.closedCandles('BTCUSDT', '240', 2, now);
+  assert.equal(r.source, 'bybit');
+  assert.deepEqual(r.candles.map(c => c.t), [open - 2 * TF, open - TF]);
+  market.setFetch(async (url) => {
+    if (url.includes('bybit')) return { status: 403, text: async () => 'blocked' };
+    return { status: 200, text: async () => JSON.stringify({ code: '0', data: [open, open - TF].map(t => [String(t), '1', '2', '0.5', '1.5', '0', '10']) }) };
+  });
+  r = await market.closedCandles('BTCUSDT', '240', 2, now);
+  assert.equal(r.source, 'okx');
+  assert.match(r.note, /HTTP 403/);
+  assert.deepEqual(r.candles.map(c => c.t), [open - TF]);
+});
+
+test('ntfy alerts: entry, exit and a quiet trailed-stop note; holds and placeholders are left out', () => {
+  const notify = require('../src/notify');
+  const st = { account: { balance: 2060 } };
+  const m = notify.messagesFor([
+    { type: 'enter', bias: 1, entry: 100000, stop: 98000, qty: 0.02, notional: 2000, riskAmt: 40, breakout: 99500, close: 100000 },
+    { type: 'hold', reason: 'x' },
+    { type: 'info', reason: 'stop trailed 98,000.0 → 103,000.0' },
+    { type: 'exit', reason: 'closed on exchange (P&L record pending)', pnl: 0 },
+    { type: 'exit', reason: 'trailing stop', pnl: 60, price: 103000 },
+  ], st);
+  assert.deepEqual(m.map(x => x.title), ['BTC LONG opened @ 100,000.0', 'BTC stop trailed', 'BTC closed +$60.00']);
+  assert.equal(m[1].priority, 2);
+  assert.match(m[0].message, /broke the 20-candle high 99,500.0/);
+  assert.match(m[2].message, /Balance \$2060.00$/);
+});
+
+test('status push: flat shows the next breakout level; a position shows its live P&L and stop', () => {
+  const summary = require('../src/summary');
+  const flat = summary.status({ account: { balance: 2000, startingBalance: 2000 }, position: null, signal: { close: 100000, upper: 103000, lower: 95000 } });
+  assert.match(flat.message, /Long above 103,000 \(3.0% away\)/);
+  const open = summary.status({ account: { balance: 2000, startingBalance: 2000 }, position: { bias: 1, qty: 0.02, entry: 100000, stop: 103000, trailed: true, unrealisedPnl: 100 } });
+  assert.equal(open.title, 'BTC bot $2100.00 (+5.0%)');
+  assert.match(open.message, /Long 0.02 BTC @ 100,000 · \+\$100.00 · stop 103,000 \(trailed\)/);
+  const at = (h) => Date.UTC(2026, 8, 24, h, 1);
+  assert.deepEqual([0, 1, 4, 11, 12, 20, 23].map(h => summary.statusDue(at(h))), [true, false, true, false, true, true, false]);
+});
+
+test('watchdog: alert when the bot stops, repeat every 6h, all-clear when back', () => {
+  const { check } = require('../scripts/watchdog');
+  const t0 = Date.UTC(2026, 8, 23, 0, 1);
+  let wd = { down: false };
+  let r = check({ lastRun: t0, wd, now: t0 + 1.5 * H });
+  assert.equal(r.message, null);
+  r = check({ lastRun: t0, wd, now: t0 + 2.5 * H });
+  assert.equal(r.message.title, 'BTC bot is not running'); wd = r.wd;
+  r = check({ lastRun: t0, wd, now: t0 + 4 * H });
+  assert.equal(r.message, null); wd = r.wd;
+  r = check({ lastRun: t0, wd, now: t0 + 8.6 * H });
+  assert.equal(r.message.title, 'BTC bot is not running'); wd = r.wd;
+  r = check({ lastRun: t0 + 9 * H, wd, now: t0 + 9.2 * H });
+  assert.equal(r.message.title, 'BTC bot is running again');
+});
+
+test('backtest replays the live signal: a breakout, a trailed stop, fees and funding', () => {
+  const { simulate, bucket } = require('../scripts/backtest');
+  // 1H candles: flat, then a steady climb, then a sharp drop.
+  const h1 = [];
+  let p = 100000;
+  for (let i = 0; i < 24 * 40; i++) {
+    const t = Date.UTC(2026, 0, 1) + i * H;
+    const drift = i < 24 * 20 ? 0 : i < 24 * 30 ? 40 : -300;
+    const o = p; p += drift + (i % 2 ? 30 : -30);
+    h1.push({ t, o, h: Math.max(o, p) + 20, l: Math.min(o, p) - 20, c: p, v: 1 });
+  }
+  const r = simulate(h1, bucket(h1, 4), {});
+  assert.ok(r.trades >= 1);
+  const tr = r.tradeList[0];
+  assert.equal(tr.bias, 1);
+  assert.ok(['trailing stop', 'exit signal'].includes(tr.reason), tr.reason);
+});
+
+test('back-to-back trades keep their own fills: a quick second close is not claimed by the first', async () => {
+  const saved = config.DIRECTION;
+  config.DIRECTION = 'both';
+  try {
+    const { ex, client } = fakeBybit();
+    const st = freshState();
+    // The fake stamps market closes with the real clock, so run near it.
+    const Tn = Math.floor(Date.now() / TF) * TF - TF, now0 = Tn + TF + 60000, t1 = now0 + 1000;
+    await exchange.runExchange({ client, st, sig: [S(Tn - TF, 100000, { enter: 1 })], events: [], now: now0 - TF });
+    // Exit signal + short breakout in one run: the long closes, the short opens.
+    ex.marks.BTCUSDT = 99000;
+    await exchange.runExchange({ client, st, sig: [S(Tn, 99000, { exitLong: true, enter: -1 })], events: [], now: t1 });
+    assert.equal(st.position.bias, -1);
+    // The short's stop fires within a minute; the sync books it to the short.
+    ex.hitStop('BTCUSDT', t1 + 20000);
+    await exchange.runExchange({ client, st, events: [], now: t1 + 30000 });
+    assert.deepEqual(st.trades.map(t => [t.bias, t.reason.split(':')[0]]), [[1, 'exit signal'], [-1, 'stop']]);
+  } finally { config.DIRECTION = saved; }
+});

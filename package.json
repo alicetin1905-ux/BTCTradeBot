@@ -1,0 +1,19 @@
+{
+  "name": "btctradebot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "BTC-only bot on Bybit Demo Trading: 4H Donchian breakout, ATR trailing stop, 2% risk per trade.",
+  "main": "src/run.js",
+  "scripts": {
+    "start": "node src/run.js",
+    "sync": "node src/run.js --sync",
+    "backtest": "node scripts/backtest.js",
+    "research": "node scripts/research.js && node scripts/research.js --focus",
+    "reset": "bash scripts/reset.sh",
+    "test": "node --test test/exchange.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED"
+}
