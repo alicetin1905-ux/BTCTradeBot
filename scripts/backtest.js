@@ -89,7 +89,7 @@ function bucket(h1, hours) {
 /* ---------------- simulation ---------------- */
 
 const LIVE = {
-  strategy: config.STRATEGY, flipScore: config.FLIP_SCORE, flipWindow: config.FLIP_WINDOW, trendBand: config.TREND_BAND_PCT,
+  strategy: config.STRATEGY, scoreMode: config.SCORE_MODE, flipScore: config.FLIP_SCORE, flipWindow: config.FLIP_WINDOW, trendBand: config.TREND_BAND_PCT,
   channelN: config.CHANNEL_N, exitN: config.EXIT_N, atrLen: config.ATR_LEN, direction: config.DIRECTION,
   stopAtr: config.STOP_ATR, trailAtr: config.TRAIL_ATR,
   start: config.PORTFOLIO.STARTING_BALANCE, riskPct: config.PORTFOLIO.RISK_PCT, maxX: config.PORTFOLIO.MAX_POSITION_X,
@@ -102,11 +102,11 @@ const LIVE = {
 // candle takes ~20 s, so each threshold/window is computed once.
 const flipCache = new Map();
 let flipDaily = null; // set by main(): bucket(h1, 24)
-function flipSeries(h4, threshold, window, trendBandPct = null) {
-  const key = `${h4.length}:${h4[0].t}:${threshold}:${window}:${trendBandPct}`;
+function flipSeries(h4, threshold, window, trendBandPct = null, scoreMode = config.SCORE_MODE) {
+  const key = `${h4.length}:${h4[0].t}:${threshold}:${window}:${trendBandPct}:${scoreMode}`;
   if (!flipCache.has(key)) {
     if (!flipDaily) throw new Error('flip backtest needs daily candles (setFlipDaily)');
-    flipCache.set(key, flip.series(h4, flipDaily, { threshold, window, trendBandPct }, 0));
+    flipCache.set(key, flip.series(h4, flipDaily, { threshold, window, trendBandPct, scoreMode }, 0));
   }
   return flipCache.get(key);
 }
@@ -114,7 +114,7 @@ function setFlipDaily(d1) { flipDaily = d1; flipCache.clear(); }
 
 function simulate(h1, h4, rules, from = -Infinity, to = Infinity) {
   const R = { ...LIVE, ...rules };
-  const sig = R.strategy === 'atlas-flip' ? flipSeries(h4, R.flipScore, R.flipWindow, R.trendBand)
+  const sig = R.strategy === 'atlas-flip' ? flipSeries(h4, R.flipScore, R.flipWindow, R.trendBand, R.scoreMode)
     : signal.series(h4, { channelN: R.channelN, exitN: R.exitN, atrLen: R.atrLen });
   const at = new Map(); // 1H candle open time whose close is the 4H close -> signal
   const tfMs = (R.tfHours || 4) * HOUR; // signal candle length (the candles passed in are this long)
@@ -185,8 +185,10 @@ function simulate(h1, h4, rules, from = -Infinity, to = Infinity) {
 
 const BO = { strategy: 'breakout' };
 const VARIANTS = [
-  ['A  live: ATLAS flip ±10 within 2 candles (8h), 200-MA band ±10%, long+short', {}],
-  ['   previous live: ±25 within 4 candles (16h), band ±10%', { flipScore: 25, flipWindow: 4 }],
+  ['A  live: ATLAS flip ±10 within 2 candles (8h), 200-MA band ±10%, long+short, graded score', {}],
+  ['   same with the classic score (live until 2026-10-01)', { scoreMode: 'classic' }],
+  ['   ±25 within 4 candles (16h), band ±10%', { flipScore: 25, flipWindow: 4 }],
+  ['   ±25 within 4 candles (16h), classic score (live before ±10)', { flipScore: 25, flipWindow: 4, scoreMode: 'classic' }],
   ['   ±15 within 2 candles (8h)', { flipScore: 15, flipWindow: 2 }],
   ['   ±10 within 4 candles (16h)', { flipScore: 10, flipWindow: 4 }],
   ['-- ATLAS flip variants --', null],

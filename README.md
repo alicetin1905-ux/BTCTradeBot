@@ -32,7 +32,11 @@ alarm.
 
 - **Signal: the ATLAS score swinging fast.** The score is TradeBot's ATLAS
   score (`src/atlasScore.js`, ~25 indicators, −100 to +100), computed on
-  closed 4H candles (00/04/08/12/16/20 UTC). Nothing repaints.
+  closed 4H candles (00/04/08/12/16/20 UTC). Nothing repaints. It uses the
+  **graded** method (`SCORE_MODE`), the same as the ATLAS page: each
+  indicator counts by its strength and the groups are blended Trend 35 /
+  Momentum 25 / Structure 20 / Flow 20. Until 2026-10-01 it used the
+  classic flat −1/0/+1 votes (`SCORE_MODE: "classic"` switches back).
   - **Long** when the score closes at **+10 or higher** and was at **−10 or
     lower** within the previous **2 candles (8h)**: a fast swing from
     bearish to bullish.
@@ -78,11 +82,12 @@ on each side and funding of about 0.01% per 8h, which longs pay.
 
 | | Trades | Win % | Return | Worst drop | Profit factor |
 |---|---:|---:|---:|---:|---:|
-| **Live: ATLAS flip ±10 within 8h, 200-MA band ±10%, long + short** | 555 (~97/yr) | 29 | **+644%** | 29% | 1.37 |
-| Previous: ±25 within 16h, band ±10% | 342 (~60/yr) | 32 | +834% | 25% | 1.56 |
-| + 0.05% slippage per side | 555 | 28 | +382% | 32% | 1.27 |
-| ±15 within 8h | 413 (~72/yr) | 31 | +432% | 33% | 1.40 |
-| ±10 within 16h | 667 (~116/yr) | 28 | +612% | 36% | 1.33 |
+| **Live: ATLAS flip ±10 within 8h, 200-MA band ±10%, long + short, graded score** | 367 (~64/yr) | 32 | **+662%** | 31% | 1.46 |
+| Same with the classic score (live until 2026-10-01) | 555 (~97/yr) | 29 | +644% | 29% | 1.37 |
+| Previous: ±25 within 16h, band ±10%, classic score | 342 (~60/yr) | 32 | +834% | 25% | 1.56 |
+| + 0.05% slippage per side (graded) | 367 | 31 | +472% | 34% | 1.37 |
+| ±15 within 8h (classic score) | 413 (~72/yr) | 31 | +432% | 33% | 1.40 |
+| ±10 within 16h (classic score) | 667 (~116/yr) | 28 | +612% | 36% | 1.33 |
 | Breakout 15, long + short (the previous live setup) | 424 (~74/yr) | 34 | +374% | 32% | 1.35 |
 | Breakout 20, long-only (the first setup) | 179 (~31/yr) | 36 | +324% | 26% | 1.70 |
 | Breakout 15 on 1H signals | 1771 | 29 | −88% | 92% | 0.90 |
@@ -93,7 +98,7 @@ Year by year, starting each year fresh with 2000 USDT at a fixed $40 risk per tr
 
 | | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 (to Sep) |
 |---|---:|---:|---:|---:|---:|---:|
-| ATLAS flip (live) | +727 | +101 | +2222 | +896 | −48 | +1023 |
+| ATLAS flip (live, graded) | +693 | +308 | +2383 | +1005 | −99 | +854 |
 | Buy & hold 2000 USDT | +1197 | −1284 | +3113 | +2425 | −128 | −94 |
 
 **Out-of-sample check:** choosing the setting on 2021–2023 alone picks exactly

@@ -33,6 +33,7 @@ const FIELDS = {
   DAILY_LOSS_LIMIT_PCT: { at: ['EXECUTION', 'DAILY_LOSS_LIMIT_PCT'], check: num(1, 100), label: 'Daily loss limit (% of balance)' },
   // Signal
   STRATEGY: { at: ['STRATEGY'], check: oneOf('atlas-flip', 'breakout'), label: 'Signal ("atlas-flip" = ATLAS score fast swing, "breakout" = 4H channel breakout)' },
+  SCORE_MODE: { at: ['SCORE_MODE'], check: oneOf('graded', 'classic'), label: 'ATLAS score method ("graded" = by strength, groups blended; "classic" = flat votes)' },
   FLIP_SCORE: { at: ['FLIP_SCORE'], check: num(10, 90, { int: true }), label: 'ATLAS flip: score level (swing from -X to +X)' },
   FLIP_WINDOW: { at: ['FLIP_WINDOW'], check: num(1, 12, { int: true }), label: 'ATLAS flip: within this many 4H candles' },
   TREND_BAND_PCT: { at: ['TREND_BAND_PCT'], check: num(2, 50, { nullable: true }), label: 'ATLAS flip: skip swings when the 4H close is more than this % from its 200-candle average (null = off)' },

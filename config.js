@@ -39,6 +39,14 @@ const config = module.exports = {
   // short: ~97 trades a year, +644% 2021-26, worst drop 29%, PF 1.37 (±25 / 16h: ~60 a year,
   // +834%, 25%, PF 1.56 - fewer, better trades; breakout: 74, +374%, 32%).
   STRATEGY: 'atlas-flip',
+  // How the ATLAS score is computed (src/atlasScore.js): 'graded' — the ATLAS
+  // page's method: each indicator counts by its strength (RSI 85 more than
+  // RSI 56), each group is averaged on its own and the groups are blended
+  // Trend 35 / Momentum 25 / Structure 20 / Flow 20 — or 'classic', every
+  // indicator a flat -1/0/+1 vote. Backtest at ±10 within 8h: graded ~60
+  // trades a year, PF 1.47, worst drop 28%; classic ~97 a year, PF 1.37, 29%
+  // (backtest/REPORT.md).
+  SCORE_MODE: 'graded',
   FLIP_SCORE: 10,
   FLIP_WINDOW: 2,
   // Ignore a swing when the 4H close is more than this % from its 200-candle

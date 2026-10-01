@@ -25,13 +25,15 @@
 'use strict';
 
 const atlas = require('./atlasScore');
+const config = require('../config');
 
 const HOUR = 3600000, DAY = 24 * HOUR, TF_H = 4, LOOKBACK = 400, TREND_MA = 200;
 
 // ATLAS score and ATR on the closed 4H candle c4[i]. d1: closed UTC daily
 // candles (any range; the ones closed by c4[i]'s close are used).
 // dj: optional cursor { j } into d1 for sequential calls (backtest speed).
-function scoreAt(c4, d1, i, dj = null) {
+// scoreMode: 'graded' or 'classic' (src/atlasScore.js), default config.SCORE_MODE.
+function scoreAt(c4, d1, i, dj = null, scoreMode = config.SCORE_MODE) {
   const closeT = c4[i].t + TF_H * HOUR;
   const closed = c4.slice(Math.max(0, i - LOOKBACK + 1), i + 1);
   // analyse() drops the last candle as "still forming": hand it a placeholder.
@@ -47,7 +49,7 @@ function scoreAt(c4, d1, i, dj = null) {
     a = atlas.analyse({
       symbol: 'BTCUSDT', candles: cs, ticker: null, oi: [], ratio: null, book: null, tape: null,
       entryTf: '240', mtfTfs: [], flipStore: {}, account: 1000, riskPct: 10, leverage: 10, scoreThreshold: 25,
-      scoreMode: 'classic', mtfTrim: false,
+      scoreMode, mtfTrim: false,
     });
   } catch (e) { a = null; }
   return a ? { t: c4[i].t, close: c4[i].c, score: a.score, atr: a.atr } : null;
@@ -76,11 +78,11 @@ function trendMa(c4, i) {
 //   { t, close, atr, score, flipFrom, enter, exitLong, exitShort, ma, blocked }
 // flipFrom: the opposite extreme within the window that made the swing.
 // blocked: a swing happened but the trend band (trendBandPct, null = off) ruled it out.
-function series(c4, d1, { threshold, window, trendBandPct = null }, from = 0) {
+function series(c4, d1, { threshold, window, trendBandPct = null, scoreMode = config.SCORE_MODE }, from = 0) {
   const start = Math.max(221, from - window);
   const dj = { j: -1 };
   const scored = [];
-  for (let i = start; i < c4.length; i++) scored.push(scoreAt(c4, d1, i, dj));
+  for (let i = start; i < c4.length; i++) scored.push(scoreAt(c4, d1, i, dj, scoreMode));
   const out = [];
   for (let k = 0; k < scored.length; k++) {
     const s = scored[k];
