@@ -21,7 +21,7 @@ const { createClient } = require('../src/okx');
 
 const HOLD_SEC = +(process.env.HOLD_SEC || 60);
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
-const px = (x) => (+x).toLocaleString('en-US', { maximumFractionDigits: 1 });
+const px = (x) => require('../src/format').price(x, 1);
 
 async function main() {
   const instrument = (process.env.OKX_INSTRUMENT || '').trim().toUpperCase() || config.OKX_INSTRUMENT;

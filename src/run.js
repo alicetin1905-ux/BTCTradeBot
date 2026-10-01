@@ -316,7 +316,7 @@ function printSummary(events, st) {
     (p ? ` · ${p.bias === 1 ? 'long' : 'short'} ${p.qty} ${COIN} @ ${px(p.entry)}, stop ${px(p.stop)}` : ' · flat'));
 }
 function fmt(x) { return (Math.round(x * 100) / 100).toLocaleString('en-US'); }
-function px(x) { return (+x).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
+function px(x) { return require('./format').price(x, 1); }
 function money(x) { return `${x < 0 ? '-' : '+'}$${fmt(Math.abs(x))}`; }
 
 if (process.argv.includes('--reset')) {

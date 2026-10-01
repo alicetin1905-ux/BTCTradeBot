@@ -919,3 +919,14 @@ test('ATLAS flip extreme entry: a close at +/-EXTREME_SCORE enters once (fresh c
     assert.equal(s.enter, 1); assert.equal(s.extreme, false); assert.equal(s.flipFrom, -40);
   } finally { atlas.analyse = real; }
 });
+
+test('price text keeps the decimals a cheap coin needs (NEAR 4.807), BTC / ETH as before', () => {
+  const { price } = require('../src/format');
+  assert.equal(price(84625.55, 1), '84,625.6');
+  assert.equal(price(84625.55, 0), '84,626');
+  assert.equal(price(2696.84), '2,696.8');
+  assert.equal(price(255.1234), '255.12');
+  assert.equal(price(4.8071), '4.807');
+  assert.equal(price(0.123456), '0.12346');
+  assert.equal(price(NaN), '—');
+});

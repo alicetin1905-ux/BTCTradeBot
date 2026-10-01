@@ -12,7 +12,7 @@ const config = require('../config');
 
 const DAY_MS = 86400000;
 const money = (x) => `${x < 0 ? '-' : '+'}$${Math.abs(x).toFixed(2)}`;
-const px = (x) => (+x).toLocaleString('en-US', { maximumFractionDigits: 0 });
+const px = (x) => require('./format').price(x, 0);
 
 function localDate(ms) {
   const d = new Date(ms);
