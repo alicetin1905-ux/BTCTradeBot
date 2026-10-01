@@ -6,7 +6,7 @@
 #   scripts/actions-run.sh testtrade   open + close the smallest position (scripts/okx-testtrade.js; COIN=ETH for another coin)
 # A run or sync goes through every coin in config.js COINS, one `node src/run.js`
 # process each (COIN=<coin>), BTC's instrument from OKX_INSTRUMENT, the others
-# from OKX_INSTRUMENT_<COIN> or <COIN>-USD_UM_XPERP-310328 (NEAR: -310725). One coin failing
+# from OKX_INSTRUMENT_<COIN> or <COIN>-USD_UM_XPERP-310328 (NEAR: the spot pair NEAR-USDC). One coin failing
 # doesn't stop the others; the exit status is non-zero if any failed.
 # Keys come from the repository's Actions secrets (OKX_API_KEY,
 # OKX_API_SECRET, OKX_API_PASSPHRASE). Until they're set, every run only does
@@ -26,8 +26,8 @@ inst_for() {
   local coin="$1" var="OKX_INSTRUMENT_$1"
   if [ -n "${!var:-}" ]; then echo "${!var}"
   elif [ "$coin" = "BTC" ]; then echo "$BTC_INSTRUMENT"
-  # The demo account's perpetual-style futures: most expire 2031-03-28, NEAR's 2031-07-25 (okx-check lists them).
-  elif [ "$coin" = "NEAR" ]; then echo "NEAR-USD_UM_XPERP-310725"
+  # NEAR trades the spot pair: its futures are refused on the EEA site (OKX 51155).
+  elif [ "$coin" = "NEAR" ]; then echo "NEAR-USDC"
   else echo "$coin-USD_UM_XPERP-310328"; fi
 }
 

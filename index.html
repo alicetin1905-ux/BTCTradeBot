@@ -324,7 +324,9 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
   // ATLAS flip: the score now, the last few, and whether a swing is armed.
   function sgn(x) { return (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x); }
   function flipSignalHtml(s, set) {
-    var X = set.FLIP_SCORE || 25, K = set.FLIP_WINDOW || 3, both = set.DIRECTION === 'both';
+    var inst = S.account && S.account.instruments && S.account.instruments[S.coin];
+    var spot = !!inst && !/-SWAP$|-\d{6}$/.test(inst); // a spot pair (NEAR-USDC): long-only
+    var X = set.FLIP_SCORE || 25, K = set.FLIP_WINDOW || 3, both = set.DIRECTION === 'both' && !spot;
     var scores = (s.chart || []).map(function (r) { return r[7]; }).filter(function (v) { return v != null; });
     var recent = scores.slice(-(K + 1));
     var prev = scores.slice(-K); // the window the NEXT close will look back on
@@ -553,6 +555,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
 
   var LABELS = {
     RISK_PCT: ['Loss at the initial stop', function (v) { return v + '% of balance'; }],
+    COIN_RISK_PCT: ['Own risk per coin', function (v) { var k = Object.keys(v || {}); return k.length ? k.map(function (c) { return c + ' ' + v[c] + '%'; }).join(', ') : 'none'; }],
     MAX_POSITION_X: ['Max position value', function (v) { return v + '× balance'; }],
     LEVERAGE: ['Leverage', function (v) { return v + '×'; }],
     DAILY_LOSS_LIMIT_PCT: ['Daily loss limit', function (v) { return v + '%'; }],

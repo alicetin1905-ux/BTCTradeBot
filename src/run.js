@@ -57,6 +57,8 @@ if (!['okx', 'bybit'].includes(config.EXCHANGE)) {
 }
 
 const P = config.PORTFOLIO;
+// A coin with its own risk per trade (config.COIN_RISK_PCT, e.g. NEAR 1%).
+if (config.COIN_RISK_PCT && config.COIN_RISK_PCT[COIN] != null) P.RISK_PCT = config.COIN_RISK_PCT[COIN];
 const ROOT = path.join(__dirname, '..', 'state', 'demo');
 // BTC keeps state/demo/ (the dashboard and history started there); the other coins use state/demo/<coin>/.
 const dirOf = (coin) => (coin === 'BTC' ? ROOT : path.join(ROOT, coin.toLowerCase()));

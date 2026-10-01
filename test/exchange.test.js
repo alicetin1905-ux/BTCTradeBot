@@ -930,3 +930,16 @@ test('price text keeps the decimals a cheap coin needs (NEAR 4.807), BTC / ETH a
   assert.equal(price(0.123456), '0.12346');
   assert.equal(price(NaN), '—');
 });
+
+test('settings: COIN_RISK_PCT gives single coins their own risk, validated', () => {
+  const { apply, current } = require('../src/settings');
+  const cfg = JSON.parse(JSON.stringify({ PORTFOLIO: { RISK_PCT: 2, MAX_POSITION_X: 2, LEVERAGE: 10, STARTING_BALANCE: 2000 }, EXECUTION: { DAILY_LOSS_LIMIT_PCT: 10 }, NOTIFY: { STATUS_EVERY_H: 4 }, COIN_RISK_PCT: { NEAR: 1 }, STRATEGY: 'atlas-flip', FLIP_SCORE: 10, FLIP_WINDOW: 2, EXTREME_SCORE: 90, TREND_BAND_PCT: 10, DIRECTION: 'both', CHANNEL_N: 15, EXIT_N: 15, STOP_ATR: 2, TRAIL_ATR: 3, ENTRY_FRESH_MIN: 180, MARKET_DATA: null, SCORE_MODE: 'graded' }));
+  assert.deepEqual(current(cfg).COIN_RISK_PCT, { NEAR: 1 });
+  let r = apply(cfg, { COIN_RISK_PCT: { NEAR: 0.5, ETH: 3 } });
+  assert.deepEqual(cfg.COIN_RISK_PCT, { NEAR: 0.5, ETH: 3 }); assert.equal(r.errors.length, 0);
+  r = apply(cfg, { COIN_RISK_PCT: { NEAR: 50 } });
+  assert.match(r.errors[0], /COIN_RISK_PCT: NEAR must be a number between 0.1 and 10/);
+  assert.deepEqual(cfg.COIN_RISK_PCT, { NEAR: 0.5, ETH: 3 }); // bad value: kept
+  r = apply(cfg, { COIN_RISK_PCT: null });
+  assert.deepEqual(cfg.COIN_RISK_PCT, {});
+});

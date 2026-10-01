@@ -22,12 +22,23 @@ const num = (min, max, { int = false, nullable = false } = {}) => (v) => {
   if (v < min || v > max) return { error: `must be between ${min} and ${max}` };
   return { value: v };
 };
+// { "NEAR": 1, ... }: each value a risk % like RISK_PCT. null/{} = every coin uses RISK_PCT.
+const coinMap = (min, max) => (v) => {
+  if (v === null) return { value: {} };
+  if (typeof v !== 'object' || Array.isArray(v)) return { error: 'must be an object like { "NEAR": 1 }' };
+  for (const [k, x] of Object.entries(v)) {
+    if (!/^[A-Z0-9]{2,10}$/.test(k)) return { error: `coin "${k}" must be an upper-case ticker` };
+    if (typeof x !== 'number' || !Number.isFinite(x) || x < min || x > max) return { error: `${k} must be a number between ${min} and ${max}` };
+  }
+  return { value: { ...v } };
+};
 const oneOf = (...opts) => (v) => (opts.includes(v) ? { value: v } : { error: `must be one of ${opts.map(o => JSON.stringify(o)).join(', ')}` });
 
 // Each field: where it lives in config, how it's checked, and a label.
 const FIELDS = {
   // Money
   RISK_PCT: { at: ['PORTFOLIO', 'RISK_PCT'], check: num(0.1, 10), label: 'Loss at the initial stop per trade (% of balance)' },
+  COIN_RISK_PCT: { at: ['COIN_RISK_PCT'], check: coinMap(0.1, 10), label: 'Own risk per trade for single coins (% of balance), e.g. { "NEAR": 1 }; others use the line above' },
   MAX_POSITION_X: { at: ['PORTFOLIO', 'MAX_POSITION_X'], check: num(0.1, 5), label: 'Max position value (x balance)' },
   LEVERAGE: { at: ['PORTFOLIO', 'LEVERAGE'], check: num(1, 25, { int: true }), label: 'Leverage' },
   DAILY_LOSS_LIMIT_PCT: { at: ['EXECUTION', 'DAILY_LOSS_LIMIT_PCT'], check: num(1, 100), label: 'Daily loss limit (% of balance)' },
@@ -54,7 +65,7 @@ function set(cfg, at, value) {
   const parent = at.slice(0, -1).reduce((o, k) => o[k], cfg);
   parent[at[at.length - 1]] = value; // mutate in place: modules hold references to PORTFOLIO etc.
 }
-const clone = (v) => (Array.isArray(v) ? v.slice() : v);
+const clone = (v) => (Array.isArray(v) ? v.slice() : v && typeof v === 'object' ? { ...v } : v);
 
 function current(cfg) {
   return Object.fromEntries(Object.entries(FIELDS).map(([k, f]) => [k, clone(get(cfg, f.at))]));

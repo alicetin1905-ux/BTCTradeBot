@@ -8,6 +8,15 @@ const config = module.exports = {
   // scripts/actions-run.sh runs `COIN=<coin> node src/run.js` for each, and
   // the last one also sends the combined daily / status pushes.
   COINS: ['NEAR', 'ETH', 'BTC'],
+  // Where each coin trades. BTC and ETH: the USD-settled futures (long + short,
+  // 10x). NEAR: its futures are refused on the EEA site (OKX 51155, local
+  // compliance), so it trades the SPOT pair NEAR-USDC: long only, no leverage,
+  // the position at most 1x the balance, stop-loss as a bot-tagged algo order.
+  // Per-coin instruments come from scripts/actions-run.sh (OKX_INSTRUMENT_<COIN>).
+  // Backtest NEAR spot: 19 trades/yr, PF 1.41, profitable every year.
+  // A coin's own risk per trade (% of the balance); the others use PORTFOLIO.RISK_PCT.
+  // BTC+ETH at 2% + NEAR at 1%: 139 trades/yr, +4,247%, worst drop 37% (BTC+ETH alone: 120, +3,692%, 32%).
+  COIN_RISK_PCT: { NEAR: 1 },
   // The coin this process handles (COIN env var, default BTC) and its symbol
   // (USDT perpetual naming: BTCUSDT on Bybit, BTC-USDT-SWAP on OKX).
   COIN: (process.env.COIN || 'BTC').trim().toUpperCase(),
@@ -87,7 +96,7 @@ const config = module.exports = {
   // Money rules.
   PORTFOLIO: {
     STARTING_BALANCE: 2000, // USDT — the bot's allocation; it trades like a 2000 USDT account
-    RISK_PCT: 1.5,          // loss at the initial stop per trade, % of the balance, per coin. Backtest BTC+ETH+NEAR (graded, ±10/8h, ±90): 1% = +1,095%, 23% worst drop; 1.5% = +3,052%, 33%; 2% = +7,117%, 42%
+    RISK_PCT: 2,            // loss at the initial stop per trade, % of the balance, per coin (COIN_RISK_PCT overrides it for one coin). Backtest BTC+ETH (graded, ±10/8h, ±90): 1% = +629%, 21% worst drop; 2% = +3,692%, 32%; 3% = +6,492%, 50%
     MAX_POSITION_X: 2,      // position value at most this many x the balance (caps size on tight stops)
     LEVERAGE: 10,           // exchange leverage (cross margin); margin = position value / leverage.
                             // Sizing is by risk, so leverage changes the margin tied up, not the loss at the stop.

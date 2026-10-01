@@ -2,7 +2,7 @@
 
 A trading bot for **BTC, ETH and NEAR** on an **OKX Demo Trading** account: mainnet
 prices, demo funds. It runs on GitHub Actions (no computer needed) and trades
-the EEA site's USD-settled BTC, ETH and NEAR futures with USDC margin at 10x. It can also
+the EEA site's USD-settled BTC and ETH futures with USDC margin at 10x, plus NEAR on spot. It can also
 trade the BTC-USDT perpetual, or **Bybit Demo Trading** (`EXCHANGE=bybit`).
 
 It's built on the same engine as
@@ -50,21 +50,27 @@ settings (graded score, ±10 within 8h, 200-MA band), by risk per trade:
 | **BTC + ETH, 2% each (live)** | **119** | **+3,086%** | **38%** | **1.56** | **1.71 / 1.76** |
 | BTC + ETH, 3% each | 119 | +6,492% | 50% | 1.43 | 1.71 / 1.76 |
 
-**NEAR was added** (live settings, graded score, ±10 within 8h, ±90 entry, 200-MA
-band, from 2021-03): NEAR alone is profitable in every year and both halves
-(37 trades/yr, PF 1.44, 1.81 before / 1.31 from 2024). XRP, DOGE and ETC lose
-money with this signal and were left out.
+**NEAR was added as a spot coin.** Its futures are refused on OKX's EEA site
+(order error 51155, local compliance), but the spot pair NEAR-USDC trades:
+**long only, no leverage**, position at most 1x the balance, stop-loss as a
+bot-tagged algo order, **1% risk** (`COIN_RISK_PCT`). The signal rules are the same
+(a short signal only closes the long). Backtest from 2021-03 (live signal):
+NEAR spot alone is profitable in every year and both halves (19 trades/yr,
+PF 1.41; with shorts on the futures it would be 37 trades/yr).
+XRP, DOGE, ETC and HYPE don't work with this signal and were left out.
 
 | | Trades/yr | Return | Worst drop | PF |
 |---|---:|---:|---:|---:|
 | BTC + ETH, 2% each (before) | 120 | +3,692% | 32% | 1.60 |
-| BTC + ETH + NEAR, 1% each | 157 | +1,095% | 23% | 1.60 |
-| **BTC + ETH + NEAR, 1.5% each (live)** | **157** | **+3,052%** | **33%** | **1.55** |
-| BTC + ETH + NEAR, 2% each | 157 | +7,117% | 42% | 1.51 |
+| BTC + ETH 2% + NEAR spot 0.5% | 139 | +3,977% | 35% | 1.58 |
+| **BTC + ETH 2% + NEAR spot 1% (live)** | **139** | **+4,247%** | **37%** | **1.57** |
+| BTC + ETH 2% + NEAR spot 2% | 139 | +4,730% | 42% | 1.54 |
+
+NEAR spot buys with the same USDC that backs the futures margin.
 
 SOL has no demo future on this account (only BTC, ETH, NEAR, XRP, DOGE and a few
 others do: `scripts/okx-check.js` lists them). Instruments:
-`BTC-USD_UM_XPERP-310328`, `ETH-USD_UM_XPERP-310328`, `NEAR-USD_UM_XPERP-310725`
+`BTC-USD_UM_XPERP-310328`, `ETH-USD_UM_XPERP-310328`, `NEAR-USDC` (spot)
 (override with the `OKX_INSTRUMENT_<COIN>` variables). Order-tested on the demo
 account with the `testtrade` workflow (coin = ETH, NEAR).
 
@@ -102,7 +108,7 @@ account with the `testtrade` workflow (coin = ETH, NEAR).
   exchange, so it works between runs.
 - **Exit:** an opposite swing closes the position at market, and the bot
   reverses into the new direction. Otherwise the trailing stop exits.
-- **Size:** each trade risks **1.5% of the balance** at its initial stop
+- **Size:** each trade risks **2% of the balance** at its initial stop (NEAR 1%, `COIN_RISK_PCT`)
   (`RISK_PCT`). Position value is capped at 2× the balance (`MAX_POSITION_X`),
   at 10× leverage, isolated margin. One position at a time.
 - **Balance:** the bot's own 2000 USDT/USDC allocation, moved by its realized
