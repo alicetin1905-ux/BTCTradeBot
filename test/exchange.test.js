@@ -760,3 +760,21 @@ test('OKX isolated margin: orders, stop and leverage use mgnMode/tdMode isolated
   await require('../src/okx').createClient({ apiKey: 'k', apiSecret: 's', passphrase: 'p', fetchImpl: g.fetchImpl, marginMode: 'isolated' }).setLeverage('BTCUSDT', 10);
   assert.deepEqual(g.S.calls.filter(x => x.path === '/api/v5/account/set-leverage').map(x => x.body.posSide), ['long', 'short']);
 });
+
+test('entry read-back: a position that shows up a moment late is still tracked', async () => {
+  exchange.setReadbackMs(0);
+  const { ex, client } = fakeBybit();
+  let hidden = 2; // the first two position reads after the order come back empty
+  const getPositions = client.getPositions;
+  client.getPositions = async () => {
+    const p = await getPositions();
+    if (p.BTCUSDT && hidden > 0) { hidden--; return {}; }
+    return p;
+  };
+  const st = freshState();
+  const events = await enterLong(client, st);
+  assert.ok(st.position, JSON.stringify(events));
+  assert.equal(st.position.qty, 0.02);
+  assert.equal(events.filter(e => e.type === 'error').length, 0);
+  exchange.setReadbackMs(500);
+});

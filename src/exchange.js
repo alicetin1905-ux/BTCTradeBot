@@ -23,6 +23,7 @@ const signal = require('./signal');
 const P = config.PORTFOLIO;
 const SYMBOL = config.SYMBOL;
 const DAY_MS = 86400000;
+let ENTRY_READBACK_MS = 500; // wait between position read-backs after an entry (tests set 0)
 const TF_MS = 4 * 3600000;
 
 function floorStep(x, step) { return Math.floor(x / step + 1e-6) * step; }
@@ -218,9 +219,15 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
 
   await client.setLeverage(SYMBOL, P.LEVERAGE);
   const entryId = await client.openMarket({ symbol: SYMBOL, bias, qty, stopLoss });
-  const after = await client.getPositions();
-  const pos = after[SYMBOL];
-  if (!pos) { events.push({ type: 'error', reason: `entry order ${entryId} sent but no position showed up` }); return; }
+  // The exchange's position list can lag the fill by a moment: without this
+  // retry the bot would lose track of its own trade (stop on the exchange,
+  // but no trailing or exit).
+  let pos = null;
+  for (let i = 0; i < 10 && !pos; i++) {
+    pos = (await client.getPositions())[SYMBOL];
+    if (!pos && i < 9) await new Promise(r => setTimeout(r, ENTRY_READBACK_MS));
+  }
+  if (!pos) { events.push({ type: 'error', reason: `entry order ${entryId} sent but no position showed up after 5 s — check the exchange` }); return; }
 
   const entry = pos.avgPrice;
   st.position = {
@@ -305,4 +312,6 @@ async function closeAll({ client, st, events, now = Date.now() }) {
 
 function px(x) { return (+x).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
 
-module.exports = { runExchange, closeAll, sizingBase, notionalFor, entryBlock, stopRound, SYMBOL };
+function setReadbackMs(ms) { ENTRY_READBACK_MS = ms; } // tests
+
+module.exports = { setReadbackMs, runExchange, closeAll, sizingBase, notionalFor, entryBlock, stopRound, SYMBOL };
