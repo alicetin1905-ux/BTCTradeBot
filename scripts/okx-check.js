@@ -73,10 +73,10 @@ async function main() {
     const h = await client.holdings();
     console.log(`  trading account (≈ $${h.totalUsd.toFixed(0)}): ${h.trading.slice(0, 6).map(c => `${c.ccy} ${+c.eq.toFixed(4)}`).join(', ') || 'empty'}`);
     if (h.fundingUsdt != null) console.log(`  funding account USDT: ${h.fundingUsdt.toFixed(2)}`);
-    for (const t of ['SWAP', 'SPOT']) {
+    for (const t of ['SWAP', 'FUTURES', 'SPOT']) {
       try { console.log(`  BTC ${t} instruments this account can trade: ${(await client.tradableBtc(t)).join(', ') || 'none'}`); } catch (e) { console.log(`  (${t} list: ${e.message})`); }
     }
-    for (const [instId, tdMode] of [['BTC-USDT-SWAP', 'cross'], ['BTC-USD-SWAP', 'cross'], ['BTC-USDC', 'cash'], ['BTC-USD', 'cash'], ['BTC-EUR', 'cash']]) {
+    for (const [instId, tdMode] of [['BTC-USD_UM_XPERP-310328', 'cross'], ['BTC-USD_UM_XPERP-310328', 'isolated'], ['BTC-USDT-SWAP', 'cross'], ['BTC-USDC', 'cash']]) {
       try { const m = await client.maxSize(instId, tdMode); console.log(`  ${instId} (${tdMode}): max buy ${m.buy}, max sell ${m.sell}`); } catch (e) { console.log(`  ${instId} (${tdMode}): ${e.message.replace(/^.*-> /, '')}`); }
     }
     console.log(`  account mode: ${MODES[a.acctLv] || a.acctLv} · position mode: ${a.posMode === 'long_short_mode' ? 'long/short' : 'net (one-way)'}`);
