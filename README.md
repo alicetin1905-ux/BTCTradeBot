@@ -1,8 +1,8 @@
 # BTCTradeBot
 
-A trading bot for **BTC and ETH** on an **OKX Demo Trading** account: mainnet
+A trading bot for **BTC, ETH and NEAR** on an **OKX Demo Trading** account: mainnet
 prices, demo funds. It runs on GitHub Actions (no computer needed) and trades
-the EEA site's USD-settled BTC and ETH futures with USDC margin at 10x. It can also
+the EEA site's USD-settled BTC, ETH and NEAR futures with USDC margin at 10x. It can also
 trade the BTC-USDT perpetual, or **Bybit Demo Trading** (`EXCHANGE=bybit`).
 
 It's built on the same engine as
@@ -28,12 +28,12 @@ alarm.
    setting makes fewer, better trades (+834%, PF 1.56); ±10 / 8h was chosen
    for trade count (`ATLAS_FLIP.md`). This is the live signal now.
 
-## Coins: BTC and ETH (`COINS` in `config.js`)
+## Coins: BTC, ETH and NEAR (`COINS` in `config.js`)
 
-The same rules run on **BTC and ETH**, each with its own position, stop and
-state (BTC in `state/demo/`, ETH in `state/demo/eth/`), sharing **one balance**
+The same rules run on **BTC, ETH and NEAR**, each with its own position, stop and
+state (BTC in `state/demo/`, the others in `state/demo/eth/`, `state/demo/near/`), sharing **one balance**
 and one daily loss limit. A run is one `COIN=<coin> node src/run.js` process per
-coin (`scripts/actions-run.sh`; ETH first, BTC last, and the last one sends the
+coin (`scripts/actions-run.sh`; NEAR, ETH, then BTC last, and the last one sends the
 combined phone pushes). One coin failing doesn't stop the other.
 
 Why: one position at a time caps the trade count, and the flip signal also
@@ -50,10 +50,23 @@ settings (graded score, ±10 within 8h, 200-MA band), by risk per trade:
 | **BTC + ETH, 2% each (live)** | **119** | **+3,086%** | **38%** | **1.56** | **1.71 / 1.76** |
 | BTC + ETH, 3% each | 119 | +6,492% | 50% | 1.43 | 1.71 / 1.76 |
 
-SOL has no demo future on this account (only BTC, ETH, XRP, DOGE and a few
-others do: `scripts/okx-check.js` lists them). ETH's instrument is
-`ETH-USD_UM_XPERP-310328` (override with the `OKX_INSTRUMENT_ETH` variable).
-Order-tested on the demo account with the `testtrade` workflow (coin = ETH).
+**NEAR was added** (live settings, graded score, ±10 within 8h, ±90 entry, 200-MA
+band, from 2021-03): NEAR alone is profitable in every year and both halves
+(37 trades/yr, PF 1.44, 1.81 before / 1.31 from 2024). XRP, DOGE and ETC lose
+money with this signal and were left out.
+
+| | Trades/yr | Return | Worst drop | PF |
+|---|---:|---:|---:|---:|
+| BTC + ETH, 2% each (before) | 120 | +3,692% | 32% | 1.60 |
+| BTC + ETH + NEAR, 1% each | 157 | +1,095% | 23% | 1.60 |
+| **BTC + ETH + NEAR, 1.5% each (live)** | **157** | **+3,052%** | **33%** | **1.55** |
+| BTC + ETH + NEAR, 2% each | 157 | +7,117% | 42% | 1.51 |
+
+SOL has no demo future on this account (only BTC, ETH, NEAR, XRP, DOGE and a few
+others do: `scripts/okx-check.js` lists them). Instruments:
+`BTC-USD_UM_XPERP-310328`, `ETH-USD_UM_XPERP-310328`, `NEAR-USD_UM_XPERP-310725`
+(override with the `OKX_INSTRUMENT_<COIN>` variables). Order-tested on the demo
+account with the `testtrade` workflow (coin = ETH, NEAR).
 
 ## The rules (`config.js`, `src/flip.js`)
 
@@ -89,7 +102,7 @@ Order-tested on the demo account with the `testtrade` workflow (coin = ETH).
   exchange, so it works between runs.
 - **Exit:** an opposite swing closes the position at market, and the bot
   reverses into the new direction. Otherwise the trailing stop exits.
-- **Size:** each trade risks **2% of the balance** at its initial stop
+- **Size:** each trade risks **1.5% of the balance** at its initial stop
   (`RISK_PCT`). Position value is capped at 2× the balance (`MAX_POSITION_X`),
   at 10× leverage, isolated margin. One position at a time.
 - **Balance:** the bot's own 2000 USDT/USDC allocation, moved by its realized
