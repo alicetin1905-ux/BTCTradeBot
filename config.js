@@ -81,7 +81,7 @@ const config = module.exports = {
   // Money rules.
   PORTFOLIO: {
     STARTING_BALANCE: 2000, // USDT — the bot's allocation; it trades like a 2000 USDT account
-    RISK_PCT: 1,            // loss at the initial stop per trade, % of the balance (per coin; backtest: BTC+ETH at 1% each = 183 trades/yr, +436%, worst drop 22%)
+    RISK_PCT: 2,            // loss at the initial stop per trade, % of the balance, per coin. Backtest BTC+ETH (graded, ±10/8h): 1% = +629%, 21% worst drop; 2% = +3,086%, 38%; 3% = +6,492%, 50%
     MAX_POSITION_X: 2,      // position value at most this many x the balance (caps size on tight stops)
     LEVERAGE: 10,           // exchange leverage (cross margin); margin = position value / leverage.
                             // Sizing is by risk, so leverage changes the margin tied up, not the loss at the stop.

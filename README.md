@@ -38,15 +38,17 @@ combined phone pushes). One coin failing doesn't stop the other.
 
 Why: one position at a time caps the trade count, and the flip signal also
 works on ETH (a coin it was never tuned on). Backtest from 2021-03, live
-settings (graded score, ±10 within 8h, 200-MA band), 1% risk per trade:
+settings (graded score, ±10 within 8h, 200-MA band), by risk per trade:
 
 | | Trades/yr | Return | Worst drop | PF | PF before / from 2024 |
 |---|---:|---:|---:|---:|---:|
 | BTC alone, 2% risk (before) | 65 | +680% | 31% | 1.46 | 2.06 / 1.45 |
 | BTC alone, 1% | 65 | +215% | 17% | 1.57 | 2.06 / 1.45 |
 | ETH alone, 1% | 54 | +158% | 16% | 1.80 | 1.33 / 2.27 |
-| **BTC + ETH, 1% each** | **119** | **+629%** | **21%** | **1.64** | **1.71 / 1.76** |
+| BTC + ETH, 1% each | 119 | +629% | 21% | 1.64 | 1.71 / 1.76 |
 | BTC + ETH, 1.5% each | 119 | +1,510% | 30% | 1.60 | 1.71 / 1.76 |
+| **BTC + ETH, 2% each (live)** | **119** | **+3,086%** | **38%** | **1.56** | **1.71 / 1.76** |
+| BTC + ETH, 3% each | 119 | +6,492% | 50% | 1.43 | 1.71 / 1.76 |
 
 SOL has no demo future on this account (only BTC, ETH, XRP, DOGE and a few
 others do: `scripts/okx-check.js` lists them). ETH's instrument is
@@ -81,7 +83,7 @@ Order-tested on the demo account with the `testtrade` workflow (coin = ETH).
   exchange, so it works between runs.
 - **Exit:** an opposite swing closes the position at market, and the bot
   reverses into the new direction. Otherwise the trailing stop exits.
-- **Size:** each trade risks **1% of the balance** at its initial stop
+- **Size:** each trade risks **2% of the balance** at its initial stop
   (`RISK_PCT`). Position value is capped at 2× the balance (`MAX_POSITION_X`),
   at 10× leverage, isolated margin. One position at a time.
 - **Balance:** the bot's own 2000 USDT/USDC allocation, moved by its realized
