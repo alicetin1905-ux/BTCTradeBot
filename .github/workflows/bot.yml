@@ -51,7 +51,8 @@ jobs:
           OKX_API_KEY: ${{ secrets.OKX_API_KEY }}
           OKX_API_SECRET: ${{ secrets.OKX_API_SECRET }}
           OKX_API_PASSPHRASE: ${{ secrets.OKX_API_PASSPHRASE }}
-          OKX_API_BASE: ${{ secrets.OKX_API_BASE }}
+          # The OKX site the account belongs to (keys only work there): EEA.
+          OKX_API_BASE: ${{ secrets.OKX_API_BASE || vars.OKX_API_BASE || 'https://my.okx.com' }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           TRADEBOT_HALT: ${{ vars.TRADEBOT_HALT }}
         run: |
