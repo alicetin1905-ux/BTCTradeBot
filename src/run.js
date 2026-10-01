@@ -35,6 +35,16 @@ if (MODE !== 'demo') {
   process.exit(1);
 }
 if (process.env.EXCHANGE) config.EXCHANGE = process.env.EXCHANGE.trim().toLowerCase();
+if (process.env.OKX_INSTRUMENT && process.env.OKX_INSTRUMENT.trim()) config.OKX_INSTRUMENT = process.env.OKX_INSTRUMENT.trim().toUpperCase();
+// What the position lives on, e.g. "okx:BTC-USDC" — switching it with a position open is refused.
+config.MARKET_ID = config.EXCHANGE === 'okx' ? `okx:${config.OKX_INSTRUMENT}` : 'bybit';
+// Spot: long-only, never more than the cash at hand.
+if (config.EXCHANGE === 'okx' && !/-SWAP$/.test(config.OKX_INSTRUMENT)) {
+  if (config.DIRECTION !== 'long') console.log(`${config.OKX_INSTRUMENT} is spot: trading long-only (DIRECTION "${config.DIRECTION}" ignored)`);
+  config.DIRECTION = 'long';
+  config.PORTFOLIO.LEVERAGE = 1;
+  config.PORTFOLIO.MAX_POSITION_X = Math.min(config.PORTFOLIO.MAX_POSITION_X, 1);
+}
 if (!['okx', 'bybit'].includes(config.EXCHANGE)) {
   console.error(`Unknown EXCHANGE "${config.EXCHANGE}" — use okx or bybit.`);
   process.exit(1);
@@ -78,6 +88,7 @@ function saveState(st, { fullRun = false } = {}) {
   st.account.settingsErrors = config.SETTINGS_ERRORS;
   st.account.mode = MODE;
   st.account.exchange = config.EXCHANGE;
+  st.account.instrument = config.EXCHANGE === 'okx' ? config.OKX_INSTRUMENT : 'BTCUSDT';
   st.account.updatedAt = Date.now();
   if (fullRun) st.account.lastRunAt = Date.now(); // the watchdog checks full runs, not syncs
   for (const k of FILES) writeJson(k, st[k]);
@@ -90,6 +101,7 @@ function exchangeClient() {
     return require('./okx').createClient({
       apiKey: process.env.OKX_API_KEY, apiSecret: process.env.OKX_API_SECRET,
       passphrase: process.env.OKX_API_PASSPHRASE, base: process.env.OKX_API_BASE,
+      instrument: config.OKX_INSTRUMENT, symbol: config.SYMBOL,
     });
   }
   return require('./bybit').createClient({ env: MODE, apiKey: process.env.BYBIT_API_KEY, apiSecret: process.env.BYBIT_API_SECRET });
@@ -99,8 +111,8 @@ function exchangeClient() {
 // open would lose track of it (and its stop), so that's refused.
 function checkExchange(st) {
   const on = st.position && st.position.exchange;
-  if (on && on !== config.EXCHANGE) {
-    throw new Error(`the open position is on ${on}, but EXCHANGE is ${config.EXCHANGE} — close it first (EXCHANGE=${on} node src/run.js --close-all) or switch back`);
+  if (on && on !== config.MARKET_ID && on !== config.EXCHANGE) {
+    throw new Error(`the open position is on ${on}, but the bot is set to ${config.MARKET_ID} — close it there first, or switch back`);
   }
 }
 

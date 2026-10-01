@@ -10,6 +10,10 @@ const config = module.exports = {
   // 'bybit' (Bybit Demo Trading). EXCHANGE in .env overrides this; the keys
   // for it go in .env too (.env.example).
   EXCHANGE: 'okx',
+  // On OKX: the BTC perpetual 'BTC-USDT-SWAP', or a spot pair such as
+  // 'BTC-USDC' for accounts without perpetual access (OKX's EEA site). Spot is
+  // long-only and unleveraged. OKX_INSTRUMENT in .env overrides this.
+  OKX_INSTRUMENT: 'BTC-USDT-SWAP',
 
   // Signal timeframe: closed 4H candles (UTC-aligned: 00/04/08/12/16/20).
   // backtest/RESEARCH.md: 1D breakouts were much weaker on BTC.

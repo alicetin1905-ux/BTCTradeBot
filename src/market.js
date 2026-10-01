@@ -28,8 +28,9 @@ async function bybitKlines(symbol, tf, limit) {
   return rows.slice().reverse().map(k => ({ t: +k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[5] }));
 }
 
+// On OKX the candles of the instrument it trades (e.g. BTC-USDC spot).
 async function okxKlines(symbol, tf, limit) {
-  const instId = symbol.replace('USDT', '') + '-USDT-SWAP';
+  const instId = config.EXCHANGE === 'okx' && config.OKX_INSTRUMENT ? config.OKX_INSTRUMENT : symbol.replace('USDT', '') + '-USDT-SWAP';
   const out = [];
   let after = '';
   // /market/candles returns at most 300 per call: page back with `after`.

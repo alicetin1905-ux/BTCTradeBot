@@ -25,8 +25,13 @@ const SYMBOL = config.SYMBOL;
 const DAY_MS = 86400000;
 const TF_MS = 4 * 3600000;
 
-function floorStep(x, step) { return Math.floor(x / step + 1e-9) * step; }
-function dp(step) { return Math.max(0, (String(step).split('.')[1] || '').length); }
+function floorStep(x, step) { return Math.floor(x / step + 1e-6) * step; }
+// Decimals of a lot / tick step — also for tiny steps JavaScript prints as "1e-8".
+function dp(step) {
+  let d = 0;
+  while (d < 12 && Math.abs(Math.round(step * 10 ** d) - step * 10 ** d) > 1e-9) d++;
+  return d;
+}
 function fixStep(x, step) { return +x.toFixed(dp(step)); }
 // Stops are rounded away from the price (a hair looser), never through it.
 function stopRound(x, tick, bias) {
@@ -109,7 +114,8 @@ async function reconcile({ client, st, live, events, now }) {
   }
   pos.qty = live.size;
   pos.markPrice = live.markPrice;
-  pos.unrealisedPnl = live.unrealisedPnl;
+  // Spot has no exchange-side P&L for the bot's own lot: work it out.
+  pos.unrealisedPnl = live.unrealisedPnl != null ? live.unrealisedPnl : (live.markPrice - pos.entry) * pos.bias * live.size;
   pos.exchangeStop = live.stopLoss;
 }
 
@@ -218,7 +224,7 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
 
   const entry = pos.avgPrice;
   st.position = {
-    symbol: SYMBOL, exchange: config.EXCHANGE, bias, entry, qty: pos.size, qtyTotal: pos.size,
+    symbol: SYMBOL, exchange: config.MARKET_ID || config.EXCHANGE, bias, entry, qty: pos.size, qtyTotal: pos.size,
     stop: stopLoss, initialStop: stopLoss, ext: s.close, trailed: false,
     entryCandleT: s.t, lastExitCheckT: s.t, openedAt: now, orders: { entry: entryId }, tickSize: inst.tickSize,
     notional: pos.size * entry, margin: (pos.size * entry) / P.LEVERAGE, riskAmt: pos.size * Math.abs(entry - stopLoss),

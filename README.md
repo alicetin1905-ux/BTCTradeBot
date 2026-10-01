@@ -101,6 +101,23 @@ npm run research             # backtest/RESEARCH.md + DONCHIAN.md
 
 It needs Node 18+ and no dependencies. Keys come from `.env` (see `.env.example`).
 
+## OKX EEA accounts: BTC-USDC spot
+
+On OKX's EEA site (`my.okx.com`) many accounts hold no USDT and can't trade
+perpetuals, the demo account included. There the bot trades **BTC-USDC
+spot** instead (`OKX_INSTRUMENT=BTC-USDC`, the GitHub workflow's default):
+
+- **Long-only** and **no leverage**: the position is at most the USDC cash.
+- **No funding fees.**
+- **Its own BTC only:** it buys BTC and puts a stop-loss sell order on exactly
+  the BTC it bought, tagged `btcbot…`. It never counts or sells other BTC in
+  the account. Don't trade BTC-USDC by hand while it holds a position: its
+  P&L is rebuilt from the pair's fills.
+- **Backtest with spot costs** (0.10% fee per side, no funding, position ≤ 1×
+  the balance), 2021-01 → 2026-09: **+190%**, worst drop 26%, profit factor
+  1.52. On 2024+, which the settings never saw, the profit factor is 1.63.
+  With 0.15% fees it's +156%.
+
 ## Setup from your phone (GitHub Actions, no Mac)
 
 The bot can run on GitHub's servers: `.github/workflows/bot.yml` does a full

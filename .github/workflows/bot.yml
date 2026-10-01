@@ -53,6 +53,8 @@ jobs:
           OKX_API_PASSPHRASE: ${{ secrets.OKX_API_PASSPHRASE }}
           # The OKX site the account belongs to (keys only work there): EEA.
           OKX_API_BASE: ${{ secrets.OKX_API_BASE || vars.OKX_API_BASE || 'https://my.okx.com' }}
+          # This account can't trade perpetuals (EEA): BTC spot against USDC.
+          OKX_INSTRUMENT: ${{ vars.OKX_INSTRUMENT || 'BTC-USDC' }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           TRADEBOT_HALT: ${{ vars.TRADEBOT_HALT }}
         run: |

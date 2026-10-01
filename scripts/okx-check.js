@@ -57,16 +57,19 @@ async function main() {
   console.log(`✓ OKX public API reachable (${base}) — BTC mark price ${(+r.data[0].markPx).toFixed(1)}`);
 
   if (haveKeys) for (const line of shapes(key, secret, pass)) console.log(`  · ${line}`);
+  const instrument = (process.env.OKX_INSTRUMENT || '').trim().toUpperCase() || require('../config').OKX_INSTRUMENT;
   const client = createClient({
     apiKey: haveKeys ? key : 'dummy-key', apiSecret: haveKeys ? secret : 'dummy',
-    passphrase: haveKeys ? pass : 'dummy', base,
+    passphrase: haveKeys ? pass : 'dummy', base, instrument,
   });
+  if (haveKeys) console.log(`  instrument: ${instrument}${client.spot ? ' (spot: long-only, no leverage)' : ' (perpetual)'}`);
   try {
     const w = await client.getWallet();
     const a = await client.accountInfo();
     const p = await client.getPositions();
     const MODES = { 1: 'Spot mode', 2: 'Futures mode', 3: 'Multi-currency margin', 4: 'Portfolio margin' };
-    console.log(`✓ Demo account OK — USDT equity ${w.equity.toFixed(2)}, available ${w.available.toFixed(2)}`);
+    const quote = client.spot ? instrument.split('-')[1] : 'USDT';
+    console.log(`✓ Demo account OK — ${quote} equity ${w.equity.toFixed(2)}, available ${w.available.toFixed(2)}`);
     const h = await client.holdings();
     console.log(`  trading account (≈ $${h.totalUsd.toFixed(0)}): ${h.trading.slice(0, 6).map(c => `${c.ccy} ${+c.eq.toFixed(4)}`).join(', ') || 'empty'}`);
     if (h.fundingUsdt != null) console.log(`  funding account USDT: ${h.fundingUsdt.toFixed(2)}`);
@@ -77,13 +80,18 @@ async function main() {
       try { const m = await client.maxSize(instId, tdMode); console.log(`  ${instId} (${tdMode}): max buy ${m.buy}, max sell ${m.sell}`); } catch (e) { console.log(`  ${instId} (${tdMode}): ${e.message.replace(/^.*-> /, '')}`); }
     }
     console.log(`  account mode: ${MODES[a.acctLv] || a.acctLv} · position mode: ${a.posMode === 'long_short_mode' ? 'long/short' : 'net (one-way)'}`);
-    if (a.acctLv === '2' && w.equity < 100) {
+    if (client.spot && w.available < 50) {
+      console.log(`✗ Hardly any ${quote} in the trading account — the bot buys ${instrument} with ${quote}.\n` +
+        `  In the OKX app (demo mode): convert or transfer some ${quote} into the Trading account (the bot trades like a 2000 ${quote} account).`);
+      return 1;
+    }
+    if (!client.spot && a.acctLv === '2' && w.equity < 100) {
       console.log('✗ No USDT in the trading account — the bot trades BTC-USDT perpetuals, which need USDT as margin in Futures mode.\n' +
         `  In the OKX app (demo mode): Assets → Transfer → USDT from ${h.fundingUsdt > 0 ? `Funding (${h.fundingUsdt.toFixed(0)} USDT there)` : 'Funding'} to Trading, e.g. 5000 USDT.\n` +
         '  Or switch the demo account to Multi-currency margin mode (Settings → Account mode): then its other coins count as margin.');
       return 1;
     }
-    if (a.acctLv === '1') {
+    if (!client.spot && a.acctLv === '1') {
       console.log('✗ Spot mode can\'t trade perpetual swaps — switch the demo account to Futures mode (Settings → Account mode)');
       return 1;
     }

@@ -589,3 +589,109 @@ test('Actions failure alerts: on the first failure, every 6h while failing, all-
   assert.equal(r.message.title, 'BTC bot runs work again');
   assert.deepEqual(r.state, { failing: false });
 });
+
+/* ---------------- OKX spot (BTC-USDC) ---------------- */
+
+// A stateful stand-in for OKX spot: market orders fill at S.mark (buy fee in
+// BTC, sell fee in USDC, 0.1%), stop-loss algo orders live in S.algos,
+// S.triggerStop() fires the bot's stop.
+function fakeOkxSpot(state = {}) {
+  const S = { mark: 100000, usdc: 5000, algos: [], orders: {}, fills: [], calls: [], seq: 0, failStop: false, ...state };
+  const ok = (data) => ({ status: 200, text: async () => JSON.stringify({ code: '0', msg: '', data }) });
+  const fail = (code, msg) => ({ status: 200, text: async () => JSON.stringify({ code: '1', msg: '', data: [{ sCode: code, sMsg: msg }] }) });
+  const fill = (ordId, side, sz, px, t) => {
+    const fee = side === 'buy' ? -sz * 0.001 : -sz * px * 0.001;
+    S.fills.push({ billId: String(++S.seq), ordId, side, fillSz: String(sz), fillPx: String(px), fee: String(fee), feeCcy: side === 'buy' ? 'BTC' : 'USDC', ts: String(t || Date.now()) });
+    return fee;
+  };
+  S.triggerStop = (t) => {
+    const a = S.algos.find(x => String(x.algoClOrdId).startsWith('btcbot'));
+    S.algos = S.algos.filter(x => x !== a);
+    fill('stop' + (++S.seq), 'sell', +a.sz, +a.slTriggerPx, t);
+  };
+  const fetchImpl = async (url, opts = {}) => {
+    const u = new URL(url), path = u.pathname, q = Object.fromEntries(u.searchParams), body = opts.body ? JSON.parse(opts.body) : null;
+    S.calls.push({ method: opts.method, path, query: q, body });
+    switch (path) {
+      case '/api/v5/public/instruments': return ok([{ instId: 'BTC-USDC', lotSz: '0.00000001', minSz: '0.0001', tickSz: '0.1' }]);
+      case '/api/v5/market/ticker': return ok([{ instId: 'BTC-USDC', last: String(S.mark) }]);
+      case '/api/v5/account/balance': return ok([{ details: [{ ccy: 'USDC', eq: String(S.usdc), availBal: String(S.usdc) }] }]);
+      case '/api/v5/trade/order':
+        if (opts.method === 'GET') return ok([S.orders[q.ordId]]);
+        {
+          const id = 'ord' + (++S.seq), sz = +body.sz;
+          const fee = fill(id, body.side, sz, S.mark);
+          S.orders[id] = { ordId: id, state: 'filled', accFillSz: String(sz), avgPx: String(S.mark), fee: String(fee), feeCcy: body.side === 'buy' ? 'BTC' : 'USDC' };
+          return ok([{ ordId: id, sCode: '0' }]);
+        }
+      case '/api/v5/trade/order-algo':
+        if (S.failStop) return fail('51000', 'stop rejected');
+        S.algos.push({ algoId: 'alg' + (++S.seq), instId: 'BTC-USDC', side: body.side, sz: body.sz, slTriggerPx: body.slTriggerPx, algoClOrdId: body.algoClOrdId });
+        return ok([{ algoId: 'alg' + S.seq, sCode: '0' }]);
+      case '/api/v5/trade/orders-algo-pending': return ok(S.algos);
+      case '/api/v5/trade/amend-algos': S.algos.find(a => a.algoId === body.algoId).slTriggerPx = body.newSlTriggerPx; return ok([{ algoId: body.algoId, sCode: '0' }]);
+      case '/api/v5/trade/cancel-algos': S.algos = S.algos.filter(a => !body.some(b => b.algoId === a.algoId)); return ok(body.map(b => ({ algoId: b.algoId, sCode: '0' })));
+      case '/api/v5/trade/orders-pending': return ok([]);
+      case '/api/v5/trade/fills-history': return ok(S.fills.filter(f => +f.ts >= +(q.begin || 0)).slice().reverse());
+      default: return { status: 404, text: async () => 'not found' };
+    }
+  };
+  return { S, fetchImpl };
+}
+const spotClient = (f) => require('../src/okx').createClient({ apiKey: 'k', apiSecret: 's', passphrase: 'p', fetchImpl: f.fetchImpl, instrument: 'btc-usdc' });
+
+test('OKX spot: buys BTC, then a stop for exactly what arrived; only the bot\'s own stop counts as its position', async () => {
+  const f = fakeOkxSpot({ algos: [{ algoId: 'mine', instId: 'BTC-USDC', side: 'sell', sz: '1', slTriggerPx: '50000', algoClOrdId: 'manual1' }] });
+  const c = spotClient(f);
+  assert.equal(c.spot, true);
+  assert.deepEqual(await c.getWallet(), { equity: 5000, available: 5000 });
+  assert.deepEqual(await c.getPositions(), {}); // someone else's stop isn't the bot's position
+  await c.openMarket({ symbol: 'BTCUSDT', bias: 1, qty: 0.02, stopLoss: 98000 });
+  const buy = f.S.calls.find(x => x.path === '/api/v5/trade/order' && x.method === 'POST').body;
+  assert.deepEqual([buy.side, buy.ordType, buy.tgtCcy, buy.sz, buy.tdMode], ['buy', 'market', 'base_ccy', '0.02', 'cash']);
+  const stop = f.S.calls.find(x => x.path === '/api/v5/trade/order-algo').body;
+  assert.deepEqual([stop.side, stop.ordType, stop.sz, stop.slTriggerPx, stop.slOrdPx, stop.slTriggerPxType], ['sell', 'conditional', '0.01998', '98000', '-1', 'last']);
+  assert.match(stop.algoClOrdId, /^btcbot/);
+  const p = (await c.getPositions()).BTCUSDT;
+  assert.deepEqual([p.bias, p.size, p.avgPrice, p.stopLoss], [1, 0.01998, 100000, 98000]);
+  await assert.rejects(c.openMarket({ symbol: 'BTCUSDT', bias: -1, qty: 0.01, stopLoss: 102000 }), /long-only/);
+});
+
+test('OKX spot: if the stop can\'t be placed, the bought BTC is sold again', async () => {
+  const f = fakeOkxSpot({ failStop: true });
+  await assert.rejects(spotClient(f).openMarket({ symbol: 'BTCUSDT', bias: 1, qty: 0.02, stopLoss: 98000 }), /sold again/);
+  const orders = f.S.calls.filter(x => x.path === '/api/v5/trade/order' && x.method === 'POST').map(x => [x.body.side, x.body.sz]);
+  assert.deepEqual(orders, [['buy', '0.02'], ['sell', '0.01998']]);
+});
+
+test('OKX spot through the bot: entry, trailed stop, stop hit booked with fees on both sides', async () => {
+  const f = fakeOkxSpot();
+  const client = spotClient(f);
+  const st = freshState();
+  const savedLev = config.PORTFOLIO.LEVERAGE, savedX = config.PORTFOLIO.MAX_POSITION_X;
+  Object.assign(config.PORTFOLIO, { LEVERAGE: 1, MAX_POSITION_X: 1 }); // as run.js sets them for spot
+  try {
+    const now0 = Date.now() - 60000;
+    const Tn = Math.floor(now0 / TF) * TF - TF;
+    await exchange.runExchange({ client, st, sig: [S(Tn, 100000, { enter: 1 })], events: [], now: now0 });
+    const pos = st.position;
+    assert.equal(pos.entry, 100000);
+    assert.equal(pos.qty, 0.01998); // 0.02 bought, 0.1% fee taken in BTC
+    assert.equal(pos.stop, 98000);
+    // Next 4H close at 106000: the stop trails to 103000 on OKX.
+    f.S.mark = 106000;
+    await exchange.runExchange({ client, st, sig: [S(Tn + TF, 106000)], events: [], now: now0 + 1000 });
+    assert.equal(f.S.algos[0].slTriggerPx, '103000');
+    assert.ok(Math.abs(st.position.unrealisedPnl - 0.01998 * 6000) < 1e-6);
+    // The stop fires; the next sync books it.
+    f.S.triggerStop(Date.now());
+    await exchange.runExchange({ client, st, events: [], now: now0 + 2000 });
+    assert.equal(st.position, null);
+    const t = st.trades[0];
+    assert.equal(t.reason, 'trailing stop');
+    // proceeds 0.01998 x 103000 minus 0.1% fee, minus the 2000 USDC the 0.02 BTC cost
+    const expected = 0.01998 * 103000 * 0.999 - 2000;
+    assert.ok(Math.abs(t.pnl - expected) < 1e-6, `${t.pnl} vs ${expected}`);
+    assert.ok(Math.abs(st.account.balance - (2000 + expected)) < 1e-6);
+  } finally { Object.assign(config.PORTFOLIO, { LEVERAGE: savedLev, MAX_POSITION_X: savedX }); }
+});

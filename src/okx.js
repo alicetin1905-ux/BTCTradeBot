@@ -35,9 +35,15 @@ function sign(secret, timestamp, method, requestPath, body) {
 const instIdOf = (symbol) => symbol.replace(/USDT$/, '') + '-USDT-SWAP';
 const symbolOf = (instId) => instId.replace(/-USDT-SWAP$/, 'USDT');
 const num = (x) => (x === '' || x == null ? 0 : +x);
-const dp = (step) => Math.max(0, (String(step).split('.')[1] || '').length);
+// Decimals of a lot / tick step — also for tiny steps JavaScript prints as "1e-8".
+function dp(step) {
+  let d = 0;
+  while (d < 12 && Math.abs(Math.round(step * 10 ** d) - step * 10 ** d) > 1e-9) d++;
+  return d;
+}
 
-function createClient({ apiKey, apiSecret, passphrase, base = DEFAULT_BASE, fetchImpl = fetch }) {
+// Signed / public HTTP for both clients. Every call is marked as demo.
+function transport({ apiKey, apiSecret, passphrase, base = DEFAULT_BASE, fetchImpl = fetch }) {
   // Pasted values often carry a stray space or line break.
   [apiKey, apiSecret, passphrase] = [apiKey, apiSecret, passphrase].map(v => (v == null ? v : String(v).trim()));
   if (!apiKey || !apiSecret || !passphrase) throw new Error('OKX_API_KEY / OKX_API_SECRET / OKX_API_PASSPHRASE are not set (see .env.example)');
@@ -88,6 +94,48 @@ function createClient({ apiKey, apiSecret, passphrase, base = DEFAULT_BASE, fetc
     return data;
   }
 
+  return { request, publicGet, base };
+}
+
+// Read-only account facts for scripts/okx-check.js (both clients).
+function diagnostics(request) {
+  return {
+    // Account and position mode, read-only (scripts/okx-check.js).
+    async accountInfo() {
+      const c = (await request('GET', '/api/v5/account/config'))[0] || {};
+      return { acctLv: c.acctLv, posMode: c.posMode };
+    },
+
+    // BTC instruments this account may trade (account-level instrument list).
+    async tradableBtc(instType = 'SWAP') {
+      const rows = await request('GET', '/api/v5/account/instruments', { instType });
+      return rows.filter(r => /^BTC-/.test(r.instId)).map(r => `${r.instId}${r.state && r.state !== 'live' ? ' (' + r.state + ')' : ''}`);
+    },
+
+    // Read-only "could I trade this?": OKX's max order size, or its refusal.
+    async maxSize(instId, tdMode) {
+      const r = (await request('GET', '/api/v5/account/max-size', { instId, tdMode }))[0] || {};
+      return { buy: num(r.maxBuy), sell: num(r.maxSell) };
+    },
+
+    // Where the coins are, for scripts/okx-check.js: the trading account's
+    // currencies (USD value) and the funding account's USDT.
+    async holdings() {
+      const acct = (await request('GET', '/api/v5/account/balance'))[0] || {};
+      const trading = (acct.details || []).map(c => ({ ccy: c.ccy, eq: num(c.eq), usd: num(c.eqUsd) }))
+        .filter(c => c.eq).sort((a, b) => b.usd - a.usd);
+      let fundingUsdt = null;
+      try {
+        const f = (await request('GET', '/api/v5/asset/balances', { ccy: 'USDT' }))[0];
+        fundingUsdt = f ? num(f.availBal) : 0;
+      } catch (e) { /* key without asset read access */ }
+      return { totalUsd: num(acct.totalEq), trading, fundingUsdt };
+    },
+  };
+}
+
+function createSwapClient(opts) {
+  const { request, publicGet } = transport(opts);
   // Instrument rules, cached per run.
   const instCache = {};
   async function inst(symbol) {
@@ -141,37 +189,7 @@ function createClient({ apiKey, apiSecret, passphrase, base = DEFAULT_BASE, fetc
     name: 'okx-demo',
     label: 'OKX',
 
-    // Account and position mode, read-only (scripts/okx-check.js).
-    async accountInfo() {
-      const c = (await request('GET', '/api/v5/account/config'))[0] || {};
-      return { acctLv: c.acctLv, posMode: c.posMode };
-    },
-
-    // BTC instruments this account may trade (account-level instrument list).
-    async tradableBtc(instType = 'SWAP') {
-      const rows = await request('GET', '/api/v5/account/instruments', { instType });
-      return rows.filter(r => /^BTC-/.test(r.instId)).map(r => `${r.instId}${r.state && r.state !== 'live' ? ' (' + r.state + ')' : ''}`);
-    },
-
-    // Read-only "could I trade this?": OKX's max order size, or its refusal.
-    async maxSize(instId, tdMode) {
-      const r = (await request('GET', '/api/v5/account/max-size', { instId, tdMode }))[0] || {};
-      return { buy: num(r.maxBuy), sell: num(r.maxSell) };
-    },
-
-    // Where the coins are, for scripts/okx-check.js: the trading account's
-    // currencies (USD value) and the funding account's USDT.
-    async holdings() {
-      const acct = (await request('GET', '/api/v5/account/balance'))[0] || {};
-      const trading = (acct.details || []).map(c => ({ ccy: c.ccy, eq: num(c.eq), usd: num(c.eqUsd) }))
-        .filter(c => c.eq).sort((a, b) => b.usd - a.usd);
-      let fundingUsdt = null;
-      try {
-        const f = (await request('GET', '/api/v5/asset/balances', { ccy: 'USDT' }))[0];
-        fundingUsdt = f ? num(f.availBal) : 0;
-      } catch (e) { /* key without asset read access */ }
-      return { totalUsd: num(acct.totalEq), trading, fundingUsdt };
-    },
+    ...diagnostics(request),
 
     // USDT equity / available balance of the trading account.
     async getWallet() {
@@ -349,6 +367,195 @@ function createClient({ apiKey, apiSecret, passphrase, base = DEFAULT_BASE, fetc
       return [...byOrder.values()].map(o => ({ orderId: o.orderId, qty: +o.qty.toFixed(8), exit: o.notional / o.qty, pnl: o.pnl, at: o.at }));
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// Spot (e.g. BTC-USDC): for accounts that can't trade perpetuals — OKX's EEA
+// site has no USDT and no perpetual access for many accounts. Long-only, no
+// leverage, no funding. The "position" is what the bot itself bought: it's
+// recognised by the bot's own stop-loss order (algoClOrdId starting "btcbot"),
+// so other BTC in the account is never sold or counted.
+//
+//   entry   market buy of the BTC amount (tgtCcy base_ccy), then a
+//           stop-loss sell order for exactly what arrived (the buy fee is
+//           taken in BTC); if the stop can't be placed the BTC is sold again
+//   stop    conditional sell, trigger on the last price, market when hit;
+//           trailing amends it
+//   P&L     rebuilt from fills: sell proceeds minus the cost of what was
+//           bought, fees included on both sides
+// Don't trade the same pair by hand on the demo account while the bot holds
+// a position: its fills would be counted as the bot's.
+const BOT_TAG = 'btcbot';
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+function createSpotClient(opts) {
+  const { request, publicGet } = transport(opts);
+  const instId = opts.instrument;
+  const [baseCcy, quoteCcy] = instId.split('-');
+  const SYMBOL = opts.symbol || 'BTCUSDT';
+  let rules = null;
+  async function inst() {
+    if (!rules) {
+      const i = (await publicGet('/api/v5/public/instruments', { instType: 'SPOT', instId }))[0];
+      if (!i) throw new Error(`${instId} is not listed on OKX`);
+      rules = { lotSz: num(i.lotSz), minSz: num(i.minSz), tickSz: num(i.tickSz) };
+    }
+    return rules;
+  }
+  const size = async (qty) => { const i = await inst(); return String(+(Math.floor(qty / i.lotSz + 1e-6) * i.lotSz).toFixed(dp(i.lotSz))); };
+  const tag = () => (BOT_TAG + Date.now().toString(36) + Math.random().toString(36).slice(2, 8)).slice(0, 32);
+  async function last() {
+    const t = (await publicGet('/api/v5/market/ticker', { instId }))[0];
+    if (!t) throw new Error(`no ticker for ${instId}`);
+    return num(t.last);
+  }
+  async function botStops() {
+    const rows = await request('GET', '/api/v5/trade/orders-algo-pending', { ordType: 'conditional', instType: 'SPOT', instId });
+    return rows.filter(r => String(r.algoClOrdId || '').startsWith(BOT_TAG) && r.side === 'sell');
+  }
+  async function placeStop(qty, stopLoss) {
+    const r = await request('POST', '/api/v5/trade/order-algo', {
+      instId, tdMode: 'cash', side: 'sell', ordType: 'conditional', sz: await size(qty),
+      slTriggerPx: String(stopLoss), slOrdPx: '-1', slTriggerPxType: 'last', algoClOrdId: tag(),
+    });
+    return r[0].algoId;
+  }
+  let lastEntry = null; // the fill of the entry this process just made (openEntry reads it right away)
+
+  return {
+    name: 'okx-demo-spot',
+    label: 'OKX',
+    spot: true,
+    instrument: instId,
+    ...diagnostics(request),
+
+    // Quote-currency (e.g. USDC) cash in the trading account.
+    async getWallet() {
+      const acct = (await request('GET', '/api/v5/account/balance', { ccy: quoteCcy }))[0] || {};
+      const q = (acct.details || []).find(c => c.ccy === quoteCcy) || {};
+      return { equity: num(q.eq), available: num(q.availBal !== undefined && q.availBal !== '' ? q.availBal : q.availEq) };
+    },
+
+    async getPositions() {
+      const stops = await botStops();
+      if (!stops.length) return {};
+      return {
+        [SYMBOL]: {
+          symbol: SYMBOL, bias: 1, size: +stops.reduce((a, o) => a + num(o.sz), 0).toFixed(8),
+          avgPrice: lastEntry ? lastEntry.avgPx : 0, markPrice: await last(), unrealisedPnl: null,
+          stopLoss: num(stops[0].slTriggerPx),
+        },
+      };
+    },
+
+    async getInstrument() {
+      const i = await inst();
+      return { qtyStep: i.lotSz, minOrderQty: i.minSz, minNotional: 0, tickSize: i.tickSz };
+    },
+
+    async getMarkPrice() { return last(); },
+
+    async setLeverage() { /* spot: no leverage */ },
+
+    async openMarket({ bias, qty, stopLoss }) {
+      if (bias !== 1) throw new Error(`${instId} is spot: the bot can only buy (long-only)`);
+      const ordId = (await request('POST', '/api/v5/trade/order', {
+        instId, tdMode: 'cash', side: 'buy', ordType: 'market', tgtCcy: 'base_ccy', sz: await size(qty), clOrdId: tag(),
+      }))[0].ordId;
+      let o = null;
+      for (let i = 0; i < 10; i++) {
+        o = (await request('GET', '/api/v5/trade/order', { instId, ordId }))[0];
+        if (o && ['filled', 'canceled', 'mmp_canceled'].includes(o.state)) break;
+        await sleep(300);
+      }
+      const filled = num(o && o.accFillSz);
+      if (!filled) throw new Error(`buy order ${ordId} did not fill (${o ? o.state : 'unknown'})`);
+      const net = filled + (o.feeCcy === baseCcy ? num(o.fee) : 0); // the buy fee is taken in BTC
+      try {
+        await placeStop(net, stopLoss);
+      } catch (err) {
+        await request('POST', '/api/v5/trade/order', { instId, tdMode: 'cash', side: 'sell', ordType: 'market', sz: await size(net), clOrdId: tag() });
+        throw new Error(`stop order failed (${err.message}) — the bought ${baseCcy} was sold again`);
+      }
+      lastEntry = { avgPx: num(o.avgPx), size: net };
+      return ordId;
+    },
+
+    async setStopLoss(symbol, stopLoss) {
+      const stops = await botStops();
+      if (!stops.length) throw new Error(`no ${instId} stop order of the bot on OKX`);
+      const px = await last();
+      if (px <= stopLoss) throw new Error(`stop ${stopLoss} is not below the price ${px}`);
+      try {
+        for (const o of stops) {
+          await request('POST', '/api/v5/trade/amend-algos', {
+            instId, algoId: o.algoId, newSlTriggerPx: String(stopLoss), newSlOrdPx: '-1', newSlTriggerPxType: 'last',
+          });
+        }
+      } catch (err) {
+        // Not amendable: place the new stop first, then cancel the old one.
+        await placeStop(stops.reduce((a, o) => a + num(o.sz), 0), stopLoss);
+        await request('POST', '/api/v5/trade/cancel-algos', stops.map(o => ({ algoId: o.algoId, instId })));
+      }
+    },
+
+    async closeMarket({ qty }) {
+      const r = await request('POST', '/api/v5/trade/order', { instId, tdMode: 'cash', side: 'sell', ordType: 'market', sz: await size(qty), clOrdId: tag() });
+      return r[0].ordId;
+    },
+
+    // Cancels the bot's own stop and open orders on the pair — nothing else.
+    async cancelAll() {
+      const stops = await botStops();
+      if (stops.length) await request('POST', '/api/v5/trade/cancel-algos', stops.map(o => ({ algoId: o.algoId, instId })));
+      const open = (await request('GET', '/api/v5/trade/orders-pending', { instType: 'SPOT', instId }))
+        .filter(o => String(o.clOrdId || '').startsWith(BOT_TAG));
+      if (open.length) await request('POST', '/api/v5/trade/cancel-batch-orders', open.map(o => ({ instId, ordId: o.ordId })));
+    },
+
+    async getFundingFees() { return []; }, // spot: no funding
+
+    // Realized P&L per sell order since startTime: proceeds minus the cost
+    // of the BTC sold (bought at the replayed average, fees included).
+    async getClosedPnl(symbol, startTime) {
+      const fills = [];
+      let after = '';
+      for (let page = 0; page < 20; page++) {
+        const params = { instType: 'SPOT', instId, begin: String(startTime), limit: '100' };
+        if (after) params.after = after;
+        const rows = await request('GET', '/api/v5/trade/fills-history', params);
+        fills.push(...rows);
+        if (rows.length < 100) break;
+        after = rows[rows.length - 1].billId;
+      }
+      fills.sort((a, b) => num(a.ts) - num(b.ts) || num(a.billId) - num(b.billId));
+      let held = 0, cost = 0;
+      const byOrder = new Map();
+      for (const f of fills) {
+        const sz = num(f.fillSz), px = num(f.fillPx), fee = num(f.fee); // fee < 0 = charged
+        if (f.side === 'buy') {
+          held += sz + (f.feeCcy === baseCcy ? fee : 0);
+          cost += sz * px - (f.feeCcy === quoteCcy ? fee : 0);
+          continue;
+        }
+        if (held <= 1e-12) continue; // not the bot's BTC
+        const share = Math.min(1, sz / held), basis = cost * share;
+        held -= Math.min(sz, held); cost -= basis;
+        const proceeds = sz * px + (f.feeCcy === quoteCcy ? fee : f.feeCcy === baseCcy ? fee * px : 0);
+        const o = byOrder.get(f.ordId) || { orderId: f.ordId, qty: 0, notional: 0, pnl: 0, at: 0 };
+        o.qty += sz; o.notional += sz * px; o.pnl += proceeds - basis; o.at = Math.max(o.at, num(f.ts));
+        byOrder.set(f.ordId, o);
+      }
+      return [...byOrder.values()].map(o => ({ orderId: o.orderId, qty: +o.qty.toFixed(8), exit: o.notional / o.qty, pnl: o.pnl, at: o.at }));
+    },
+  };
+}
+
+// BTC-USDT-SWAP (default) or a spot pair such as BTC-USDC.
+function createClient(opts) {
+  const instrument = String(opts.instrument || '').trim().toUpperCase();
+  if (instrument && !/-SWAP$/.test(instrument)) return createSpotClient({ ...opts, instrument });
+  return createSwapClient(opts);
 }
 
 module.exports = { createClient, sign, instIdOf, symbolOf, OkxError };
