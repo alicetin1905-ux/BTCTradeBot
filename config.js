@@ -20,10 +20,12 @@ const config = module.exports = {
   // Signal timeframe: closed 4H candles (UTC-aligned: 00/04/08/12/16/20).
   // backtest/RESEARCH.md: 1D breakouts were much weaker on BTC.
   ENTRY_TF: '240',
-  // New entries only on the run right after the 4H close (within this many
-  // minutes), like the backtest; a breakout that's an hour or more old isn't
-  // chased. Stops and exits still update on any run.
-  ENTRY_FRESH_MIN: 60,
+  // New entries only within this many minutes of the 4H close. GitHub's cron
+  // often delays or drops runs, so this leaves room for a few late ones; a
+  // signal older than that isn't chased. Backtest: entering 1-4h after the
+  // close costs nothing measurable (PF 1.43-1.46 vs 1.44 at the close).
+  // Stops and exits still update on any run.
+  ENTRY_FRESH_MIN: 180,
 
   // Where the candles come from: null = the exchange it trades on (the
   // other one as a fallback), or 'bybit' / 'okx'.

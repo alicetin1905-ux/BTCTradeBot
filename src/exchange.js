@@ -188,7 +188,7 @@ function entryBlock(st, s, now, { halt = false, live = null } = {}) {
   if (!signal.allowed(s.enter, config.DIRECTION)) return 'short signal, but the bot trades long-only (DIRECTION)';
   if (st.meta && st.meta.lastEntryCandle === s.t) return 'already entered on this 4H candle';
   const ago = now - (s.t + TF_MS);
-  if (config.ENTRY_FRESH_MIN != null && ago > config.ENTRY_FRESH_MIN * 60000) return `signal candle closed ${Math.round(ago / 60000)} min ago — entries only right after a 4H close`;
+  if (config.ENTRY_FRESH_MIN != null && ago > config.ENTRY_FRESH_MIN * 60000) return `signal candle closed ${Math.round(ago / 60000)} min ago — entries only within ${config.ENTRY_FRESH_MIN} min of a 4H close`;
   if (halt) return 'trading halted (TRADEBOT_HALT)';
   if (dailyLossHit(st, now)) return `daily loss limit (${config.EXECUTION.DAILY_LOSS_LIMIT_PCT}%) reached — no new entries until 00:00 UTC`;
   return null;

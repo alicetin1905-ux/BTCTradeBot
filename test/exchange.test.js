@@ -160,7 +160,7 @@ test('sizing: a tight stop is capped at 2x the balance; the smaller of allocatio
 
 test('no entry: stale breakout, short in long-only mode, the same candle twice, halted, untracked BTC position', async () => {
   const cases = [
-    ['stale', (st, c) => exchange.runExchange({ client: c, st, sig: [S(T0, 100000, { enter: 1 })], events: [], now: T0 + TF + 61 * 60000 }), /min ago/],
+    ['stale', (st, c) => exchange.runExchange({ client: c, st, sig: [S(T0, 100000, { enter: 1 })], events: [], now: T0 + TF + 181 * 60000 }), /min ago/],
     ['short', (st, c) => exchange.runExchange({ client: c, st, sig: [S(T0, 100000, { enter: -1 })], events: [], now: after(T0) }), /long-only/],
     ['same candle', (st, c) => { st.meta.lastEntryCandle = T0; return enterLong(c, st); }, /already entered/],
     ['halt', (st, c) => exchange.runExchange({ client: c, st, sig: [S(T0, 100000, { enter: 1 })], events: [], now: after(T0), halt: true }), /halted/],
@@ -170,7 +170,7 @@ test('no entry: stale breakout, short in long-only mode, the same candle twice, 
     const st = freshState();
     await fn(st, client);
     assert.equal(ex.calls.filter(c => c[0] === 'openMarket').length, 0, name);
-    assert.match(exchange.entryBlock(st, S(T0, 100000, { enter: name === 'short' ? -1 : 1 }), name === 'stale' ? T0 + TF + 61 * 60000 : after(T0), { halt: name === 'halt' }), why, name);
+    assert.match(exchange.entryBlock(st, S(T0, 100000, { enter: name === 'short' ? -1 : 1 }), name === 'stale' ? T0 + TF + 181 * 60000 : after(T0), { halt: name === 'halt' }), why, name);
   }
   // A BTCUSDT position the bot didn't open: left alone, no entry on top of it.
   const { ex, client } = fakeBybit();

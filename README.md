@@ -41,7 +41,7 @@ alarm.
   funding / open interest / order book / taker-flow inputs, which have no
   history. So the live score is exactly the one the backtest used.
 - **Entry:** a market order with the stop attached, on the run right after the
-  4H close (within 60 min, `ENTRY_FRESH_MIN`). One attempt per signal candle.
+  4H close (within 3 h, `ENTRY_FRESH_MIN`, so late GitHub runs don't miss it). One attempt per signal candle.
 - **Initial stop:** 2 × ATR(14) from the entry (`STOP_ATR`).
 - **Trailing stop:** after every 4H close the stop moves to *best close since
   entry ∓ 3 × ATR* (`TRAIL_ATR`). It only ever tightens, and it sits on the
