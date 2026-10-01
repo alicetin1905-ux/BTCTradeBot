@@ -83,3 +83,21 @@ X=±40       0.95 (4)    0.90 (13)    0.97 (22)    1.20 (31)    1.19 (37)    1.2
 Picked on 2021-2023 only: X=±25 K=3 (PF 1.93 before 2024) → 2024+ PF 1.49
 2024+ PF across all cells with >= 30 trades/yr: median 1.34, worst 1.12, best 1.70
 ```
+
+## Combined with the live breakout (one position at a time)
+
+Same engine as `scripts/backtest.js` (row A reproduces the live backtest exactly). C = enter on whichever signal fires first; an opposite signal from either reverses. D = breakout only when the ATLAS score agrees (±25). E = C without the exit channel — identical, because with equal 15-candle channels an exit-channel close is also an opposite breakout.
+
+```
+variant                                       trades/yr win%    ret%  DD%   PF  in mkt | <2024 2024+ | 2021  2022  2023  2024  2025  2026
+A  breakout only (live bot)                          74   34     374   32 1.35     76% |  1.41  1.51 |  -110   120  2113  1472    16   731
+B  ATLAS flip only                                   60   31     581   25 1.47     60% |  1.93  1.49 |   727   101  2222   896   -48  1023
+C  either, first wins (+ exit channel)               92   31     283   36 1.22     87% |  1.42  1.30 |   312    49  1969  1216  -255   692
+D  breakout only when ATLAS agrees (>= ±25)          71   35     334   33 1.33     72% |  1.43  1.47 |  -122    78  2187  1356  -165   777
+E  either, stop/trail exits only                     92   31     283   36 1.22     87% |  1.42  1.30 |   312    49  1969  1216  -255   692
+
+C — where the trades came from: breakout: 198 trades, +1032 · both: 111 trades, +1597 · flip: 222 trades, +3033
+C — longest losing streak: 11
+```
+
+**Result:** combining is worse than either signal alone (+283%, worst drop 36%, PF 1.22): the two signals reverse each other's trades, the position is open 87% of the time (more funding) and the longest losing streak grows to 11. Using ATLAS as a filter on the breakout (D) changes little. The ATLAS flip alone (B) stays the strongest.
