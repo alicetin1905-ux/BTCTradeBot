@@ -1,0 +1,45 @@
+{
+  "balance": 2000,
+  "startingBalance": 2000,
+  "fundingSince": 1790814227992,
+  "funding": {
+    "total": 0
+  },
+  "startedAt": 1790814227992,
+  "fundingError": null,
+  "exchangeEquity": 1999.93941129761,
+  "settings": {
+    "RISK_PCT": 2,
+    "MAX_POSITION_X": 1,
+    "LEVERAGE": 1,
+    "DAILY_LOSS_LIMIT_PCT": 10,
+    "DIRECTION": "long",
+    "CHANNEL_N": 20,
+    "EXIT_N": 20,
+    "STOP_ATR": 2,
+    "TRAIL_ATR": 3,
+    "ENTRY_FRESH_MIN": 60,
+    "MARKET_DATA": null,
+    "STATUS_EVERY_H": 4
+  },
+  "settingsDefaults": {
+    "RISK_PCT": 2,
+    "MAX_POSITION_X": 2,
+    "LEVERAGE": 5,
+    "DAILY_LOSS_LIMIT_PCT": 10,
+    "DIRECTION": "long",
+    "CHANNEL_N": 20,
+    "EXIT_N": 20,
+    "STOP_ATR": 2,
+    "TRAIL_ATR": 3,
+    "ENTRY_FRESH_MIN": 60,
+    "MARKET_DATA": null,
+    "STATUS_EVERY_H": 4
+  },
+  "settingsErrors": [],
+  "mode": "demo",
+  "exchange": "okx",
+  "instrument": "BTC-USDC",
+  "updatedAt": 1790814228970,
+  "lastRunAt": 1790814228970
+}
