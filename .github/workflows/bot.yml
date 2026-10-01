@@ -25,6 +25,10 @@ on:
         type: choice
         options: [check, run, sync, testtrade]
         default: check
+      instrument:
+        description: 'testtrade / check only: another OKX instrument to try (e.g. BTC-USDC); empty = the bot''s'
+        type: string
+        default: ''
 
 permissions:
   contents: write
@@ -65,4 +69,5 @@ jobs:
           elif [ "${{ github.event.schedule }}" = "18,48 * * * *" ]; then MODE=sync;
           else MODE=run; fi
           echo "mode: $MODE"
+          if [ -n "${{ inputs.instrument }}" ] && { [ "$MODE" = testtrade ] || [ "$MODE" = check ]; }; then export OKX_INSTRUMENT="${{ inputs.instrument }}"; fi
           bash scripts/actions-run.sh "$MODE"

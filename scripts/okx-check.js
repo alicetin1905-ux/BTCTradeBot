@@ -23,7 +23,7 @@ const HINTS = {
   50111: 'the API key is not valid (typo, deleted, or not a demo key)',
   50113: 'invalid signature — OKX_API_SECRET is wrong',
   50119: 'OKX does not know this API key on this site',
-  50123: 'the key is read-only — edit it on OKX (Demo Trading API) and tick "Trade"',
+  50123: 'OKX refuses trading this product with this API key',
 };
 // OKX's sites: a key only exists on the one its account belongs to.
 const SITES = { 'https://www.okx.com': 'global', 'https://my.okx.com': 'EEA', 'https://app.okx.com': 'US', 'https://tr.okx.com': 'Türkiye' };
