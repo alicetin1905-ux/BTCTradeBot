@@ -38,8 +38,10 @@ const num = (x) => (x === '' || x == null ? 0 : +x);
 const dp = (step) => Math.max(0, (String(step).split('.')[1] || '').length);
 
 function createClient({ apiKey, apiSecret, passphrase, base = DEFAULT_BASE, fetchImpl = fetch }) {
+  // Pasted values often carry a stray space or line break.
+  [apiKey, apiSecret, passphrase] = [apiKey, apiSecret, passphrase].map(v => (v == null ? v : String(v).trim()));
   if (!apiKey || !apiSecret || !passphrase) throw new Error('OKX_API_KEY / OKX_API_SECRET / OKX_API_PASSPHRASE are not set (see .env.example)');
-  base = (base || DEFAULT_BASE).replace(/\/$/, '');
+  base = (String(base || '').trim() || DEFAULT_BASE).replace(/\/$/, '');
 
   async function parse(path, res) {
     const text = await res.text();

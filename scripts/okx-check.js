@@ -22,12 +22,30 @@ const HINTS = {
   50110: 'the key is bound to other IP addresses — for GitHub Actions create it without an IP binding',
   50111: 'the API key is not valid (typo, deleted, or not a demo key)',
   50113: 'invalid signature — OKX_API_SECRET is wrong',
-  50119: 'the API key does not exist',
+  50119: 'OKX does not know this API key on this site',
 };
+// OKX's sites: a key only exists on the one its account belongs to.
+const SITES = { 'https://www.okx.com': 'global', 'https://my.okx.com': 'EEA', 'https://app.okx.com': 'US', 'https://tr.okx.com': 'Türkiye' };
+
+// Shape of the pasted values, without printing them: an OKX API key is a
+// UUID (8-4-4-4-12), the secret 32 hex characters.
+function shapes(key, secret, pass) {
+  const out = [];
+  const uuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, hex32 = /^[0-9a-f]{32}$/i;
+  const raw = [process.env.OKX_API_KEY, process.env.OKX_API_SECRET, process.env.OKX_API_PASSPHRASE];
+  if (raw.some(v => v && v !== v.trim())) out.push('a value had spaces or a line break around it (ignored now)');
+  if (uuid.test(key) && hex32.test(secret)) return out.concat('key and secret look right (UUID key, 32-character secret)');
+  if (uuid.test(secret) && hex32.test(key)) return out.concat('OKX_API_KEY and OKX_API_SECRET are SWAPPED — the key is the one with dashes');
+  if (!uuid.test(key)) out.push(`OKX_API_KEY doesn't look like an OKX API key (usually 36 characters like xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx; it has ${key.length})`);
+  if (!hex32.test(secret)) out.push(`OKX_API_SECRET doesn't look like an OKX secret key (usually 32 letters/digits; it has ${secret.length})`);
+  if (!pass) out.push('OKX_API_PASSPHRASE is empty');
+  return out;
+}
 
 async function main() {
-  const base = process.env.OKX_API_BASE || 'https://www.okx.com';
-  const haveKeys = !!(process.env.OKX_API_KEY && process.env.OKX_API_SECRET && process.env.OKX_API_PASSPHRASE);
+  const base = (process.env.OKX_API_BASE || '').trim().replace(/\/$/, '') || 'https://www.okx.com';
+  const key = (process.env.OKX_API_KEY || '').trim(), secret = (process.env.OKX_API_SECRET || '').trim(), pass = (process.env.OKX_API_PASSPHRASE || '').trim();
+  const haveKeys = !!(key && secret && pass);
   let r;
   try {
     r = await (await fetch(base + '/api/v5/public/mark-price?instType=SWAP&instId=BTC-USDT-SWAP')).json();
@@ -38,9 +56,10 @@ async function main() {
   if (r.code !== '0') { console.log(`✗ OKX public API answered ${r.code}: ${r.msg}`); return 1; }
   console.log(`✓ OKX public API reachable (${base}) — BTC mark price ${(+r.data[0].markPx).toFixed(1)}`);
 
+  if (haveKeys) for (const line of shapes(key, secret, pass)) console.log(`  · ${line}`);
   const client = createClient({
-    apiKey: haveKeys ? process.env.OKX_API_KEY : 'dummy-key', apiSecret: haveKeys ? process.env.OKX_API_SECRET : 'dummy',
-    passphrase: haveKeys ? process.env.OKX_API_PASSPHRASE : 'dummy', base,
+    apiKey: haveKeys ? key : 'dummy-key', apiSecret: haveKeys ? secret : 'dummy',
+    passphrase: haveKeys ? pass : 'dummy', base,
   });
   try {
     const w = await client.getWallet();
@@ -61,7 +80,27 @@ async function main() {
       console.log('✓ OKX private API reachable (a dummy key was refused, as expected) — add the three OKX_API_* keys to trade');
       return 0;
     }
-    console.log(`✗ ${haveKeys ? 'Keys refused' : 'Private API'}: ${err.message}${HINTS[code] ? `\n  → ${HINTS[code]}` : ''}`);
+    console.log(`✗ ${haveKeys ? 'Keys refused' : 'Private API'} on ${base}: ${err.message}${HINTS[code] ? `\n  → ${HINTS[code]}` : ''}`);
+    if (haveKeys && (code === 50119 || code === 50111)) {
+      // Is the key known on another OKX site?
+      for (const [site, name] of Object.entries(SITES)) {
+        if (site === base) continue;
+        try {
+          const w = await createClient({ apiKey: key, apiSecret: secret, passphrase: pass, base: site }).getWallet();
+          console.log(`→ The key works on the OKX ${name} site (${site}), demo equity ${w.equity.toFixed(2)} USDT.\n  Add a repository secret OKX_API_BASE = ${site} and run the check again.`);
+          return 1;
+        } catch (e) {
+          if (e.code && +e.code !== 50119 && +e.code !== 50111) {
+            console.log(`→ The key exists on the OKX ${name} site (${site}), which answered: ${e.message}${HINTS[+e.code] ? `\n  → ${HINTS[+e.code]}` : ''}\n  Add a repository secret OKX_API_BASE = ${site}.`);
+            return 1;
+          }
+        }
+      }
+      console.log('  The key is unknown on every OKX site (global, EEA, US, Türkiye). Check that:\n' +
+        '  - it was created while in Demo Trading (Demo Trading API page), and not deleted since\n' +
+        '  - OKX_API_KEY holds the API key (with dashes), OKX_API_SECRET the secret key — re-paste them\n' +
+        '    (GitHub: Settings → Secrets and variables → Actions → the secret → Update).');
+    }
     return 1;
   }
 }
