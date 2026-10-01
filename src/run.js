@@ -173,7 +173,7 @@ async function buildSignal(candles, now) {
   if (config.STRATEGY === 'atlas-flip') {
     const daily = await market.closedCandles(config.SYMBOL, 'D', 400, now);
     if (daily.note) console.log(`daily candles from ${daily.source} (${market.primary()} failed: ${daily.note})`);
-    return flip.series(candles, daily.candles, { threshold: config.FLIP_SCORE, window: config.FLIP_WINDOW }, Math.max(0, candles.length - 60));
+    return flip.series(candles, daily.candles, { threshold: config.FLIP_SCORE, window: config.FLIP_WINDOW, trendBandPct: config.TREND_BAND_PCT }, Math.max(0, candles.length - 60));
   }
   return signal.series(candles, sigParams());
 }

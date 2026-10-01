@@ -35,6 +35,7 @@ const FIELDS = {
   STRATEGY: { at: ['STRATEGY'], check: oneOf('atlas-flip', 'breakout'), label: 'Signal ("atlas-flip" = ATLAS score fast swing, "breakout" = 4H channel breakout)' },
   FLIP_SCORE: { at: ['FLIP_SCORE'], check: num(10, 90, { int: true }), label: 'ATLAS flip: score level (swing from -X to +X)' },
   FLIP_WINDOW: { at: ['FLIP_WINDOW'], check: num(1, 12, { int: true }), label: 'ATLAS flip: within this many 4H candles' },
+  TREND_BAND_PCT: { at: ['TREND_BAND_PCT'], check: num(2, 50, { nullable: true }), label: 'ATLAS flip: skip swings when the 4H close is more than this % from its 200-candle average (null = off)' },
   DIRECTION: { at: ['DIRECTION'], check: oneOf('long', 'both'), label: 'Trade direction ("long" = long-only, "both" = longs and shorts)' },
   CHANNEL_N: { at: ['CHANNEL_N'], check: num(5, 100, { int: true }), label: 'Breakout channel (4H candles)' },
   EXIT_N: { at: ['EXIT_N'], check: num(5, 100, { int: true }), label: 'Exit channel (4H candles)' },

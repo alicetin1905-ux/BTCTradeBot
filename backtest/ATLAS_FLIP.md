@@ -101,3 +101,27 @@ C — longest losing streak: 11
 ```
 
 **Result:** combining is worse than either signal alone (+283%, worst drop 36%, PF 1.22): the two signals reverse each other's trades, the position is open 87% of the time (more funding) and the longest losing streak grows to 11. Using ATLAS as a filter on the breakout (D) changes little. The ATLAS flip alone (B) stays the strongest.
+
+## Trend band + 16h window (live from 2026-10-01)
+
+Trade-by-trade look at the ±25 / 3-candle flip (360 trades, fixed $40 risk):
+trades against the 200-candle 4H average by more than 10% lost (31 trades,
+PF 0.11, negative in both halves), trades already over-extended by more than
+10% in their direction lost too (PF 0.47), and very volatile entries (ATR > 3%
+of price) were weak. Entry-score and swing-depth buckets were not monotonic, so
+no strength-based sizing. Stop 2 ATR / trail 3 ATR sits on a flat plateau
+(tested 1.5-3 x 2-5), so it stays.
+
+Rule added: ignore a swing when |close / MA200(4H) - 1| > 10%
+(`TREND_BAND_PCT`), and widen the window to 4 candles.
+
+| | trades | win% | return | max DD | PF | PF <2024 / 2024+ |
+|---|---:|---:|---:|---:|---:|---:|
+| previous (no band, 3 candles) | 347 | 31 | +581% | 24.9% | 1.47 | 1.93 / 1.49 |
+| live (band ±10%, 4 candles) | 342 | 32 | +834% | 24.6% | 1.56 | 2.33 / 1.49 |
+
+Across X 20-40 x window 2-6 the band lifts the median PF from 1.21 to 1.41 and
+the cells profitable in both halves from 19 to 22 of 25. Caveat: the filter was
+found on the full period, so part of the gain is in-sample. Faster timeframes
+(15m ATLAS flip: PF 0.82-0.96, every setting loses) and support/resistance
+fades (30m/1H/4H, fixed +2.5% target) were tested and rejected.

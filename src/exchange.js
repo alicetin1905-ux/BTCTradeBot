@@ -184,6 +184,7 @@ function entryBlock(st, s, now, { halt = false, live = null } = {}) {
   if (!s) return 'not enough candle history yet';
   if (st.position) return 'a position is open';
   if (live) return 'a BTCUSDT position the bot didn\'t open is on the account — left alone';
+  if (s.blocked) return `ATLAS flip, but the 4H close is more than ${config.TREND_BAND_PCT}% from its 200-candle average — skipped`;
   if (!s.enter) return `no ${config.STRATEGY === 'atlas-flip' ? 'ATLAS flip' : 'breakout'} on the last 4H close`;
   if (!signal.allowed(s.enter, config.DIRECTION)) return 'short signal, but the bot trades long-only (DIRECTION)';
   if (st.meta && st.meta.lastEntryCandle === s.t) return 'already entered on this 4H candle';

@@ -35,11 +35,16 @@ const config = module.exports = {
   //   'atlas-flip'  the ATLAS score swings from <= -FLIP_SCORE to >= +FLIP_SCORE
   //                 (or back) within FLIP_WINDOW candles (src/flip.js) — live
   //   'breakout'    Donchian channel breakout (src/signal.js) — the first setup
-  // backtest/REPORT.md (+ research in ATLAS_FLIP.md): ±25 within 3 candles (12h), long and short:
-  // ~60 trades a year, +581% 2021-26, worst drop 25% (breakout: 74, +374%, 32%).
+  // backtest/REPORT.md (+ research in ATLAS_FLIP.md): ±25 within 4 candles (16h) with the trend band, long and
+  // short: ~60 trades a year, +834% 2021-26, worst drop 25%, PF 1.56 (breakout: 74, +374%, 32%).
   STRATEGY: 'atlas-flip',
   FLIP_SCORE: 25,
-  FLIP_WINDOW: 3,
+  FLIP_WINDOW: 4,
+  // Ignore a swing when the 4H close is more than this % from its 200-candle
+  // 4H average (null = off). Backtest: PF 1.47 -> 1.56-1.61, better in both
+  // halves and across the score/window grid; the losses were counter-trend
+  // and over-extended entries.
+  TREND_BAND_PCT: 10,
 
   // The breakout signal (src/signal.js), when STRATEGY is 'breakout'.
   CHANNEL_N: 15,       // enter when a 4H close breaks the high (low) of the previous 15 candles

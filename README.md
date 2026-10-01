@@ -33,10 +33,13 @@ alarm.
   score (`src/atlasScore.js`, ~25 indicators, −100 to +100), computed on
   closed 4H candles (00/04/08/12/16/20 UTC). Nothing repaints.
   - **Long** when the score closes at **+25 or higher** and was at **−25 or
-    lower** within the previous **3 candles (12h)**: a fast swing from
+    lower** within the previous **4 candles (16h)**: a fast swing from
     bearish to bullish.
   - **Short** is the mirror image.
-  - Settings: `FLIP_SCORE`, `FLIP_WINDOW`, `DIRECTION`.
+  - **Trend band:** a swing is ignored when the 4H close is more than 10 %
+    from its 200-candle 4H average (`TREND_BAND_PCT`): the flip lost on
+    counter-trend and over-extended entries.
+  - Settings: `FLIP_SCORE`, `FLIP_WINDOW`, `TREND_BAND_PCT`, `DIRECTION`.
 - **Price and volume only.** The score is calculated without the
   funding / open interest / order book / taker-flow inputs, which have no
   history. So the live score is exactly the one the backtest used.
@@ -74,7 +77,7 @@ on each side and funding of about 0.01% per 8h, which longs pay.
 
 | | Trades | Win % | Return | Worst drop | Profit factor |
 |---|---:|---:|---:|---:|---:|
-| **Live: ATLAS flip ±25 within 12h, long + short** | 347 (~60/yr) | 31 | **+581%** | 25% | 1.47 |
+| **Live: ATLAS flip ±25 within 16h, 200-MA band ±10%, long + short** | 342 (~60/yr) | 32 | **+834%** | 25% | 1.56 |
 | + 0.05% slippage per side | 347 | 29 | +433% | 26% | 1.38 |
 | Flip within 16h | 416 (~72/yr) | 30 | +459% | 28% | 1.39 |
 | Flip within 20h | 467 (~81/yr) | 30 | +403% | 31% | 1.34 |
@@ -93,7 +96,11 @@ Year by year, starting each year fresh with 2000 USDT at a fixed $40 risk per tr
 
 **Out-of-sample check:** choosing the setting on 2021–2023 alone picks exactly
 ±25 within 3 candles (profit factor 1.93). On 2024–2026, which that choice
-never saw, it made +1870 with a profit factor of 1.49. 27 of 35 neighbouring
+never saw, it made +1870 with a profit factor of 1.49. (The 200-candle trend
+band and the 4-candle window were added afterwards, from the trade-by-trade
+look in `backtest/ATLAS_FLIP.md`: they lifted every one of 8 settings checked
+and 22 of 25 grid cells are profitable in both periods, but they were found on
+the full period, so expect somewhat less than the table.) 27 of 35 neighbouring
 settings are profitable in both periods (`backtest/ATLAS_FLIP.md`).
 
 Other research behind the choice:

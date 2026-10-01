@@ -836,7 +836,7 @@ test('ATLAS flip through the bot: an opposite swing closes the long (and reverse
     assert.equal(st.position.bias, 1);
     assert.equal(st.position.score, 30);
     const notify = require('../src/notify');
-    assert.match(notify.messagesFor(events, st)[0].message, /ATLAS score swung -40 → \+30 within 12h/);
+    assert.match(notify.messagesFor(events, st)[0].message, /ATLAS score swung -40 → \+30 within 16h/);
     const t1 = T0 + TF;
     ex.marks.BTCUSDT = 99000;
     await exchange.runExchange({ client, st, sig: [flipSig(t1, 99000, -28, 35, -1)], events: [], now: after(t1) });
@@ -846,7 +846,7 @@ test('ATLAS flip through the bot: an opposite swing closes the long (and reverse
     const summary = require('../src/summary');
     const m = summary.status({ account: { balance: 2000, startingBalance: 2000 }, position: null, signal: flipSig(t1, 99000, -12, null, 0) });
     assert.match(m.message, /ATLAS score -12/);
-    assert.match(m.message, /swing from −25 to \+25 within 12h, short on the mirror/);
+    assert.match(m.message, /swing from −25 to \+25 within 16h, short on the mirror/);
   } finally { [config.DIRECTION, config.STRATEGY] = saved; }
 });
 
@@ -856,4 +856,22 @@ test('settings: STRATEGY / FLIP_SCORE / FLIP_WINDOW are adjustable within limits
   const r = apply(cfg, { STRATEGY: 'breakout', FLIP_SCORE: 35, FLIP_WINDOW: 99 });
   assert.deepEqual(r.applied, { STRATEGY: 'breakout', FLIP_SCORE: 35 });
   assert.match(r.errors[0], /FLIP_WINDOW: must be between 1 and 12/);
+});
+
+test('ATLAS flip trend band: a swing far from the 200-candle average is ignored, a near one trades', () => {
+  const atlas = require('../src/atlasScore'), flip = require('../src/flip');
+  const real = atlas.analyse;
+  // Stub the scorer: each candle carries its own score in `v`.
+  atlas.analyse = ({ candles }) => { const c = candles[240]; return { score: c[c.length - 2].v, atr: 1 }; };
+  try {
+    const run = (closeNow, band) => {
+      const c4 = Array.from({ length: 260 }, (_, i) => ({ t: i * 14400000, o: 100, h: 100, l: 100, c: 100, v: 0 }));
+      c4[257].v = -40; c4[259].v = 30; c4[259].c = closeNow;
+      return flip.series(c4, [], { threshold: 25, window: 3, trendBandPct: band }, 255).find(s => s && s.t === 259 * 14400000);
+    };
+    assert.equal(run(105, 10).enter, 1);                 // 5% above the average: trades
+    const far = run(120, 10);                            // 20% above: ignored, and says why
+    assert.equal(far.enter, 0); assert.equal(far.blocked, true); assert.equal(far.exitShort, false);
+    assert.equal(run(120, null).enter, 1);               // band off: trades
+  } finally { atlas.analyse = real; }
 });
