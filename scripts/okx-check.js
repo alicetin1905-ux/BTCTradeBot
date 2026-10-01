@@ -77,6 +77,19 @@ async function main() {
     for (const t of ['SWAP', 'FUTURES', 'SPOT']) {
       try { console.log(`  BTC ${t} instruments this account can trade: ${(await client.tradableBtc(t)).join(', ') || 'none'}`); } catch (e) { console.log(`  (${t} list: ${e.message})`); }
     }
+    for (const coin of ['ETH', 'SOL']) {
+      for (const t of ['FUTURES', 'SWAP']) {
+        try {
+          const list = await client.tradable(coin, t);
+          console.log(`  ${coin} ${t} instruments this account can trade: ${list.join(', ') || 'none'}`);
+          for (const id of list.map(x => x.split(' ')[0]).filter(x => /XPERP/.test(x))) {
+            for (const tdMode of ['isolated']) {
+              try { const m = await client.maxSize(id, tdMode); console.log(`  ${id} (${tdMode}): max buy ${m.buy}, max sell ${m.sell}`); } catch (e) { console.log(`  ${id} (${tdMode}): ${e.message.replace(/^.*-> /, '')}`); }
+            }
+          }
+        } catch (e) { console.log(`  (${coin} ${t} list: ${e.message})`); }
+      }
+    }
     for (const [instId, tdMode] of [['BTC-USD_UM_XPERP-310328', 'cross'], ['BTC-USD_UM_XPERP-310328', 'isolated'], ['BTC-USDT-SWAP', 'cross'], ['BTC-USDC', 'cash']]) {
       try { const m = await client.maxSize(instId, tdMode); console.log(`  ${instId} (${tdMode}): max buy ${m.buy}, max sell ${m.sell}`); } catch (e) { console.log(`  ${instId} (${tdMode}): ${e.message.replace(/^.*-> /, '')}`); }
     }

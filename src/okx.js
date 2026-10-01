@@ -107,10 +107,11 @@ function diagnostics(request) {
     },
 
     // BTC instruments this account may trade (account-level instrument list).
-    async tradableBtc(instType = 'SWAP') {
+    async tradable(coin, instType = 'SWAP') {
       const rows = await request('GET', '/api/v5/account/instruments', { instType });
-      return rows.filter(r => /^BTC-/.test(r.instId)).map(r => `${r.instId}${r.state && r.state !== 'live' ? ' (' + r.state + ')' : ''}`);
+      return rows.filter(r => r.instId.startsWith(coin + '-')).map(r => `${r.instId}${r.state && r.state !== 'live' ? ' (' + r.state + ')' : ''}`);
     },
+    async tradableBtc(instType = 'SWAP') { return this.tradable('BTC', instType); },
 
     // Read-only "could I trade this?": OKX's max order size, or its refusal.
     async maxSize(instId, tdMode) {
