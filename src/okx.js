@@ -109,7 +109,7 @@ function createClient({ apiKey, apiSecret, passphrase, base = DEFAULT_BASE, fetc
     if (!acctCfg) {
       const c = (await request('GET', '/api/v5/account/config'))[0] || {};
       if (c.acctLv === '1') throw new Error('OKX account is in Spot mode — switch the demo account to Futures (or multi-currency) mode to trade swaps');
-      acctCfg = { posMode: c.posMode || 'net_mode' };
+      acctCfg = { posMode: c.posMode || 'net_mode', acctLv: c.acctLv };
     }
     return acctCfg;
   }
@@ -147,24 +147,36 @@ function createClient({ apiKey, apiSecret, passphrase, base = DEFAULT_BASE, fetc
       return { acctLv: c.acctLv, posMode: c.posMode };
     },
 
-    // The raw USDT balance row (numbers only), for scripts/okx-check.js.
-    async balanceRow() {
-      const acct = (await request('GET', '/api/v5/account/balance', { ccy: 'USDT' }))[0] || {};
-      const usdt = (acct.details || []).find(c => c.ccy === 'USDT') || {};
-      const pick = (o, keys) => Object.fromEntries(keys.filter(k => o[k] !== undefined).map(k => [k, o[k]]));
-      return {
-        account: pick(acct, ['totalEq', 'adjEq', 'availEq', 'imr', 'mmr', 'upl']),
-        usdt: pick(usdt, ['eq', 'cashBal', 'availBal', 'availEq', 'frozenBal', 'ordFrozen', 'upl', 'isoEq', 'disEq', 'maxLoan', 'liab', 'imr', 'mmr']),
-      };
+    // Where the coins are, for scripts/okx-check.js: the trading account's
+    // currencies (USD value) and the funding account's USDT.
+    async holdings() {
+      const acct = (await request('GET', '/api/v5/account/balance'))[0] || {};
+      const trading = (acct.details || []).map(c => ({ ccy: c.ccy, eq: num(c.eq), usd: num(c.eqUsd) }))
+        .filter(c => c.eq).sort((a, b) => b.usd - a.usd);
+      let fundingUsdt = null;
+      try {
+        const f = (await request('GET', '/api/v5/asset/balances', { ccy: 'USDT' }))[0];
+        fundingUsdt = f ? num(f.availBal) : 0;
+      } catch (e) { /* key without asset read access */ }
+      return { totalUsd: num(acct.totalEq), trading, fundingUsdt };
     },
 
     // USDT equity / available balance of the trading account.
     async getWallet() {
-      const acct = (await request('GET', '/api/v5/account/balance', { ccy: 'USDT' }))[0];
+      const acct = (await request('GET', '/api/v5/account/balance'))[0];
       if (!acct) throw new Error('no trading account balance on OKX');
+      // Multi-currency / portfolio margin: every coin counts as margin, valued
+      // in USD (adjusted equity, minus the margin already in use).
+      const { acctLv } = await accountConfig();
+      if (acctLv === '3' || acctLv === '4') {
+        const adj = num(acct.adjEq || acct.totalEq);
+        return { equity: adj, available: Math.max(0, adj - num(acct.imr)) };
+      }
+      // Futures mode: only USDT counts — USDT-margined swaps can't use other
+      // coins as margin (no USDT in the trading account = nothing to trade with).
       const usdt = (acct.details || []).find(c => c.ccy === 'USDT') || {};
       return {
-        equity: num(usdt.eq || acct.totalEq),
+        equity: num(usdt.eq),
         available: num(usdt.availEq !== undefined && usdt.availEq !== '' ? usdt.availEq : usdt.availBal),
       };
     },

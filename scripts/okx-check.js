@@ -67,9 +67,16 @@ async function main() {
     const p = await client.getPositions();
     const MODES = { 1: 'Spot mode', 2: 'Futures mode', 3: 'Multi-currency margin', 4: 'Portfolio margin' };
     console.log(`✓ Demo account OK — USDT equity ${w.equity.toFixed(2)}, available ${w.available.toFixed(2)}`);
-    const raw = await client.balanceRow();
-    console.log(`  balance fields: ${JSON.stringify(raw)}`);
+    const h = await client.holdings();
+    console.log(`  trading account (≈ $${h.totalUsd.toFixed(0)}): ${h.trading.slice(0, 6).map(c => `${c.ccy} ${+c.eq.toFixed(4)}`).join(', ') || 'empty'}`);
+    if (h.fundingUsdt != null) console.log(`  funding account USDT: ${h.fundingUsdt.toFixed(2)}`);
     console.log(`  account mode: ${MODES[a.acctLv] || a.acctLv} · position mode: ${a.posMode === 'long_short_mode' ? 'long/short' : 'net (one-way)'}`);
+    if (a.acctLv === '2' && w.equity < 100) {
+      console.log('✗ No USDT in the trading account — the bot trades BTC-USDT perpetuals, which need USDT as margin in Futures mode.\n' +
+        `  In the OKX app (demo mode): Assets → Transfer → USDT from ${h.fundingUsdt > 0 ? `Funding (${h.fundingUsdt.toFixed(0)} USDT there)` : 'Funding'} to Trading, e.g. 5000 USDT.\n` +
+        '  Or switch the demo account to Multi-currency margin mode (Settings → Account mode): then its other coins count as margin.');
+      return 1;
+    }
     if (a.acctLv === '1') {
       console.log('✗ Spot mode can\'t trade perpetual swaps — switch the demo account to Futures mode (Settings → Account mode)');
       return 1;

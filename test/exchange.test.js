@@ -471,7 +471,7 @@ function fakeOkx(state = {}) {
       case '/api/v5/public/instruments': return ok([{ instId: 'BTC-USDT-SWAP', ctVal: '0.01', lotSz: '0.01', minSz: '0.01', tickSz: '0.1' }]);
       case '/api/v5/public/mark-price': return ok([{ markPx: String(S.mark || 100000) }]);
       case '/api/v5/account/config': return ok([{ posMode: S.posMode, acctLv: S.acctLv || '2' }]);
-      case '/api/v5/account/balance': return ok([{ totalEq: '5000', details: [{ ccy: 'USDT', eq: '5000.5', availEq: '4800' }] }]);
+      case '/api/v5/account/balance': return ok(S.balance || [{ totalEq: '5000', details: [{ ccy: 'USDT', eq: '5000.5', availEq: '4800' }] }]);
       case '/api/v5/account/positions': return ok(S.positions);
       case '/api/v5/account/set-leverage': return ok([{}]);
       case '/api/v5/trade/order': return ok([{ ordId: 'ord' + (++S.seq), sCode: '0' }]);
@@ -495,10 +495,16 @@ test('OKX: signed like v5 (base64 HMAC of ts+method+path+body), always demo, key
     crypto.createHmac('sha256', 's').update('2026-10-01T00:00:00.000ZGET/api/v5/account/balance?ccy=USDT').digest('base64'));
   const f = fakeOkx();
   assert.deepEqual(await okxClient(f).getWallet(), { equity: 5000.5, available: 4800 });
-  const h = f.S.calls[0].headers;
+  const h = f.S.calls.find(x => x.path === '/api/v5/account/balance').headers;
   assert.equal(h['x-simulated-trading'], '1');
   assert.equal(h['OK-ACCESS-PASSPHRASE'], 'p');
-  assert.equal(h['OK-ACCESS-SIGN'], sign('s', h['OK-ACCESS-TIMESTAMP'], 'GET', '/api/v5/account/balance?ccy=USDT', ''));
+  assert.equal(h['OK-ACCESS-SIGN'], sign('s', h['OK-ACCESS-TIMESTAMP'], 'GET', '/api/v5/account/balance', ''));
+  // Futures mode with no USDT: nothing to trade with (never the other coins' USD value).
+  const g = fakeOkx({ balance: [{ totalEq: '480000', details: [{ ccy: 'BTC', eq: '5', eqUsd: '420000' }] }] });
+  assert.deepEqual(await okxClient(g).getWallet(), { equity: 0, available: 0 });
+  // Multi-currency margin: every coin counts, minus margin in use.
+  const m = fakeOkx({ acctLv: '3', balance: [{ totalEq: '480000', adjEq: '470000', imr: '1000', details: [] }] });
+  assert.deepEqual(await okxClient(m).getWallet(), { equity: 470000, available: 469000 });
   assert.throws(() => require('../src/okx').createClient({ apiKey: 'k', apiSecret: 's' }), /OKX_API_PASSPHRASE/);
 });
 
