@@ -33,7 +33,7 @@ on:
       coin:
         description: 'testtrade only: which coin'
         type: choice
-        options: [BTC, ETH, NEAR]
+        options: [BTC, ETH, NEAR, HYPE]
         default: BTC
 
 permissions:

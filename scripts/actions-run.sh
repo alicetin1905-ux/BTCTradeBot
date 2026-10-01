@@ -28,6 +28,7 @@ inst_for() {
   elif [ "$coin" = "BTC" ]; then echo "$BTC_INSTRUMENT"
   # The demo account's perpetual-style futures: most expire 2031-03-28, NEAR's 2031-07-25 (okx-check lists them).
   elif [ "$coin" = "NEAR" ]; then echo "NEAR-USD_UM_XPERP-310725"
+  elif [ "$coin" = "HYPE" ]; then echo "HYPE-USD_UM_XPERP-310801"
   else echo "$coin-USD_UM_XPERP-310328"; fi
 }
 
