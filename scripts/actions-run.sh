@@ -3,6 +3,7 @@
 #   scripts/actions-run.sh run     full run (exit / trail / enter), then upload state/demo/
 #   scripts/actions-run.sh sync    sync the position and fills only, then upload
 #   scripts/actions-run.sh check   read-only OKX check (reachability, keys, account mode)
+#   scripts/actions-run.sh testtrade   open + close the smallest position (scripts/okx-testtrade.js)
 # Keys come from the repository's Actions secrets (OKX_API_KEY,
 # OKX_API_SECRET, OKX_API_PASSPHRASE). Until they're set, every run only does
 # the check, so nothing fails while you're still setting up.
@@ -14,6 +15,10 @@ export EXCHANGE="${EXCHANGE:-okx}"
 
 if [ "$MODE" = "check" ]; then
   node scripts/okx-check.js
+  exit $?
+fi
+if [ "$MODE" = "testtrade" ]; then
+  node scripts/okx-testtrade.js
   exit $?
 fi
 if [ -z "${OKX_API_KEY:-}" ] || [ -z "${OKX_API_SECRET:-}" ] || [ -z "${OKX_API_PASSPHRASE:-}" ]; then

@@ -21,9 +21,9 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: 'run = full run, sync = fills only, check = test OKX connection and keys (no trading)'
+        description: 'run = full run, sync = fills only, check = test OKX connection and keys (no trading), testtrade = open + close the smallest position (real demo order)'
         type: choice
-        options: [check, run, sync]
+        options: [check, run, sync, testtrade]
         default: check
 
 permissions:
