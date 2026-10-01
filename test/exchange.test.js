@@ -853,7 +853,7 @@ test('ATLAS flip through the bot: an opposite swing closes the long (and reverse
     const summary = require('../src/summary');
     const m = summary.status({ account: { balance: 2000, startingBalance: 2000 }, position: null, signal: flipSig(t1, 99000, -12, null, 0) });
     assert.match(m.message, /ATLAS -12/);
-    assert.match(m.message, /swing from −10 to \+10 within 8h, short on the mirror/);
+    assert.match(m.message, /swing from −10 to \+10 within 8h or a score of \+90, short on the mirror/);
   } finally { [config.DIRECTION, config.STRATEGY] = saved; }
 });
 
@@ -894,4 +894,28 @@ test('daily loss limit counts the other coins\' trades too', () => {
   assert.match(exchange.entryBlock(st, sig, now), /daily loss limit/);
   st.peers = { ETH: { trades: [{ closedAt: now - 3600000, pnl: -100 }] } };
   assert.equal(exchange.entryBlock(st, sig, now), null);
+});
+
+test('ATLAS flip extreme entry: a close at +/-EXTREME_SCORE enters once (fresh crossing), inside the trend band', () => {
+  const atlas = require('../src/atlasScore'), flip = require('../src/flip');
+  const real = atlas.analyse;
+  atlas.analyse = ({ candles }) => { const c = candles[240]; return { score: c[c.length - 2].v, atr: 1 }; };
+  try {
+    const run = (scores, closeNow = 100, extremeScore = 90, trendBandPct = 10) => {
+      const c4 = Array.from({ length: 260 }, (_, i) => ({ t: i * 14400000, o: 100, h: 100, l: 100, c: 100, v: 0 }));
+      scores.forEach((v, i) => { c4[260 - scores.length + i].v = v; });
+      c4[259].c = closeNow;
+      return flip.series(c4, [], { threshold: 25, window: 3, trendBandPct, extremeScore }, 255).find(s => s && s.t === 259 * 14400000);
+    };
+    let s = run([0, 0, 85, 92]);                       // crosses +90 now: long, no swing behind it
+    assert.equal(s.enter, 1); assert.equal(s.extreme, true); assert.equal(s.flipFrom, null); assert.equal(s.exitShort, true);
+    assert.equal(run([0, 0, 95, 93]).enter, 0);        // already above 90 on the candle before: not a fresh crossing
+    s = run([0, 0, -85, -91]);                         // short mirror
+    assert.equal(s.enter, -1); assert.equal(s.extreme, true);
+    assert.equal(run([0, 0, 85, 92], 100, null).enter, 0);          // off
+    s = run([0, 0, 85, 92], 120);                      // 20% above its average: band rules it out
+    assert.equal(s.enter, 0); assert.equal(s.blocked, true);
+    s = run([-40, -5, 10, 30]);                        // an ordinary swing still enters as before
+    assert.equal(s.enter, 1); assert.equal(s.extreme, false); assert.equal(s.flipFrom, -40);
+  } finally { atlas.analyse = real; }
 });

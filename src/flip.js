@@ -4,6 +4,10 @@
 //                −FLIP_SCORE or less within the previous FLIP_WINDOW 4H
 //                candles (2 = 8h): a fast swing from bearish to bullish
 //   enter short  the mirror image
+//   extreme      or the score closes at +EXTREME_SCORE or higher (-EXTREME_SCORE
+//                or lower), having been inside the level on the candle before:
+//                a strong-trend entry in the same direction (and the same
+//                reversal), also ignored outside the trend band
 //   trend band   a swing is ignored (no entry, no reversal) when the 4H close
 //                is more than TREND_BAND_PCT % away from its 200-candle 4H
 //                average — chasing an over-extended move, or fading a strong
@@ -75,10 +79,11 @@ function trendMa(c4, i) {
 
 // Signal entries for c4[from..] (needs `window` scored candles before `from`).
 // Returns one entry per candle (null where it can't be scored):
-//   { t, close, atr, score, flipFrom, enter, exitLong, exitShort, ma, blocked }
-// flipFrom: the opposite extreme within the window that made the swing.
-// blocked: a swing happened but the trend band (trendBandPct, null = off) ruled it out.
-function series(c4, d1, { threshold, window, trendBandPct = null, scoreMode = config.SCORE_MODE }, from = 0) {
+//   { t, close, atr, score, flipFrom, enter, exitLong, exitShort, ma, blocked, extreme }
+// flipFrom: the opposite extreme within the window that made the swing (null on an extreme entry).
+// extreme: the entry is the ±extremeScore one, not a swing.
+// blocked: a swing / extreme happened but the trend band (trendBandPct, null = off) ruled it out.
+function series(c4, d1, { threshold, window, trendBandPct = null, extremeScore = null, scoreMode = config.SCORE_MODE }, from = 0) {
   const start = Math.max(221, from - window);
   const dj = { j: -1 };
   const scored = [];
@@ -90,13 +95,19 @@ function series(c4, d1, { threshold, window, trendBandPct = null, scoreMode = co
     if (!s) { out.push(null); continue; }
     const prev = scored.slice(Math.max(0, k - window), k).filter(Boolean).map(p => p.score);
     let { enter, flipFrom } = prev.length === window ? swing(s.score, prev, threshold) : { enter: 0, flipFrom: null };
+    let extreme = false;
+    const before = k > 0 ? scored[k - 1] : null;
+    if (!enter && extremeScore != null && before) {
+      if (s.score >= extremeScore && before.score < extremeScore) { enter = 1; extreme = true; }
+      else if (s.score <= -extremeScore && before.score > -extremeScore) { enter = -1; extreme = true; }
+    }
     const ma = trendMa(c4, start + k);
     let blocked = false;
     if (enter && trendBandPct != null && ma != null && Math.abs((s.close / ma - 1) * 100) > trendBandPct) {
-      enter = 0; flipFrom = null; blocked = true;
+      enter = 0; flipFrom = null; extreme = false; blocked = true;
     }
     out.push({
-      ...s, flipFrom, enter, exitLong: enter === -1, exitShort: enter === 1, ma, blocked,
+      ...s, flipFrom, enter, exitLong: enter === -1, exitShort: enter === 1, ma, blocked, extreme,
       // No channel in this strategy (src/signal.js fields, for shared code).
       upper: null, lower: null, exitUpper: null, exitLower: null,
     });

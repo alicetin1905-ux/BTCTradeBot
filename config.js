@@ -56,6 +56,12 @@ const config = module.exports = {
   SCORE_MODE: 'graded',
   FLIP_SCORE: 10,
   FLIP_WINDOW: 2,
+  // Also enter when the score closes at +EXTREME_SCORE or higher (long) or
+  // -EXTREME_SCORE or lower (short), the candle before being inside it (null =
+  // off). BTC+ETH backtest, 2% risk each: flip only +3,086%, PF 1.56, worst
+  // drop 38%; with 90 +3,692%, PF 1.60, 32%; with 75 +2,699%, PF 1.51 (more,
+  // later entries hurt).
+  EXTREME_SCORE: 90,
   // Ignore a swing when the 4H close is more than this % from its 200-candle
   // 4H average (null = off). Backtest: PF 1.47 -> 1.56-1.61, better in both
   // halves and across the score/window grid; the losses were counter-trend

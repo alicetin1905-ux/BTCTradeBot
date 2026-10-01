@@ -143,7 +143,9 @@ async function manage({ client, st, live, sig, events, now }) {
   if (last) pos.lastExitCheckT = Math.max(pos.lastExitCheckT || 0, last.t);
   if (exitOn) {
     const why = exitOn.exitLower == null && exitOn.score != null
-      ? `exit signal: ATLAS score swung ${exitOn.flipFrom > 0 ? '+' : ''}${exitOn.flipFrom} → ${exitOn.score > 0 ? '+' : ''}${exitOn.score} against the ${pos.bias === 1 ? 'long' : 'short'}`
+      ? (exitOn.flipFrom == null
+        ? `exit signal: ATLAS score reached ${exitOn.score > 0 ? '+' : ''}${exitOn.score} against the ${pos.bias === 1 ? 'long' : 'short'}`
+        : `exit signal: ATLAS score swung ${exitOn.flipFrom > 0 ? '+' : ''}${exitOn.flipFrom} → ${exitOn.score > 0 ? '+' : ''}${exitOn.score} against the ${pos.bias === 1 ? 'long' : 'short'}`)
       : `exit signal: 4H close ${px(exitOn.close)} ${pos.bias === 1 ? `below the ${config.EXIT_N}-candle low ${px(exitOn.exitLower)}` : `above the ${config.EXIT_N}-candle high ${px(exitOn.exitUpper)}`}`;
     await closeAtMarket(client, st, pos, live, why, events, now);
     return true;

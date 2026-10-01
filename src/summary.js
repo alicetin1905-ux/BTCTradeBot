@@ -93,7 +93,7 @@ function status(st) {
   }
   const X = config.FLIP_SCORE, h = config.FLIP_WINDOW * 4;
   if (coins.some(c => c.signal && c.signal.upper == null)) {
-    lines.push(`Long on a swing from −${X} to +${X} within ${h}h` + (config.DIRECTION === 'both' ? ', short on the mirror' : ''));
+    lines.push(`Long on a swing from −${X} to +${X} within ${h}h` + (config.EXTREME_SCORE ? ` or a score of +${config.EXTREME_SCORE}` : '') + (config.DIRECTION === 'both' ? ', short on the mirror' : ''));
   }
   lines.push(`Balance $${a.balance.toFixed(2)}`);
   return { title: `Bot $${equity.toFixed(2)} (${pct >= 0 ? '+' : ''}${pct}%)`, message: lines.join('\n'), tags: ['clock3'], priority: 2 };

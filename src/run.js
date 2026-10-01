@@ -202,7 +202,7 @@ async function buildSignal(candles, now) {
   if (config.STRATEGY === 'atlas-flip') {
     const daily = await market.closedCandles(config.SYMBOL, 'D', 400, now);
     if (daily.note) console.log(`daily candles from ${daily.source} (${market.primary()} failed: ${daily.note})`);
-    return flip.series(candles, daily.candles, { threshold: config.FLIP_SCORE, window: config.FLIP_WINDOW, trendBandPct: config.TREND_BAND_PCT }, Math.max(0, candles.length - 60));
+    return flip.series(candles, daily.candles, { threshold: config.FLIP_SCORE, window: config.FLIP_WINDOW, trendBandPct: config.TREND_BAND_PCT, extremeScore: config.EXTREME_SCORE }, Math.max(0, candles.length - 60));
   }
   return signal.series(candles, sigParams());
 }
@@ -300,7 +300,7 @@ function printSummary(events, st) {
   console.log(`\n=== BTCTradeBot ${COIN} [${config.EXCHANGE} ${MODE}${config.EXCHANGE === 'okx' ? ' ' + config.OKX_INSTRUMENT : ''}] (${config.STRATEGY}, ${P.STARTING_BALANCE} ${quote}, ${P.RISK_PCT}% risk, ${config.DIRECTION === 'both' ? 'long+short' : 'long-only'}) @ ${new Date().toISOString()} ===\n`);
   for (const ev of events) {
     if (ev.type === 'enter') {
-      const why = ev.breakout != null ? `breakout ${px(ev.breakout)}` : `ATLAS ${ev.flipFrom} → ${ev.score}`;
+      const why = ev.breakout != null ? `breakout ${px(ev.breakout)}` : (ev.flipFrom == null ? `ATLAS extreme ${ev.score}` : `ATLAS ${ev.flipFrom} → ${ev.score}`);
       console.log(`ENTER ${ev.bias === 1 ? 'LONG' : 'SHORT'} ${ev.qty} ${COIN} @ ${px(ev.entry)} | ${why} | SL ${px(ev.stop)} | value $${fmt(ev.notional)} risk $${fmt(ev.riskAmt)}`);
     } else if (ev.type === 'exit') {
       console.log(`EXIT — ${ev.reason} | pnl ${money(ev.pnl)}${ev.price ? ' @ ' + px(ev.price) : ''}`);

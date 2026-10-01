@@ -89,7 +89,7 @@ function bucket(h1, hours) {
 /* ---------------- simulation ---------------- */
 
 const LIVE = {
-  strategy: config.STRATEGY, scoreMode: config.SCORE_MODE, flipScore: config.FLIP_SCORE, flipWindow: config.FLIP_WINDOW, trendBand: config.TREND_BAND_PCT,
+  strategy: config.STRATEGY, scoreMode: config.SCORE_MODE, flipScore: config.FLIP_SCORE, flipWindow: config.FLIP_WINDOW, trendBand: config.TREND_BAND_PCT, extreme: config.EXTREME_SCORE,
   channelN: config.CHANNEL_N, exitN: config.EXIT_N, atrLen: config.ATR_LEN, direction: config.DIRECTION,
   stopAtr: config.STOP_ATR, trailAtr: config.TRAIL_ATR,
   start: config.PORTFOLIO.STARTING_BALANCE, riskPct: config.PORTFOLIO.RISK_PCT, maxX: config.PORTFOLIO.MAX_POSITION_X,
@@ -102,11 +102,11 @@ const LIVE = {
 // candle takes ~20 s, so each threshold/window is computed once.
 const flipCache = new Map();
 let flipDaily = null; // set by main(): bucket(h1, 24)
-function flipSeries(h4, threshold, window, trendBandPct = null, scoreMode = config.SCORE_MODE) {
-  const key = `${h4.length}:${h4[0].t}:${threshold}:${window}:${trendBandPct}:${scoreMode}`;
+function flipSeries(h4, threshold, window, trendBandPct = null, scoreMode = config.SCORE_MODE, extremeScore = null) {
+  const key = `${h4.length}:${h4[0].t}:${threshold}:${window}:${trendBandPct}:${scoreMode}:${extremeScore}`;
   if (!flipCache.has(key)) {
     if (!flipDaily) throw new Error('flip backtest needs daily candles (setFlipDaily)');
-    flipCache.set(key, flip.series(h4, flipDaily, { threshold, window, trendBandPct, scoreMode }, 0));
+    flipCache.set(key, flip.series(h4, flipDaily, { threshold, window, trendBandPct, extremeScore, scoreMode }, 0));
   }
   return flipCache.get(key);
 }
@@ -114,7 +114,7 @@ function setFlipDaily(d1) { flipDaily = d1; flipCache.clear(); }
 
 function simulate(h1, h4, rules, from = -Infinity, to = Infinity) {
   const R = { ...LIVE, ...rules };
-  const sig = R.strategy === 'atlas-flip' ? flipSeries(h4, R.flipScore, R.flipWindow, R.trendBand, R.scoreMode)
+  const sig = R.strategy === 'atlas-flip' ? flipSeries(h4, R.flipScore, R.flipWindow, R.trendBand, R.scoreMode, R.extreme)
     : signal.series(h4, { channelN: R.channelN, exitN: R.exitN, atrLen: R.atrLen });
   const at = new Map(); // 1H candle open time whose close is the 4H close -> signal
   const tfMs = (R.tfHours || 4) * HOUR; // signal candle length (the candles passed in are this long)
@@ -192,6 +192,8 @@ const VARIANTS = [
   ['   ±15 within 2 candles (8h)', { flipScore: 15, flipWindow: 2 }],
   ['   ±10 within 4 candles (16h)', { flipScore: 10, flipWindow: 4 }],
   ['-- ATLAS flip variants --', null],
+  ['no extreme entry (flip only)', { extreme: null }],
+  ['extreme entry at ±75', { extreme: 75 }],
   ['no trend band', { trendBand: null }],
   ['no trend band, window 3 candles (12h) — the previous live setting', { trendBand: null, flipWindow: 3 }],
   ['trend band ±5%', { trendBand: 5 }],
