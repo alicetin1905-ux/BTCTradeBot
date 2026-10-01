@@ -183,6 +183,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
   }
   async function okxPrice() {
     var inst = (S.account && S.account.exchange === 'okx' && S.account.instrument) || 'BTC-USDT-SWAP';
+    if (/-\d{6}$/.test(inst)) inst = 'BTC-USDT-SWAP'; // demo-only future: show the real BTC price
     var o = (await (await fetch('https://www.okx.com/api/v5/market/ticker?instId=' + encodeURIComponent(inst), { cache: 'no-store' })).json()).data[0];
     return { px: +o.last, chg: (+o.last / +o.open24h - 1) * 100, src: 'OKX' };
   }
@@ -508,7 +509,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
   function renderAll() {
     var ex = S.account && EXCHANGE_NAME[S.account.exchange];
     var inst = S.account && S.account.instrument;
-    var market = inst && !/-SWAP$/.test(inst) && inst !== 'BTCUSDT' ? inst + ' spot' : 'BTC perp';
+    var market = !inst || inst === 'BTCUSDT' || /-SWAP$/.test(inst) ? 'BTC perp' : /-\d{6}$/.test(inst) ? 'BTC future ' + inst.replace(/^BTC-/, '') : inst + ' spot';
     $('subtitle').textContent = (ex ? ex + ' ' : '') + 'demo · ' + market + ' · 4H breakout';
     renderTiles(); renderPosition(); renderSignal(); renderPriceChart(); renderEquity(); renderTrades(); renderSettings(); renderLive();
   }

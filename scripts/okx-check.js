@@ -62,13 +62,13 @@ async function main() {
     apiKey: haveKeys ? key : 'dummy-key', apiSecret: haveKeys ? secret : 'dummy',
     passphrase: haveKeys ? pass : 'dummy', base, instrument,
   });
-  if (haveKeys) console.log(`  instrument: ${instrument}${client.spot ? ' (spot: long-only, no leverage)' : ' (perpetual)'}`);
+  if (haveKeys) console.log(`  instrument: ${instrument}${client.spot ? ' (spot: long-only, no leverage)' : /-SWAP$/.test(instrument) ? ' (perpetual swap)' : ' (future)'}`);
   try {
     const w = await client.getWallet();
     const a = await client.accountInfo();
     const p = await client.getPositions();
     const MODES = { 1: 'Spot mode', 2: 'Futures mode', 3: 'Multi-currency margin', 4: 'Portfolio margin' };
-    const quote = client.spot ? instrument.split('-')[1] : 'USDT';
+    const quote = client.spot ? instrument.split('-')[1] : await client.marginCcy();
     console.log(`✓ Demo account OK — ${quote} equity ${w.equity.toFixed(2)}, available ${w.available.toFixed(2)}`);
     const h = await client.holdings();
     console.log(`  trading account (≈ $${h.totalUsd.toFixed(0)}): ${h.trading.slice(0, 6).map(c => `${c.ccy} ${+c.eq.toFixed(4)}`).join(', ') || 'empty'}`);
@@ -86,8 +86,8 @@ async function main() {
       return 1;
     }
     if (!client.spot && a.acctLv === '2' && w.equity < 100) {
-      console.log('✗ No USDT in the trading account — the bot trades BTC-USDT perpetuals, which need USDT as margin in Futures mode.\n' +
-        `  In the OKX app (demo mode): Assets → Transfer → USDT from ${h.fundingUsdt > 0 ? `Funding (${h.fundingUsdt.toFixed(0)} USDT there)` : 'Funding'} to Trading, e.g. 5000 USDT.\n` +
+      console.log(`✗ No ${quote} in the trading account — ${instrument} needs ${quote} as margin in Futures mode.\n` +
+        `  In the OKX app (demo mode): Assets → Transfer / Convert → ${quote} into the Trading account (the bot trades like a 2000 ${quote} account).\n` +
         '  Or switch the demo account to Multi-currency margin mode (Settings → Account mode): then its other coins count as margin.');
       return 1;
     }
@@ -95,7 +95,7 @@ async function main() {
       console.log('✗ Spot mode can\'t trade perpetual swaps — switch the demo account to Futures mode (Settings → Account mode)');
       return 1;
     }
-    console.log(`  open USDT-swap positions: ${Object.keys(p).length ? Object.entries(p).map(([s, x]) => `${s} ${x.bias === 1 ? 'long' : 'short'} ${x.size}`).join(', ') : 'none'}`);
+    console.log(`  open positions: ${Object.keys(p).length ? Object.entries(p).map(([s, x]) => `${s} ${x.bias === 1 ? 'long' : 'short'} ${x.size}`).join(', ') : 'none'}`);
     return 0;
   } catch (err) {
     const code = +(err.code || 0);

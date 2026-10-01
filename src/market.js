@@ -28,9 +28,19 @@ async function bybitKlines(symbol, tf, limit) {
   return rows.slice().reverse().map(k => ({ t: +k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[5] }));
 }
 
-// On OKX the candles of the instrument it trades (e.g. BTC-USDC spot).
+// Live-market candles (never the demo environment's: demo-only instruments
+// such as the XPERP future trade thinly there, with wicks up to ~11% off the
+// real price). Spot pairs and swaps use their own live candles; a future uses
+// the live BTC-USDT perpetual — its stop triggers on the mark price, which
+// tracks the same index.
+function okxSignalInstrument(symbol) {
+  const inst = config.EXCHANGE === 'okx' && config.OKX_INSTRUMENT;
+  if (inst && !/-\d{6}$/.test(inst)) return inst;
+  return symbol.replace('USDT', '') + '-USDT-SWAP';
+}
+
 async function okxKlines(symbol, tf, limit) {
-  const instId = config.EXCHANGE === 'okx' && config.OKX_INSTRUMENT ? config.OKX_INSTRUMENT : symbol.replace('USDT', '') + '-USDT-SWAP';
+  const instId = okxSignalInstrument(symbol);
   const out = [];
   let after = '';
   // /market/candles returns at most 300 per call: page back with `after`.
@@ -61,4 +71,4 @@ async function closedCandles(symbol = config.SYMBOL, tf = config.ENTRY_TF, limit
   return { candles, source, note };
 }
 
-module.exports = { closedCandles, bybitKlines, okxKlines, setFetch, primary, TF_MS };
+module.exports = { closedCandles, bybitKlines, okxKlines, okxSignalInstrument, setFetch, primary, TF_MS };

@@ -42,7 +42,7 @@ was the most robust: 188 of 192 nearby settings made money in both periods
   did better in the 2022 bear market.
 - **Size:** each trade risks **2% of the balance** at its initial stop
   (`RISK_PCT`). Position value is capped at 2× the balance (`MAX_POSITION_X`),
-  at 5× leverage, cross margin (`LEVERAGE`). One position at a time.
+  at 10× leverage, cross margin (`LEVERAGE`). One position at a time.
 - **Balance:** the bot's own 2000 USDT allocation, moved by its realized P&L
   and BTC funding payments. A bigger demo wallet still trades like 2000 USDT.
 - **Safety:**
@@ -101,22 +101,29 @@ npm run research             # backtest/RESEARCH.md + DONCHIAN.md
 
 It needs Node 18+ and no dependencies. Keys come from `.env` (see `.env.example`).
 
-## OKX EEA accounts: BTC-USDC spot
+## OKX EEA accounts: USD-settled BTC future, USDC margin, 10x
 
-On OKX's EEA site (`my.okx.com`) many accounts hold no USDT and can't trade
-perpetuals, the demo account included. There the bot trades **BTC-USDC
-spot** instead (`OKX_INSTRUMENT=BTC-USDC`, the GitHub workflow's default):
+On OKX's EEA site (`my.okx.com`) the demo account holds no USDT and can't
+trade perpetual swaps. Its futures are the USD-settled `BTC-USD_UM…` contracts.
+The bot trades **`BTC-USD_UM_XPERP-310328`** there, which is the GitHub
+workflow's default:
 
-- **Long-only** and **no leverage**: the position is at most the USDC cash.
-- **No funding fees.**
-- **Its own BTC only:** it buys BTC and puts a stop-loss sell order on exactly
-  the BTC it bought, tagged `btcbot…`. It never counts or sells other BTC in
-  the account. Don't trade BTC-USDC by hand while it holds a position: its
-  P&L is rebuilt from the pair's fills.
-- **Backtest with spot costs** (0.10% fee per side, no funding, position ≤ 1×
-  the balance), 2021-01 → 2026-09: **+190%**, worst drop 26%, profit factor
-  1.52. On 2024+, which the settings never saw, the profit factor is 1.63.
-  With 0.15% fees it's +156%.
+- **The contract:** a perpetual-style future that runs to 2031, with funding
+  like a perpetual. 1 contract = 1 BTC, sizes in steps of 0.0001 BTC.
+- **Margin in USDC** at **10x** leverage, cross margin (max 10x). Sizing is
+  still by risk: each trade loses 2% of the balance at its initial stop.
+  Leverage only sets how much USDC is tied up as margin. The position is
+  capped at 2× the balance (`MAX_POSITION_X`).
+- **Long and short** possible (`DIRECTION`); long-only by default.
+- **Signal from real prices:** this future only exists in OKX's demo
+  environment, where it trades thinly (candle wicks up to ~11% off the real
+  price). So the 4H signal reads the live BTC-USDT perpetual, the same data as
+  the backtest. Orders and the stop go to the future, whose stop triggers on
+  the mark price, which tracks the BTC index.
+
+There's no USDC-margined BTC contract on OKX itself. For a spot-only setup
+instead, set the repository variable `OKX_INSTRUMENT` to `BTC-USDC`
+(long-only, no leverage, backtest +190%).
 
 ## Setup from your phone (GitHub Actions, no Mac)
 

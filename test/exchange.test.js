@@ -131,7 +131,7 @@ test('entry: market buy with the stop attached, sized so the stop loses 2% of th
   const events = await enterLong(client, st);
   // stop 2 ATR = 2000 = 2% away; risk $40 -> $2000 position -> 0.02 BTC
   assert.deepEqual(ex.calls.find(c => c[0] === 'openMarket'), ['openMarket', 'BTCUSDT', 1, 0.02, 98000]);
-  assert.deepEqual(ex.calls.find(c => c[0] === 'setLeverage'), ['setLeverage', 'BTCUSDT', 5]);
+  assert.deepEqual(ex.calls.find(c => c[0] === 'setLeverage'), ['setLeverage', 'BTCUSDT', 10]);
   const p = st.position;
   assert.equal(p.bias, 1);
   assert.equal(p.entry, 100000);
@@ -694,4 +694,53 @@ test('OKX spot through the bot: entry, trailed stop, stop hit booked with fees o
     assert.ok(Math.abs(t.pnl - expected) < 1e-6, `${t.pnl} vs ${expected}`);
     assert.ok(Math.abs(st.account.balance - (2000 + expected)) < 1e-6);
   } finally { Object.assign(config.PORTFOLIO, { LEVERAGE: savedLev, MAX_POSITION_X: savedX }); }
+});
+
+/* ---------------- OKX USD-settled future (EEA): BTC-USD_UM_XPERP ---------------- */
+
+test('OKX XPERP future: 1 BTC contracts, USDC margin, 10x, FUTURES endpoints, its funding only', async () => {
+  const XP = 'BTC-USD_UM_XPERP-310328';
+  const f = fakeOkx({
+    positions: [{ instId: XP, pos: '0.0234', posSide: 'net', avgPx: '100000', markPx: '101000', upl: '23.4' }],
+    algos: [{ ordType: 'conditional', algoId: 'a1', instId: XP, slTriggerPx: '98000' }],
+    bills: [
+      { billId: 'b1', instId: XP, balChg: '-0.2', ts: '1000' },
+      { billId: 'b2', instId: 'ETH-USD_UM_XPERP-310328', balChg: '-9', ts: '1000' },
+    ],
+    balance: [{ totalEq: '483000', details: [{ ccy: 'USD', eq: '100000', availEq: '' }, { ccy: 'USDC', eq: '1999.94', availEq: '1999.94' }] }],
+  });
+  // The fake's instrument row for this future.
+  const orig = f.fetchImpl;
+  f.fetchImpl = async (url, opts) => (url.includes('/public/instruments')
+    ? { status: 200, text: async () => JSON.stringify({ code: '0', data: [{ instId: XP, ctVal: '1', lotSz: '0.0001', minSz: '0.0001', tickSz: '0.1', settleCcy: 'USD' }] }) }
+    : orig(url, opts));
+  const c = require('../src/okx').createClient({ apiKey: 'k', apiSecret: 's', passphrase: 'p', fetchImpl: f.fetchImpl, instrument: XP, symbol: 'BTCUSDT' });
+  assert.equal(c.spot, undefined);
+  assert.equal(await c.marginCcy(), 'USDC');
+  assert.deepEqual(await c.getWallet(), { equity: 1999.94, available: 1999.94 });
+  assert.deepEqual(await c.getInstrument('BTCUSDT'), { qtyStep: 0.0001, minOrderQty: 0.0001, minNotional: 0, tickSize: 0.1 });
+  const p = await c.getPositions();
+  assert.deepEqual(p.BTCUSDT, { symbol: 'BTCUSDT', bias: 1, size: 0.0234, avgPrice: 100000, markPrice: 101000, unrealisedPnl: 23.4, stopLoss: 98000 });
+  await c.setLeverage('BTCUSDT', 10);
+  await c.openMarket({ symbol: 'BTCUSDT', bias: 1, qty: 0.0234, stopLoss: 98000 });
+  assert.deepEqual(f.S.calls.find(x => x.path === '/api/v5/account/set-leverage').body, { instId: XP, lever: '10', mgnMode: 'cross' });
+  const order = f.S.calls.find(x => x.path === '/api/v5/trade/order').body;
+  assert.deepEqual([order.instId, order.side, order.sz, order.attachAlgoOrds[0].slTriggerPx], [XP, 'buy', '0.0234', '98000']);
+  assert.ok(f.S.calls.filter(x => x.path === '/api/v5/trade/orders-algo-pending' || x.path === '/api/v5/account/positions').every(x => x.query.instType === 'FUTURES'));
+  assert.deepEqual(await c.getFundingFees(0), [{ id: 'b1', symbol: 'BTCUSDT', amount: -0.2, at: 1000 }]);
+  assert.equal(require('../src/okx').isSpot(XP), false);
+  assert.equal(require('../src/okx').isSpot('BTC-USDC'), true);
+  assert.equal(require('../src/okx').isSpot('BTC-USDT-SWAP'), false);
+});
+
+test('signal candles: live market data — a demo-only future reads the live BTC-USDT perpetual', () => {
+  const market = require('../src/market');
+  const saved = [config.EXCHANGE, config.OKX_INSTRUMENT];
+  try {
+    config.EXCHANGE = 'okx';
+    for (const [inst, want] of [['BTC-USD_UM_XPERP-310328', 'BTC-USDT-SWAP'], ['BTC-USDT-SWAP', 'BTC-USDT-SWAP'], ['BTC-USDC', 'BTC-USDC']]) {
+      config.OKX_INSTRUMENT = inst;
+      assert.equal(market.okxSignalInstrument('BTCUSDT'), want, inst);
+    }
+  } finally { [config.EXCHANGE, config.OKX_INSTRUMENT] = saved; }
 });

@@ -136,13 +136,21 @@ function diagnostics(request) {
 
 function createSwapClient(opts) {
   const { request, publicGet } = transport(opts);
+  // The bot's instrument: BTC-USDT-SWAP by default, or e.g. the USD-margined
+  // BTC-USD_UM_XPERP-310328 future (OKX EEA). Other symbols keep the USDT-swap naming.
+  const SYMBOL = opts.symbol || 'BTCUSDT';
+  const INST = String(opts.instrument || '').trim().toUpperCase() || instIdOf(SYMBOL);
+  const idOf = (symbol) => (symbol === SYMBOL ? INST : instIdOf(symbol));
+  const symOf = (instId) => (instId === INST ? SYMBOL : symbolOf(instId));
+  const TYPE = /-SWAP$/.test(INST) ? 'SWAP' : 'FUTURES';
+  const ours = (instId) => instId === INST || /-USDT-SWAP$/.test(instId);
   // Instrument rules, cached per run.
   const instCache = {};
   async function inst(symbol) {
     if (!instCache[symbol]) {
-      const i = (await publicGet('/api/v5/public/instruments', { instType: 'SWAP', instId: instIdOf(symbol) }))[0];
+      const i = (await publicGet('/api/v5/public/instruments', { instType: TYPE, instId: idOf(symbol) }))[0];
       if (!i) throw new Error(`${symbol} is not listed on OKX`);
-      instCache[symbol] = { ctVal: num(i.ctVal), lotSz: num(i.lotSz), minSz: num(i.minSz), tickSz: num(i.tickSz) };
+      instCache[symbol] = { ctVal: num(i.ctVal), lotSz: num(i.lotSz), minSz: num(i.minSz), tickSz: num(i.tickSz), settleCcy: i.settleCcy };
     }
     return instCache[symbol];
   }
@@ -150,6 +158,12 @@ function createSwapClient(opts) {
   async function contracts(symbol, qty) {
     const i = await inst(symbol);
     return String(+(Math.round(qty / i.ctVal / i.lotSz) * i.lotSz).toFixed(dp(i.lotSz)));
+  }
+
+  async function marginCcy() {
+    if (opts.marginCcy) return String(opts.marginCcy).trim().toUpperCase();
+    const settle = (await inst(SYMBOL)).settleCcy || 'USDT';
+    return settle === 'USD' ? 'USDC' : settle;
   }
 
   let acctCfg = null;
@@ -171,7 +185,7 @@ function createSwapClient(opts) {
   async function stopOrders(symbol) {
     const out = [];
     for (const ordType of ['conditional', 'oco']) {
-      const rows = await request('GET', '/api/v5/trade/orders-algo-pending', { ordType, instType: 'SWAP', instId: instIdOf(symbol) });
+      const rows = await request('GET', '/api/v5/trade/orders-algo-pending', { ordType, instType: TYPE, instId: idOf(symbol) });
       for (const r of rows) if (num(r.slTriggerPx)) out.push(r);
     }
     return out;
@@ -179,7 +193,7 @@ function createSwapClient(opts) {
 
   async function placeStop(symbol, bias, stopLoss) {
     await request('POST', '/api/v5/trade/order-algo', {
-      instId: instIdOf(symbol), tdMode: TD_MODE, side: bias === 1 ? 'sell' : 'buy', ...(await posSide(bias)),
+      instId: idOf(symbol), tdMode: TD_MODE, side: bias === 1 ? 'sell' : 'buy', ...(await posSide(bias)),
       ordType: 'conditional', slTriggerPx: String(stopLoss), slOrdPx: '-1', slTriggerPxType: 'mark',
       closeFraction: '1', reduceOnly: true,
     });
@@ -188,10 +202,14 @@ function createSwapClient(opts) {
   return {
     name: 'okx-demo',
     label: 'OKX',
+    instrument: INST,
+    marginCcy,
 
     ...diagnostics(request),
 
-    // USDT equity / available balance of the trading account.
+    // Margin balance of the trading account: the instrument's settlement
+    // currency (USDT for BTC-USDT-SWAP). USD-settled futures (OKX EEA) are
+    // margined in USDC — OKX_MARGIN_CCY can name another.
     async getWallet() {
       const acct = (await request('GET', '/api/v5/account/balance'))[0];
       if (!acct) throw new Error('no trading account balance on OKX');
@@ -202,23 +220,22 @@ function createSwapClient(opts) {
         const adj = num(acct.adjEq || acct.totalEq);
         return { equity: adj, available: Math.max(0, adj - num(acct.imr)) };
       }
-      // Futures mode: only USDT counts — USDT-margined swaps can't use other
-      // coins as margin (no USDT in the trading account = nothing to trade with).
-      const usdt = (acct.details || []).find(c => c.ccy === 'USDT') || {};
+      const ccy = await marginCcy();
+      const m = (acct.details || []).find(c => c.ccy === ccy) || {};
       return {
-        equity: num(usdt.eq),
-        available: num(usdt.availEq !== undefined && usdt.availEq !== '' ? usdt.availEq : usdt.availBal),
+        equity: num(m.eq),
+        available: num(m.availEq !== undefined && m.availEq !== '' ? m.availEq : m.availBal),
       };
     },
 
-    // Open USDT swap positions, keyed like Bybit ("BTCUSDT"), size in BTC.
+    // Open positions on the bot's instrument (and USDT swaps), keyed like Bybit ("BTCUSDT"), size in BTC.
     async getPositions() {
-      const rows = await request('GET', '/api/v5/account/positions', { instType: 'SWAP' });
+      const rows = await request('GET', '/api/v5/account/positions', { instType: TYPE });
       const out = {};
       for (const p of rows) {
         const pos = num(p.pos);
-        if (!pos || !/-USDT-SWAP$/.test(p.instId)) continue;
-        const symbol = symbolOf(p.instId);
+        if (!pos || !ours(p.instId)) continue;
+        const symbol = symOf(p.instId);
         const i = await inst(symbol);
         const bias = p.posSide === 'long' ? 1 : p.posSide === 'short' ? -1 : pos > 0 ? 1 : -1;
         out[symbol] = {
@@ -228,7 +245,7 @@ function createSwapClient(opts) {
       }
       // The stop lives in a separate algo order: read it for the bot's coin(s).
       for (const symbol of Object.keys(out)) {
-        if (symbol !== 'BTCUSDT') continue;
+        if (symbol !== SYMBOL) continue;
         const sl = (await stopOrders(symbol))[0];
         if (sl) out[symbol].stopLoss = num(sl.slTriggerPx);
       }
@@ -241,21 +258,21 @@ function createSwapClient(opts) {
     },
 
     async getMarkPrice(symbol) {
-      const r = (await publicGet('/api/v5/public/mark-price', { instType: 'SWAP', instId: instIdOf(symbol) }))[0];
+      const r = (await publicGet('/api/v5/public/mark-price', { instType: TYPE, instId: idOf(symbol) }))[0];
       if (!r) throw new Error(`no mark price for ${symbol}`);
       return num(r.markPx);
     },
 
     async setLeverage(symbol, leverage) {
       await accountConfig();
-      await request('POST', '/api/v5/account/set-leverage', { instId: instIdOf(symbol), lever: String(leverage), mgnMode: TD_MODE });
+      await request('POST', '/api/v5/account/set-leverage', { instId: idOf(symbol), lever: String(leverage), mgnMode: TD_MODE });
     },
 
     // Market entry with the stop-loss attached to the same order, so the
     // position never exists on OKX without a stop.
     async openMarket({ symbol, bias, qty, stopLoss }) {
       const r = await request('POST', '/api/v5/trade/order', {
-        instId: instIdOf(symbol), tdMode: TD_MODE, side: bias === 1 ? 'buy' : 'sell', ...(await posSide(bias)),
+        instId: idOf(symbol), tdMode: TD_MODE, side: bias === 1 ? 'buy' : 'sell', ...(await posSide(bias)),
         ordType: 'market', sz: await contracts(symbol, qty),
         attachAlgoOrds: [{ slTriggerPx: String(stopLoss), slOrdPx: '-1', slTriggerPxType: 'mark' }],
       });
@@ -274,7 +291,7 @@ function createSwapClient(opts) {
       try {
         for (const o of current) {
           await request('POST', '/api/v5/trade/amend-algos', {
-            instId: instIdOf(symbol), algoId: o.algoId, newSlTriggerPx: String(stopLoss), newSlOrdPx: '-1', newSlTriggerPxType: 'mark',
+            instId: idOf(symbol), algoId: o.algoId, newSlTriggerPx: String(stopLoss), newSlOrdPx: '-1', newSlTriggerPxType: 'mark',
           });
         }
       } catch (err) {
@@ -291,7 +308,7 @@ function createSwapClient(opts) {
 
     async closeMarket({ symbol, bias, qty }) {
       const r = await request('POST', '/api/v5/trade/order', {
-        instId: instIdOf(symbol), tdMode: TD_MODE, side: bias === 1 ? 'sell' : 'buy', ...(await posSide(bias)),
+        instId: idOf(symbol), tdMode: TD_MODE, side: bias === 1 ? 'sell' : 'buy', ...(await posSide(bias)),
         ordType: 'market', sz: await contracts(symbol, qty), reduceOnly: true,
       });
       return r[0].ordId;
@@ -299,25 +316,25 @@ function createSwapClient(opts) {
 
     // Cancels pending orders and stop-loss algo orders on one instrument.
     async cancelAll(symbol) {
-      const instId = instIdOf(symbol);
+      const instId = idOf(symbol);
       const algos = await stopOrders(symbol);
       if (algos.length) await request('POST', '/api/v5/trade/cancel-algos', algos.map(o => ({ algoId: o.algoId, instId })));
-      const open = await request('GET', '/api/v5/trade/orders-pending', { instType: 'SWAP', instId });
+      const open = await request('GET', '/api/v5/trade/orders-pending', { instType: TYPE, instId });
       if (open.length) await request('POST', '/api/v5/trade/cancel-batch-orders', open.map(o => ({ instId, ordId: o.ordId })));
     },
 
-    // Funding payments on USDT swaps since startTime (bills type 8, last 7
+    // Funding payments on the bot's instrument since startTime (bills type 8, last 7
     // days). amount: > 0 received, < 0 paid.
     async getFundingFees(startTime) {
       const out = [];
       let after = '';
       for (let page = 0; page < 10; page++) {
-        const params = { instType: 'SWAP', type: '8', begin: String(Math.max(startTime, Date.now() - 7 * 86400000 + 60000)), limit: '100' };
+        const params = { instType: TYPE, type: '8', begin: String(Math.max(startTime, Date.now() - 7 * 86400000 + 60000)), limit: '100' };
         if (after) params.after = after;
         const rows = await request('GET', '/api/v5/account/bills', params);
         for (const b of rows) {
-          if (!/-USDT-SWAP$/.test(b.instId)) continue;
-          out.push({ id: b.billId, symbol: symbolOf(b.instId), amount: num(b.balChg), at: num(b.ts) });
+          if (!ours(b.instId)) continue;
+          out.push({ id: b.billId, symbol: symOf(b.instId), amount: num(b.balChg), at: num(b.ts) });
         }
         if (rows.length < 100) break;
         after = rows[rows.length - 1].billId;
@@ -330,12 +347,12 @@ function createSwapClient(opts) {
     // collect their fee, and each closing order gets its fillPnl + its own
     // fee + its share of the opening fee. Fills history covers 3 months.
     async getClosedPnl(symbol, startTime) {
-      const instId = instIdOf(symbol);
+      const instId = idOf(symbol);
       const i = await inst(symbol);
       const fills = [];
       let after = '';
       for (let page = 0; page < 20; page++) {
-        const params = { instType: 'SWAP', instId, begin: String(startTime), limit: '100' };
+        const params = { instType: TYPE, instId, begin: String(startTime), limit: '100' };
         if (after) params.after = after;
         const rows = await request('GET', '/api/v5/trade/fills-history', params);
         fills.push(...rows);
@@ -551,11 +568,15 @@ function createSpotClient(opts) {
   };
 }
 
-// BTC-USDT-SWAP (default) or a spot pair such as BTC-USDC.
+// Perpetual swaps ("-SWAP") and dated / XPERP futures ("-YYMMDD") are
+// derivatives; anything else (e.g. BTC-USDC) is a spot pair.
+function isSpot(instrument) { return !/-SWAP$|-\d{6}$/.test(String(instrument).toUpperCase()); }
+
+// BTC-USDT-SWAP (default), a future such as BTC-USD_UM_XPERP-310328, or a spot pair such as BTC-USDC.
 function createClient(opts) {
   const instrument = String(opts.instrument || '').trim().toUpperCase();
-  if (instrument && !/-SWAP$/.test(instrument)) return createSpotClient({ ...opts, instrument });
-  return createSwapClient(opts);
+  if (instrument && isSpot(instrument)) return createSpotClient({ ...opts, instrument });
+  return createSwapClient({ ...opts, instrument });
 }
 
-module.exports = { createClient, sign, instIdOf, symbolOf, OkxError };
+module.exports = { createClient, isSpot, sign, instIdOf, symbolOf, OkxError };

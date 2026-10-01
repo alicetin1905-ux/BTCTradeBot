@@ -10,9 +10,11 @@ const config = module.exports = {
   // 'bybit' (Bybit Demo Trading). EXCHANGE in .env overrides this; the keys
   // for it go in .env too (.env.example).
   EXCHANGE: 'okx',
-  // On OKX: the BTC perpetual 'BTC-USDT-SWAP', or a spot pair such as
-  // 'BTC-USDC' for accounts without perpetual access (OKX's EEA site). Spot is
-  // long-only and unleveraged. OKX_INSTRUMENT in .env overrides this.
+  // On OKX: the BTC perpetual 'BTC-USDT-SWAP'; on OKX's EEA site (no USDT,
+  // no perpetual swaps) the USD-settled, USDC-margined BTC future
+  // 'BTC-USD_UM_XPERP-310328' (perpetual-style, runs to 2031, max 10x); or a
+  // spot pair such as 'BTC-USDC' (long-only, unleveraged). OKX_INSTRUMENT in
+  // .env (or the GitHub workflow) overrides this.
   OKX_INSTRUMENT: 'BTC-USDT-SWAP',
 
   // Signal timeframe: closed 4H candles (UTC-aligned: 00/04/08/12/16/20).
@@ -46,7 +48,8 @@ const config = module.exports = {
     STARTING_BALANCE: 2000, // USDT — the bot's allocation; it trades like a 2000 USDT account
     RISK_PCT: 2,            // loss at the initial stop per trade, % of the balance
     MAX_POSITION_X: 2,      // position value at most this many x the balance (caps size on tight stops)
-    LEVERAGE: 5,            // exchange leverage (cross margin); margin = position value / leverage
+    LEVERAGE: 10,           // exchange leverage (cross margin); margin = position value / leverage.
+                            // Sizing is by risk, so leverage changes the margin tied up, not the loss at the stop.
   },
 
   // Execution safety limits.

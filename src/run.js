@@ -39,7 +39,7 @@ if (process.env.OKX_INSTRUMENT && process.env.OKX_INSTRUMENT.trim()) config.OKX_
 // What the position lives on, e.g. "okx:BTC-USDC" — switching it with a position open is refused.
 config.MARKET_ID = config.EXCHANGE === 'okx' ? `okx:${config.OKX_INSTRUMENT}` : 'bybit';
 // Spot: long-only, never more than the cash at hand.
-if (config.EXCHANGE === 'okx' && !/-SWAP$/.test(config.OKX_INSTRUMENT)) {
+if (config.EXCHANGE === 'okx' && require('./okx').isSpot(config.OKX_INSTRUMENT)) {
   if (config.DIRECTION !== 'long') console.log(`${config.OKX_INSTRUMENT} is spot: trading long-only (DIRECTION "${config.DIRECTION}" ignored)`);
   config.DIRECTION = 'long';
   config.PORTFOLIO.LEVERAGE = 1;
@@ -101,7 +101,7 @@ function exchangeClient() {
     return require('./okx').createClient({
       apiKey: process.env.OKX_API_KEY, apiSecret: process.env.OKX_API_SECRET,
       passphrase: process.env.OKX_API_PASSPHRASE, base: process.env.OKX_API_BASE,
-      instrument: config.OKX_INSTRUMENT, symbol: config.SYMBOL,
+      instrument: config.OKX_INSTRUMENT, symbol: config.SYMBOL, marginCcy: process.env.OKX_MARGIN_CCY,
     });
   }
   return require('./bybit').createClient({ env: MODE, apiKey: process.env.BYBIT_API_KEY, apiSecret: process.env.BYBIT_API_SECRET });
@@ -250,7 +250,8 @@ function reset() {
 /* ---------------- output ---------------- */
 
 function printSummary(events, st) {
-  const quote = config.EXCHANGE === 'okx' && !/-SWAP$/.test(config.OKX_INSTRUMENT) ? config.OKX_INSTRUMENT.split('-')[1] : 'USDT';
+  const quote = config.EXCHANGE !== 'okx' ? 'USDT' : require('./okx').isSpot(config.OKX_INSTRUMENT) ? config.OKX_INSTRUMENT.split('-')[1]
+    : /^BTC-USD_/.test(config.OKX_INSTRUMENT) ? 'USDC' : 'USDT';
   console.log(`\n=== BTCTradeBot [${config.EXCHANGE} ${MODE}${config.EXCHANGE === 'okx' ? ' ' + config.OKX_INSTRUMENT : ''}] (${P.STARTING_BALANCE} ${quote}, ${P.RISK_PCT}% risk, ${config.DIRECTION === 'both' ? 'long+short' : 'long-only'}) @ ${new Date().toISOString()} ===\n`);
   for (const ev of events) {
     if (ev.type === 'enter') {
