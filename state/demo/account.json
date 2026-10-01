@@ -10,8 +10,8 @@
   "exchangeEquity": 1999.93941129761,
   "settings": {
     "RISK_PCT": 2,
-    "MAX_POSITION_X": 1,
-    "LEVERAGE": 1,
+    "MAX_POSITION_X": 2,
+    "LEVERAGE": 10,
     "DAILY_LOSS_LIMIT_PCT": 10,
     "DIRECTION": "long",
     "CHANNEL_N": 20,
@@ -25,7 +25,7 @@
   "settingsDefaults": {
     "RISK_PCT": 2,
     "MAX_POSITION_X": 2,
-    "LEVERAGE": 5,
+    "LEVERAGE": 10,
     "DAILY_LOSS_LIMIT_PCT": 10,
     "DIRECTION": "long",
     "CHANNEL_N": 20,
@@ -39,7 +39,7 @@
   "settingsErrors": [],
   "mode": "demo",
   "exchange": "okx",
-  "instrument": "BTC-USDC",
-  "updatedAt": 1790814228970,
-  "lastRunAt": 1790814228970
+  "instrument": "BTC-USD_UM_XPERP-310328",
+  "updatedAt": 1790814597009,
+  "lastRunAt": 1790814597009
 }
