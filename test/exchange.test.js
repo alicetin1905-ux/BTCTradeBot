@@ -9,6 +9,11 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const crypto = require('crypto');
 const config = require('../config');
+// These tests were written for long-only 20/20 channels; pin that so changing
+// the live defaults in config.js doesn't change what's tested.
+config.DIRECTION = 'long';
+config.CHANNEL_N = 20;
+config.EXIT_N = 20;
 const signal = require('../src/signal');
 const exchange = require('../src/exchange');
 const { sign, createClient } = require('../src/bybit');

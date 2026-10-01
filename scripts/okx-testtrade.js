@@ -3,7 +3,8 @@
 // client and settings — to prove OKX accepts its orders before the first
 // real breakout:
 //   1. leverage (LEVERAGE, margin mode as configured)
-//   2. market buy of the smallest size with the stop-loss attached
+//   2. market order of the smallest size with the stop-loss attached — a
+//      long, and a short too when the bot trades both directions
 //   3. read back the position and the stop on OKX
 //   4. move the stop up once (what trailing does)
 //   5. hold HOLD_SEC seconds (look in the OKX app), then cancel the stop and
@@ -37,25 +38,39 @@ async function main() {
     return 1;
   }
   const inst = await client.getInstrument(S);
+  // Longs always; shorts too when the bot trades both directions (not on spot).
+  const sides = client.spot || config.DIRECTION !== 'both' ? [1] : [1, -1];
+  let ok = true;
+  for (const bias of sides) ok = (await testSide(client, inst, S, bias, lev, sides.length > 1 ? Math.round(HOLD_SEC / 2) : HOLD_SEC)) && ok;
+  console.log(ok ? `\nTEST PASSED — the bot can trade this instrument (${sides.length > 1 ? 'long and short' : 'long'}).` : '\nTEST FAILED — see the ✗ lines above.');
+  return ok ? 0 : 1;
+}
+
+// One open → read back → move stop → hold → close round-trip in one direction.
+async function testSide(client, inst, S, bias, lev, holdSec) {
+  const side = bias === 1 ? 'long' : 'short';
+  console.log(`\n— ${side} —`);
   const qty = inst.minOrderQty;
   const mark = await client.getMarkPrice(S);
-  const stop1 = +(Math.floor(mark * 0.98 / inst.tickSize) * inst.tickSize).toFixed(4);
-  const stop2 = +(Math.floor(mark * 0.985 / inst.tickSize) * inst.tickSize).toFixed(4);
+  // Stops 2% then 1.5% away on the losing side, on the tick, away from the price.
+  const lvl = (pct) => { const x = mark * (1 - bias * pct) / inst.tickSize; return +((bias === 1 ? Math.floor(x) : Math.ceil(x)) * inst.tickSize).toFixed(4); };
+  const stop1 = lvl(0.02), stop2 = lvl(0.015);
   const startedAt = Date.now();
   let opened = false, ok = true;
   try {
     await client.setLeverage(S, lev);
     console.log(`✓ 1. leverage ${lev}x set`);
 
-    const ordId = await client.openMarket({ symbol: S, bias: 1, qty, stopLoss: stop1 });
+    const ordId = await client.openMarket({ symbol: S, bias, qty, stopLoss: stop1 });
     opened = true;
-    console.log(`✓ 2. bought ${qty} BTC at market (order ${ordId}), stop attached at ${px(stop1)} (mark was ${px(mark)})`);
+    console.log(`✓ 2. ${bias === 1 ? 'bought' : 'sold short'} ${qty} BTC at market (order ${ordId}), stop attached at ${px(stop1)} (mark was ${px(mark)})`);
 
     let live = null;
     for (let i = 0; i < 10 && !(live && live.stopLoss); i++) { live = (await client.getPositions())[S]; if (!(live && live.stopLoss)) await sleep(500); }
-    if (!live) throw new Error('no position showed up after the buy');
-    console.log(`${live.stopLoss ? '✓' : '✗'} 3. OKX shows: long ${live.size} BTC @ ${px(live.avgPrice)}, stop ${live.stopLoss ? px(live.stopLoss) : 'MISSING'}`);
-    if (!live.stopLoss) ok = false;
+    if (!live) throw new Error('no position showed up after the order');
+    const sideOk = live.bias === bias;
+    console.log(`${live.stopLoss && sideOk ? '✓' : '✗'} 3. OKX shows: ${live.bias === 1 ? 'long' : 'short'} ${live.size} BTC @ ${px(live.avgPrice)}, stop ${live.stopLoss ? px(live.stopLoss) : 'MISSING'}`);
+    if (!live.stopLoss || !sideOk) ok = false;
 
     await client.setStopLoss(S, stop2);
     await sleep(500);
@@ -64,8 +79,8 @@ async function main() {
     console.log(`${movedOk ? '✓' : '✗'} 4. stop moved ${px(stop1)} → ${moved ? px(moved.stopLoss) : '?'}`);
     if (!movedOk) ok = false;
 
-    console.log(`   holding ${HOLD_SEC}s — open the OKX app: Positions should show the long with its stop-loss…`);
-    await sleep(HOLD_SEC * 1000);
+    console.log(`   holding ${holdSec}s — open the OKX app: Positions should show the ${side} with its stop-loss…`);
+    await sleep(holdSec * 1000);
   } catch (err) {
     ok = false;
     console.log(`✗ ${err.message}`);
@@ -89,14 +104,13 @@ async function main() {
 
   if (opened) {
     let recs = [];
-    for (let i = 0; i < 10 && !recs.length; i++) { await sleep(1000); recs = await client.getClosedPnl(S, startedAt - 60000); }
+    for (let i = 0; i < 10 && !recs.length; i++) { await sleep(1000); recs = await client.getClosedPnl(S, startedAt - 2000); }
     const pnl = recs.reduce((a, r) => a + r.pnl, 0);
     console.log(recs.length ? `✓ 6. realized P&L read back: ${pnl >= 0 ? '+' : ''}${pnl.toFixed(4)} (fees included)` : '✗ 6. no P&L record found yet (it can take a moment on OKX)');
     if (!(await client.getPositions())[S]) console.log('✓ nothing left open');
     else { ok = false; console.log('✗ a position is still open — close it in the OKX app'); }
   }
-  console.log(ok ? '\nTEST PASSED — the bot can trade this instrument.' : '\nTEST FAILED — see the ✗ lines above.');
-  return ok ? 0 : 1;
+  return ok;
 }
 
 main().then((c) => { process.exitCode = c; }, (e) => { console.error(e); process.exitCode = 1; });

@@ -30,13 +30,15 @@ const config = module.exports = {
   MARKET_DATA: null,
 
   // The signal (src/signal.js): 4H Donchian channel breakout.
-  CHANNEL_N: 20,       // enter when a 4H close breaks the high (low) of the previous 20 candles
-  EXIT_N: 20,          // exit when a 4H close breaks the opposite side of the previous 20 candles
+  CHANNEL_N: 15,       // enter when a 4H close breaks the high (low) of the previous 15 candles
+  EXIT_N: 15,          // exit when a 4H close breaks the opposite side of the previous 15 candles
   ATR_LEN: 14,
-  // 'long' = long-only, 'both' = longs and shorts. backtest/DONCHIAN.md:
-  // long-only made more with a smaller worst drop (2021-26, both halves),
-  // long+short did better only in the 2022 bear market.
-  DIRECTION: 'long',
+  // 'long' = long-only, 'both' = longs and shorts. backtest/FREQUENCY.md:
+  // long+short with a 15-candle channel trades ~74x a year (long-only 20: ~31)
+  // and made more (+374% vs +324%, 2021-26) with a deeper worst drop (32% vs
+  // 26%); profit factor 1.41 before / 1.51 from 2024. 1H and 2H signals didn't
+  // hold up after fees.
+  DIRECTION: 'both',
 
   // Stops, in ATRs of the 4H candles. Both live on the exchange as the position's
   // stop-loss, so they work while the machine running the bot is off.

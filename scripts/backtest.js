@@ -99,7 +99,8 @@ function simulate(h1, h4, rules, from = -Infinity, to = Infinity) {
   const R = { ...LIVE, ...rules };
   const sig = signal.series(h4, { channelN: R.channelN, exitN: R.exitN, atrLen: R.atrLen });
   const at = new Map(); // 1H candle open time whose close is the 4H close -> signal
-  for (const s of sig) if (s) at.set(s.t + TF - HOUR, s);
+  const tfMs = (R.tfHours || 4) * HOUR; // signal candle length (the candles passed in are this long)
+  for (const s of sig) if (s) at.set(s.t + tfMs - HOUR, s);
   const cost = TAKER + R.slippage;
   let bal = R.start, peak = R.start, maxDD = 0, pos = null, exposedH = 0;
   const trades = [];
@@ -165,18 +166,23 @@ function simulate(h1, h4, rules, from = -Infinity, to = Infinity) {
 /* ---------------- variants ---------------- */
 
 const VARIANTS = [
-  ['A  live: long-only, 20/20, stop 2 ATR, trail 3 ATR, 2% risk', {}],
-  ['-- direction --', null],
-  ['long + short', { direction: 'both' }],
+  ['A  live: long+short, 15/15, stop 2 ATR, trail 3 ATR, 2% risk', {}],
+  ['-- direction / channel --', null],
+  ['previous: long-only, 20/20', { direction: 'long', channelN: 20, exitN: 20 }],
+  ['long-only, 15/15', { direction: 'long' }],
+  ['long + short, 20/20', { channelN: 20, exitN: 20 }],
   ['-- costs --', null],
   ['+ 0.05% slippage per side', { slippage: 0.0005 }],
   ['no funding (fees only)', { funding: false }],
   ['-- breakout channel --', null],
-  ['channel 15', { channelN: 15 }],
-  ['channel 30', { channelN: 30 }],
-  ['channel 40', { channelN: 40 }],
+  ['channel 10', { channelN: 10, exitN: 10 }],
+  ['channel 20', { channelN: 20, exitN: 20 }],
+  ['channel 30', { channelN: 30, exitN: 30 }],
   ['exit channel 10', { exitN: 10 }],
-  ['exit channel 30', { exitN: 30 }],
+  ['exit channel 20', { exitN: 20 }],
+  ['-- timeframe --', null],
+  ['2H signals', { tfHours: 2 }],
+  ['1H signals', { tfHours: 1 }],
   ['-- stops --', null],
   ['initial stop 1.5 ATR', { stopAtr: 1.5 }],
   ['initial stop 2.5 ATR', { stopAtr: 2.5 }],
@@ -193,6 +199,8 @@ async function main() {
   const h1all = await fetchHistory(FROM - 90 * DAY);
   const h1 = h1all.filter(c => c.t >= FROM - 90 * DAY);
   const h4 = bucket(h1, 4);
+  const byTf = { 4: h4 };
+  const candlesFor = (r) => byTf[r.tfHours || 4] || (byTf[r.tfHours] = bucket(h1, r.tfHours));
   const last = h1[h1.length - 1].t;
   process.stderr.write(`${h1.length} candles to ${new Date(last).toISOString().slice(0, 16)}\n`);
 
@@ -204,10 +212,10 @@ async function main() {
     if (!rules) { rows.push({ name, header: true }); continue; }
     rows.push({
       name, rules,
-      all: simulate(h1, h4, rules, FROM),
-      perYear: years.map(y => simulate(h1, h4, fixed(rules), Date.UTC(y, 0, 1), Date.UTC(y + 1, 0, 1))),
-      before: simulate(h1, h4, fixed(rules), FROM, SPLIT),
-      after: simulate(h1, h4, fixed(rules), SPLIT),
+      all: simulate(h1, candlesFor(rules), rules, FROM),
+      perYear: years.map(y => simulate(h1, candlesFor(rules), fixed(rules), Date.UTC(y, 0, 1), Date.UTC(y + 1, 0, 1))),
+      before: simulate(h1, candlesFor(rules), fixed(rules), FROM, SPLIT),
+      after: simulate(h1, candlesFor(rules), fixed(rules), SPLIT),
     });
   }
   const bh = years.map(y => {

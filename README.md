@@ -28,18 +28,19 @@ was the most robust: 188 of 192 nearby settings made money in both periods
 
 - **Signal:** closed 4H candles only (00/04/08/12/16/20 UTC), nothing repaints.
 - **Entry:** long when a 4H candle **closes above the highest high of the
-  previous 20 candles**. It's a market order with the stop attached, placed
+  previous 15 candles**, short when it **closes below their lowest low**. It's a market order with the stop attached, placed
   on the run right after the close (within 60 min, `ENTRY_FRESH_MIN`). It
   doesn't chase an old breakout, and makes one attempt per breakout candle.
 - **Initial stop:** 2 × ATR(14) below the entry (`STOP_ATR`).
 - **Trailing stop:** after every 4H close the stop moves up to *best close
   since entry − 3 × ATR* (`TRAIL_ATR`). It only ever tightens, and it's set on
   the exchange, so it works while the Mac is off.
-- **Exit:** a 4H close **below the lowest low of the previous 20 candles**
+- **Exit:** a 4H close back through the opposite side of the 15-candle channel
   (`EXIT_N`) closes at market, if the stop hasn't already.
-- **Direction:** long-only by default. `DIRECTION: "both"` also shorts the
-  mirror image. Long-only made more with a smaller worst drop; long+short only
-  did better in the 2022 bear market.
+- **Direction:** long and short (`DIRECTION: "both"`), about 74 trades a
+  year. `"long"` with a 20-candle channel was the first setup: about 31 trades
+  a year, a smaller worst drop (26% vs 32%) and a little less return
+  (`backtest/FREQUENCY.md`).
 - **Size:** each trade risks **2% of the balance** at its initial stop
   (`RISK_PCT`). Position value is capped at 2× the balance (`MAX_POSITION_X`),
   at 10× leverage, cross margin (`LEVERAGE`). One position at a time.
@@ -55,7 +56,7 @@ was the most robust: 188 of 192 nearby settings made money in both periods
 
 Expect it to be wrong often. About 1 trade in 3 wins: most breakouts fail and
 cost a little, and a few long trends pay for all of them. Long flat or losing
-stretches are normal (2022 and 2025 in the backtest).
+stretches are normal (2021 and 2025 in the backtest were roughly flat).
 
 ## Backtest (`node scripts/backtest.js` → `backtest/REPORT.md`)
 
@@ -66,10 +67,11 @@ slightly cheaper) and funding of about 0.01% per 8h, which longs pay.
 
 | | Trades | Win % | Return | Worst drop | Profit factor |
 |---|---:|---:|---:|---:|---:|
-| **Live: long-only, 2% risk** | 179 | 36 | **+324%** | 26% | 1.70 |
-| + 0.05% slippage per side | 179 | 35 | +272% | 28% | 1.61 |
-| Long + short | 354 | 34 | +287% | 28% | 1.36 |
-| Risk 1% | 179 | 36 | +125% | 14% | 1.83 |
+| **Live: long + short, 15-candle channel, 2% risk** | 424 (~74/yr) | 34 | **+374%** | 32% | 1.35 |
+| + 0.05% slippage per side | 424 | 33 | +250% | 36% | 1.27 |
+| First setup: long-only, 20-candle channel | 179 (~31/yr) | 36 | +324% | 26% | 1.70 |
+| Live with risk 1.5% | 424 | 34 | +252% | 25% | 1.38 |
+| 1H signals instead of 4H | 1771 | 29 | −88% | 92% | 0.90 |
 
 These are compounding results, 2021-01 → 2026-09, starting from 2000 USDT.
 
@@ -77,12 +79,13 @@ Year by year, starting each year fresh with 2000 USDT at a fixed $40 risk per tr
 
 | | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 (to Sep) |
 |---|---:|---:|---:|---:|---:|---:|
-| Bot (net USDT) | +267 | −386 | +2511 | +941 | −105 | +447 |
+| Bot (net USDT) | −110 | +120 | +2113 | +1472 | +16 | +731 |
 | Buy & hold 2000 USDT | +1197 | −1284 | +3113 | +2425 | −128 | −90 |
 
-The settings were picked on 2021–2023 (+2392, profit factor 2.22). On
-2024–2026, which the choice never saw, the bot made +1282 with a profit factor
-of 1.70.
+Before 2024 it made +2033 (profit factor 1.41); from 2024, +2207 (1.51). The
+breakout family was chosen on 2021–2023 only (`RESEARCH.md`, `DONCHIAN.md`).
+The move to long+short with a 15-candle channel came later, to trade more
+often (`FREQUENCY.md`), and looked at the whole period.
 
 It's still an approximation: no slippage in the main line, funding is
 estimated, and fills come at candle closes.

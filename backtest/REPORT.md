@@ -1,6 +1,6 @@
 # BTC backtest 2021-01-01 → 2026-09-30
 
-Generated 2026-09-30 23:32 UTC by `node scripts/backtest.js` — the live signal code (`src/signal.js`) replayed on OKX BTC-USDT-SWAP 1H candles.
+Generated 2026-10-01 00:54 UTC by `node scripts/backtest.js` — the live signal code (`src/signal.js`) replayed on OKX BTC-USDT-SWAP 1H candles.
 
 - **trades … in mkt**: the whole period, compounding from 2000 USDT with the variant's % risk; *in mkt* = share of the time a position is open.
 - **year columns**: net USDT for that calendar year alone, fresh 2000 USDT each year and a fixed $ risk (the variant's % of 2000), so years compare fairly.
@@ -10,40 +10,45 @@ Costs: Bybit taker fee 0.055% per side; funding approximated at 0.01% per 8h of 
 
 ```
 variant                                                        trades win%   ret% maxDD%    PF in mkt |   2021   2022   2023   2024   2025   2026 |  <2024   PF  2024+   PF
-A  live: long-only, 20/20, stop 2 ATR, trail 3 ATR, 2% risk       179   36    324   26.0  1.70    35% |    267   -386   2511    941   -105    447 |   2392 2.22   1282 1.70
--- direction --
-long + short                                                      354   34    287   27.5  1.36    65% |   -241     42   2192   1106    -34    626 |   1955 1.47   1706 1.48
+A  live: long+short, 15/15, stop 2 ATR, trail 3 ATR, 2% risk      424   34    374   32.2  1.35    76% |   -110    120   2113   1472     16    731 |   2033 1.41   2207 1.51
+-- direction / channel --
+previous: long-only, 20/20                                        179   36    324   26.0  1.70    35% |    267   -386   2511    941   -105    447 |   2392 2.22   1282 1.70
+long-only, 15/15                                                  215   35    356   30.9  1.60    39% |     97   -385   2486   1369   -160    489 |   2170 1.88   1755 1.76
+long + short, 20/20                                               354   34    287   27.5  1.36    65% |   -241     42   2192   1106    -34    626 |   1955 1.47   1706 1.48
 -- costs --
-+ 0.05% slippage per side                                         179   35    272   27.9  1.61    35% |    241   -423   2453    899   -167    404 |   2271 2.11   1137 1.59
-no funding (fees only)                                            179   36    401   24.3  1.80    35% |    304   -351   2623   1007    -42    501 |   2575 2.34   1465 1.82
++ 0.05% slippage per side                                         424   33    250   36.4  1.27    76% |   -177     27   1992   1377   -142    610 |   1753 1.34   1873 1.42
+no funding (fees only)                                            424   33    390   31.8  1.36    76% |   -104    108   2176   1498     28    738 |   2094 1.42   2247 1.52
 -- breakout channel --
-channel 15                                                        212   35    326   33.9  1.56    40% |    184   -414   2480   1336   -316    483 |   2249 1.92   1561 1.67
-channel 30                                                        147   33    227   35.0  1.59    28% |    207   -187   2193    825   -275    249 |   2213 2.58    813 1.43
-channel 40                                                        121   38    298   24.0  1.96    26% |    199   -152   2281    826    -11    229 |   2328 3.00   1045 1.78
-exit channel 10                                                   193   35    261   24.4  1.59    31% |    190   -360   2278    849    -85    402 |   2011 1.98   1166 1.60
-exit channel 30                                                   179   36    311   26.0  1.68    35% |    267   -394   2466    914   -105    447 |   2340 2.19   1256 1.68
+channel 10                                                        555   33     89   43.3  1.10    84% |     84   -255   1654    823   -425    518 |   1376 1.23    943 1.16
+channel 20                                                        354   34    287   27.5  1.36    65% |   -241     42   2192   1106    -34    626 |   1955 1.47   1706 1.48
+channel 30                                                        284   32    199   27.9  1.33    51% |   -239     52   2141    786   -265    514 |   1925 1.61   1051 1.32
+exit channel 10                                                   446   35    290   31.7  1.29    70% |     33     94   1862   1287    -84    683 |   1892 1.39   1859 1.42
+exit channel 20                                                   405   35    309   34.0  1.32    75% |   -133     72   2185   1319   -165    655 |   2035 1.42   1798 1.45
+-- timeframe --
+2H signals                                                        858   30     28   42.9  1.03    72% |   -213   -163   1269    897   -508    644 |    684 1.07   1208 1.13
+1H signals                                                       1771   29    -88   91.8  0.90    75% |     -7  -1106    133   -691  -1229    -12 |  -1453 0.91  -1663 0.86
 -- stops --
-initial stop 1.5 ATR                                              191   32    434   35.6  1.57    33% |    510   -461   2948   1153    -89    230 |   3028 2.27   1580 1.65
-initial stop 2.5 ATR                                              170   39    250   24.3  1.77    36% |    198   -233   1973    878    -77    295 |   1938 2.21   1095 1.77
-trail 2.5 ATR                                                     200   38    204   29.7  1.54    30% |     70   -303   1722    984    -93    349 |   1488 1.74   1271 1.66
-trail 4 ATR                                                       165   29    211   33.8  1.56    39% |    349   -599   2272    665   -140    542 |   2020 1.94   1067 1.57
+initial stop 1.5 ATR                                              455   30    427   41.3  1.25    69% |    -77    292   2704   1598   -237    563 |   2866 1.49   2425 1.41
+initial stop 2.5 ATR                                              407   36    285   29.1  1.36    79% |   -123    172   1673   1365     -2    468 |   1650 1.41   1805 1.53
+trail 2.5 ATR                                                     457   36    229   30.6  1.27    67% |   -224    344   1321   1138    -55    678 |   1442 1.30   1762 1.40
+trail 4 ATR                                                       394   32    313   36.8  1.31    83% |      8    234   2026   1247   -109    611 |   2178 1.44   1791 1.41
 -- risk per trade --
-risk 1%                                                           179   36    125   14.0  1.83    35% |    134   -193   1255    470    -53    223 |   1196 2.22    641 1.70
-risk 1.5%                                                         179   36    215   20.3  1.76    35% |    200   -290   1883    706    -79    335 |   1794 2.22    962 1.70
-risk 3%                                                           179   36    442   36.1  1.51    35% |    401   -576   3325   1411   -197    290 |   3017 2.02   1924 1.70
-buy & hold 2000 USDT, 1x                                                                              |   1197  -1284   3113   2425   -128    -90
+risk 1%                                                           424   34    147   17.4  1.41    76% |    -55     60   1057    736     18    366 |   1016 1.41   1103 1.51
+risk 1.5%                                                         424   34    252   25.1  1.38    76% |    -83     90   1585   1104     27    548 |   1525 1.41   1655 1.51
+risk 3%                                                           424   34    419   44.5  1.23    76% |   -165    181   2728   2208   -200    666 |   2539 1.34   3310 1.51
+buy & hold 2000 USDT, 1x                                                                              |   1197  -1284   3113   2425   -128    -92
 ```
 
 ## Live variant in detail
 
-- 179 trades, 36% winners; average win $246, average loss $-80 (compounding, so later trades are bigger)
-- 69 months with a closed trade, 36 of them losing; longest losing streak 9 trades
-- worst drop from a peak 26.0%
+- 424 trades, 34% winners; average win $197, average loss $-77 (compounding, so later trades are bigger)
+- 69 months with a closed trade, 33 of them losing; longest losing streak 12 trades
+- worst drop from a peak 32.2%
 
 | Exit | Trades | Net $ |
 |---|---:|---:|
-| trailing stop | 114 | 10835 |
-| stop | 60 | -5955 |
-| exit signal | 5 | 1609 |
+| trailing stop | 237 | 15474 |
+| stop | 142 | -13548 |
+| exit signal | 45 | 5556 |
 
 Most trades lose a little (false breakouts); a few long trends pay for them. Expect long flat or losing stretches.
