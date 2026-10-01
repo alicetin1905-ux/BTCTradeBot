@@ -250,7 +250,8 @@ function reset() {
 /* ---------------- output ---------------- */
 
 function printSummary(events, st) {
-  console.log(`\n=== BTCTradeBot [${config.EXCHANGE} ${MODE}] (${P.STARTING_BALANCE} USDT, ${P.RISK_PCT}% risk, ${config.DIRECTION === 'both' ? 'long+short' : 'long-only'}) @ ${new Date().toISOString()} ===\n`);
+  const quote = config.EXCHANGE === 'okx' && !/-SWAP$/.test(config.OKX_INSTRUMENT) ? config.OKX_INSTRUMENT.split('-')[1] : 'USDT';
+  console.log(`\n=== BTCTradeBot [${config.EXCHANGE} ${MODE}${config.EXCHANGE === 'okx' ? ' ' + config.OKX_INSTRUMENT : ''}] (${P.STARTING_BALANCE} ${quote}, ${P.RISK_PCT}% risk, ${config.DIRECTION === 'both' ? 'long+short' : 'long-only'}) @ ${new Date().toISOString()} ===\n`);
   for (const ev of events) {
     if (ev.type === 'enter') {
       console.log(`ENTER ${ev.bias === 1 ? 'LONG' : 'SHORT'} ${ev.qty} BTC @ ${px(ev.entry)} | breakout ${px(ev.breakout)} | SL ${px(ev.stop)} | value $${fmt(ev.notional)} risk $${fmt(ev.riskAmt)}`);
