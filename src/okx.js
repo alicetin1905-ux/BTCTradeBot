@@ -103,7 +103,7 @@ function diagnostics(request) {
     // Account and position mode, read-only (scripts/okx-check.js).
     async accountInfo() {
       const c = (await request('GET', '/api/v5/account/config'))[0] || {};
-      return { acctLv: c.acctLv, posMode: c.posMode };
+      return { acctLv: c.acctLv, posMode: c.posMode, perm: c.perm || '' };
     },
 
     // BTC instruments this account may trade (account-level instrument list).

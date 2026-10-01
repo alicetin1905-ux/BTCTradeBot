@@ -23,6 +23,7 @@ const HINTS = {
   50111: 'the API key is not valid (typo, deleted, or not a demo key)',
   50113: 'invalid signature — OKX_API_SECRET is wrong',
   50119: 'OKX does not know this API key on this site',
+  50123: 'the key is read-only — edit it on OKX (Demo Trading API) and tick "Trade"',
 };
 // OKX's sites: a key only exists on the one its account belongs to.
 const SITES = { 'https://www.okx.com': 'global', 'https://my.okx.com': 'EEA', 'https://app.okx.com': 'US', 'https://tr.okx.com': 'Türkiye' };
@@ -89,6 +90,11 @@ async function main() {
       console.log(`✗ No ${quote} in the trading account — ${instrument} needs ${quote} as margin in Futures mode.\n` +
         `  In the OKX app (demo mode): Assets → Transfer / Convert → ${quote} into the Trading account (the bot trades like a 2000 ${quote} account).\n` +
         '  Or switch the demo account to Multi-currency margin mode (Settings → Account mode): then its other coins count as margin.');
+      return 1;
+    }
+    console.log(`  key permissions: ${a.perm || 'unknown'}`);
+    if (a.perm && !/trade/.test(a.perm)) {
+      console.log('✗ The API key can only read. Edit it in OKX (demo mode: profile → Demo Trading API → Edit) and tick "Trade" — key, secret and passphrase stay the same.');
       return 1;
     }
     if (!client.spot && a.acctLv === '1') {

@@ -69,6 +69,7 @@ async function main() {
   } catch (err) {
     ok = false;
     console.log(`✗ ${err.message}`);
+    if (+err.code === 50123) console.log('  → the key is read-only: edit it on OKX (demo mode: profile → Demo Trading API → Edit) and tick "Trade".');
   } finally {
     // Close whatever is open on the instrument, in every case.
     try {
