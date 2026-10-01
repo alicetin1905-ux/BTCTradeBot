@@ -836,7 +836,7 @@ test('ATLAS flip through the bot: an opposite swing closes the long (and reverse
     assert.equal(st.position.bias, 1);
     assert.equal(st.position.score, 30);
     const notify = require('../src/notify');
-    assert.match(notify.messagesFor(events, st)[0].message, /ATLAS score swung -40 → \+30 within 16h/);
+    assert.match(notify.messagesFor(events, st)[0].message, /ATLAS score swung -40 → \+30 within 8h/);
     const t1 = T0 + TF;
     ex.marks.BTCUSDT = 99000;
     await exchange.runExchange({ client, st, sig: [flipSig(t1, 99000, -28, 35, -1)], events: [], now: after(t1) });
@@ -846,7 +846,7 @@ test('ATLAS flip through the bot: an opposite swing closes the long (and reverse
     const summary = require('../src/summary');
     const m = summary.status({ account: { balance: 2000, startingBalance: 2000 }, position: null, signal: flipSig(t1, 99000, -12, null, 0) });
     assert.match(m.message, /ATLAS score -12/);
-    assert.match(m.message, /swing from −25 to \+25 within 16h, short on the mirror/);
+    assert.match(m.message, /swing from −10 to \+10 within 8h, short on the mirror/);
   } finally { [config.DIRECTION, config.STRATEGY] = saved; }
 });
 

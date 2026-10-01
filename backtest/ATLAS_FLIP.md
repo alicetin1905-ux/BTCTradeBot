@@ -125,3 +125,13 @@ the cells profitable in both halves from 19 to 22 of 25. Caveat: the filter was
 found on the full period, so part of the gain is in-sample. Faster timeframes
 (15m ATLAS flip: PF 0.82-0.96, every setting loses) and support/resistance
 fades (30m/1H/4H, fixed +2.5% target) were tested and rejected.
+
+## Live from 2026-10-01 (later): ±10 within 2 candles (8h), band ±10%
+
+Chosen for trade count. With the 200-MA band: 555 trades (~97/yr), +644%, max
+drawdown 29%, PF 1.37 (1.88 before 2024 / 1.31 from 2024), +0.05% slippage
+per side still +382% (PF 1.27). The stricter ±25 / 4 candles had 342 trades,
++834%, 25% drawdown, PF 1.56 — fewer, better trades; set `FLIP_SCORE` 25 and
+`FLIP_WINDOW` 4 (control/settings.json or config.js) to go back.
+Lower levels (±10, ±15) with 4-6 candle windows lose in 2025 (-380 to -440 at
+$40 risk); the 2-candle window avoids that.

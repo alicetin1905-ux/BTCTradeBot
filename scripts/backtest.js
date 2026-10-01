@@ -185,7 +185,10 @@ function simulate(h1, h4, rules, from = -Infinity, to = Infinity) {
 
 const BO = { strategy: 'breakout' };
 const VARIANTS = [
-  ['A  live: ATLAS flip ±25 within 4 candles (16h), 200-MA band ±10%, long+short', {}],
+  ['A  live: ATLAS flip ±10 within 2 candles (8h), 200-MA band ±10%, long+short', {}],
+  ['   previous live: ±25 within 4 candles (16h), band ±10%', { flipScore: 25, flipWindow: 4 }],
+  ['   ±15 within 2 candles (8h)', { flipScore: 15, flipWindow: 2 }],
+  ['   ±10 within 4 candles (16h)', { flipScore: 10, flipWindow: 4 }],
   ['-- ATLAS flip variants --', null],
   ['no trend band', { trendBand: null }],
   ['no trend band, window 3 candles (12h) — the previous live setting', { trendBand: null, flipWindow: 3 }],

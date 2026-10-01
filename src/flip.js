@@ -2,7 +2,7 @@
 //
 //   enter long   the 4H score is +FLIP_SCORE or more now, and was
 //                −FLIP_SCORE or less within the previous FLIP_WINDOW 4H
-//                candles (4 = 16h): a fast swing from bearish to bullish
+//                candles (2 = 8h): a fast swing from bearish to bullish
 //   enter short  the mirror image
 //   trend band   a swing is ignored (no entry, no reversal) when the 4H close
 //                is more than TREND_BAND_PCT % away from its 200-candle 4H

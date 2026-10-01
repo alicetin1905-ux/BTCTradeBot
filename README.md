@@ -21,19 +21,20 @@ alarm.
    on 4H candles (`RESEARCH.md`, `DONCHIAN.md`). 1H loses to fees
    (`FREQUENCY.md`). The breakout was the first live signal.
 3. **The ATLAS score works when used as a fast swing, with a trailing stop
-   instead of fixed targets.** Trade when the score swings from −25 to +25
-   (or back) within 12 hours. This made more than the breakout (+581% vs
-   +374%) with a smaller worst drop (25% vs 32%). The same setting is chosen
-   when picking on 2021–2023 alone, and it held up on 2024–2026
-   (`ATLAS_FLIP.md`). This is the live signal now.
+   instead of fixed targets.** Trade when the score swings from −10 to +10
+   (or back) within 8 hours, ignoring swings far from the 200-candle average.
+   This made more than the breakout (+644% vs +374%) at a similar worst drop
+   (29% vs 32%), with more trades (~97 a year vs ~74). The stricter ±25 / 16h
+   setting makes fewer, better trades (+834%, PF 1.56); ±10 / 8h was chosen
+   for trade count (`ATLAS_FLIP.md`). This is the live signal now.
 
 ## The rules (`config.js`, `src/flip.js`)
 
 - **Signal: the ATLAS score swinging fast.** The score is TradeBot's ATLAS
   score (`src/atlasScore.js`, ~25 indicators, −100 to +100), computed on
   closed 4H candles (00/04/08/12/16/20 UTC). Nothing repaints.
-  - **Long** when the score closes at **+25 or higher** and was at **−25 or
-    lower** within the previous **4 candles (16h)**: a fast swing from
+  - **Long** when the score closes at **+10 or higher** and was at **−10 or
+    lower** within the previous **2 candles (8h)**: a fast swing from
     bearish to bullish.
   - **Short** is the mirror image.
   - **Trend band:** a swing is ignored when the 4H close is more than 10 %
@@ -77,10 +78,11 @@ on each side and funding of about 0.01% per 8h, which longs pay.
 
 | | Trades | Win % | Return | Worst drop | Profit factor |
 |---|---:|---:|---:|---:|---:|
-| **Live: ATLAS flip ±25 within 16h, 200-MA band ±10%, long + short** | 342 (~60/yr) | 32 | **+834%** | 25% | 1.56 |
-| + 0.05% slippage per side | 347 | 29 | +433% | 26% | 1.38 |
-| Flip within 16h | 416 (~72/yr) | 30 | +459% | 28% | 1.39 |
-| Flip within 20h | 467 (~81/yr) | 30 | +403% | 31% | 1.34 |
+| **Live: ATLAS flip ±10 within 8h, 200-MA band ±10%, long + short** | 555 (~97/yr) | 29 | **+644%** | 29% | 1.37 |
+| Previous: ±25 within 16h, band ±10% | 342 (~60/yr) | 32 | +834% | 25% | 1.56 |
+| + 0.05% slippage per side | 555 | 28 | +382% | 32% | 1.27 |
+| ±15 within 8h | 413 (~72/yr) | 31 | +432% | 33% | 1.40 |
+| ±10 within 16h | 667 (~116/yr) | 28 | +612% | 36% | 1.33 |
 | Breakout 15, long + short (the previous live setup) | 424 (~74/yr) | 34 | +374% | 32% | 1.35 |
 | Breakout 20, long-only (the first setup) | 179 (~31/yr) | 36 | +324% | 26% | 1.70 |
 | Breakout 15 on 1H signals | 1771 | 29 | −88% | 92% | 0.90 |
