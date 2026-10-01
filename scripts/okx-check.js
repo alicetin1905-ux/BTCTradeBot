@@ -67,6 +67,8 @@ async function main() {
     const p = await client.getPositions();
     const MODES = { 1: 'Spot mode', 2: 'Futures mode', 3: 'Multi-currency margin', 4: 'Portfolio margin' };
     console.log(`✓ Demo account OK — USDT equity ${w.equity.toFixed(2)}, available ${w.available.toFixed(2)}`);
+    const raw = await client.balanceRow();
+    console.log(`  balance fields: ${JSON.stringify(raw)}`);
     console.log(`  account mode: ${MODES[a.acctLv] || a.acctLv} · position mode: ${a.posMode === 'long_short_mode' ? 'long/short' : 'net (one-way)'}`);
     if (a.acctLv === '1') {
       console.log('✗ Spot mode can\'t trade perpetual swaps — switch the demo account to Futures mode (Settings → Account mode)');

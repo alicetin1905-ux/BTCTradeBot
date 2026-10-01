@@ -147,6 +147,17 @@ function createClient({ apiKey, apiSecret, passphrase, base = DEFAULT_BASE, fetc
       return { acctLv: c.acctLv, posMode: c.posMode };
     },
 
+    // The raw USDT balance row (numbers only), for scripts/okx-check.js.
+    async balanceRow() {
+      const acct = (await request('GET', '/api/v5/account/balance', { ccy: 'USDT' }))[0] || {};
+      const usdt = (acct.details || []).find(c => c.ccy === 'USDT') || {};
+      const pick = (o, keys) => Object.fromEntries(keys.filter(k => o[k] !== undefined).map(k => [k, o[k]]));
+      return {
+        account: pick(acct, ['totalEq', 'adjEq', 'availEq', 'imr', 'mmr', 'upl']),
+        usdt: pick(usdt, ['eq', 'cashBal', 'availBal', 'availEq', 'frozenBal', 'ordFrozen', 'upl', 'isoEq', 'disEq', 'maxLoan', 'liab', 'imr', 'mmr']),
+      };
+    },
+
     // USDT equity / available balance of the trading account.
     async getWallet() {
       const acct = (await request('GET', '/api/v5/account/balance', { ccy: 'USDT' }))[0];
