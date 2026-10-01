@@ -110,7 +110,8 @@ workflow's default:
 
 - **The contract:** a perpetual-style future that runs to 2031, with funding
   like a perpetual. 1 contract = 1 BTC, sizes in steps of 0.0001 BTC.
-- **Margin in USDC** at **10x** leverage, cross margin (max 10x). Sizing is
+- **Margin in USDC** at **10x** leverage, **isolated** margin as in the OKX
+  app (`OKX_MARGIN_MODE`; `cross` also works; max 10x). Sizing is
   still by risk: each trade loses 2% of the balance at its initial stop.
   Leverage only sets how much USDC is tied up as margin. The position is
   capped at 2× the balance (`MAX_POSITION_X`).

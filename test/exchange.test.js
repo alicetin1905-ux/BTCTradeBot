@@ -744,3 +744,19 @@ test('signal candles: live market data — a demo-only future reads the live BTC
     }
   } finally { [config.EXCHANGE, config.OKX_INSTRUMENT] = saved; }
 });
+
+test('OKX isolated margin: orders, stop and leverage use mgnMode/tdMode isolated', async () => {
+  const f = fakeOkx({ positions: [{ instId: 'BTC-USDT-SWAP', pos: '2', posSide: 'net', avgPx: '100000', markPx: '106000', upl: '0' }], mark: 106000 });
+  const c = require('../src/okx').createClient({ apiKey: 'k', apiSecret: 's', passphrase: 'p', fetchImpl: f.fetchImpl, marginMode: 'isolated' });
+  assert.equal(c.marginMode, 'isolated');
+  await c.setLeverage('BTCUSDT', 10);
+  await c.openMarket({ symbol: 'BTCUSDT', bias: 1, qty: 0.02, stopLoss: 98000 });
+  await c.setStopLoss('BTCUSDT', 103000); // no stop algo in the fake -> a new one is placed
+  await c.closeMarket({ symbol: 'BTCUSDT', bias: 1, qty: 0.02 });
+  assert.equal(f.S.calls.find(x => x.path === '/api/v5/account/set-leverage').body.mgnMode, 'isolated');
+  assert.deepEqual(f.S.calls.filter(x => x.path === '/api/v5/trade/order' || x.path === '/api/v5/trade/order-algo').map(x => x.body.tdMode), ['isolated', 'isolated', 'isolated']);
+  // Long/short mode: leverage set for both sides.
+  const g = fakeOkx({ posMode: 'long_short_mode' });
+  await require('../src/okx').createClient({ apiKey: 'k', apiSecret: 's', passphrase: 'p', fetchImpl: g.fetchImpl, marginMode: 'isolated' }).setLeverage('BTCUSDT', 10);
+  assert.deepEqual(g.S.calls.filter(x => x.path === '/api/v5/account/set-leverage').map(x => x.body.posSide), ['long', 'short']);
+});

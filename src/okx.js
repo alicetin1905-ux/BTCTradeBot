@@ -19,7 +19,7 @@
 const crypto = require('crypto');
 
 const DEFAULT_BASE = 'https://www.okx.com';
-const TD_MODE = 'cross';
+const TD_MODE = 'cross'; // default margin mode for derivatives; opts.marginMode can pick 'isolated'
 
 class OkxError extends Error {
   constructor(path, code, msg) {
@@ -144,6 +144,8 @@ function createSwapClient(opts) {
   const symOf = (instId) => (instId === INST ? SYMBOL : symbolOf(instId));
   const TYPE = /-SWAP$/.test(INST) ? 'SWAP' : 'FUTURES';
   const ours = (instId) => instId === INST || /-USDT-SWAP$/.test(instId);
+  // 'cross' (default) or 'isolated': each position's margin kept apart.
+  const TDM = String(opts.marginMode || '').trim().toLowerCase() === 'isolated' ? 'isolated' : TD_MODE;
   // Instrument rules, cached per run.
   const instCache = {};
   async function inst(symbol) {
@@ -193,7 +195,7 @@ function createSwapClient(opts) {
 
   async function placeStop(symbol, bias, stopLoss) {
     await request('POST', '/api/v5/trade/order-algo', {
-      instId: idOf(symbol), tdMode: TD_MODE, side: bias === 1 ? 'sell' : 'buy', ...(await posSide(bias)),
+      instId: idOf(symbol), tdMode: TDM, side: bias === 1 ? 'sell' : 'buy', ...(await posSide(bias)),
       ordType: 'conditional', slTriggerPx: String(stopLoss), slOrdPx: '-1', slTriggerPxType: 'mark',
       closeFraction: '1', reduceOnly: true,
     });
@@ -203,6 +205,7 @@ function createSwapClient(opts) {
     name: 'okx-demo',
     label: 'OKX',
     instrument: INST,
+    marginMode: TDM,
     marginCcy,
 
     ...diagnostics(request),
@@ -265,14 +268,19 @@ function createSwapClient(opts) {
 
     async setLeverage(symbol, leverage) {
       await accountConfig();
-      await request('POST', '/api/v5/account/set-leverage', { instId: idOf(symbol), lever: String(leverage), mgnMode: TD_MODE });
+      const { posMode } = await accountConfig();
+      // Isolated margin in long/short mode keeps one leverage per side.
+      const sides = TDM === 'isolated' && posMode === 'long_short_mode' ? [{ posSide: 'long' }, { posSide: 'short' }] : [{}];
+      for (const side of sides) {
+        await request('POST', '/api/v5/account/set-leverage', { instId: idOf(symbol), lever: String(leverage), mgnMode: TDM, ...side });
+      }
     },
 
     // Market entry with the stop-loss attached to the same order, so the
     // position never exists on OKX without a stop.
     async openMarket({ symbol, bias, qty, stopLoss }) {
       const r = await request('POST', '/api/v5/trade/order', {
-        instId: idOf(symbol), tdMode: TD_MODE, side: bias === 1 ? 'buy' : 'sell', ...(await posSide(bias)),
+        instId: idOf(symbol), tdMode: TDM, side: bias === 1 ? 'buy' : 'sell', ...(await posSide(bias)),
         ordType: 'market', sz: await contracts(symbol, qty),
         attachAlgoOrds: [{ slTriggerPx: String(stopLoss), slOrdPx: '-1', slTriggerPxType: 'mark' }],
       });
@@ -308,7 +316,7 @@ function createSwapClient(opts) {
 
     async closeMarket({ symbol, bias, qty }) {
       const r = await request('POST', '/api/v5/trade/order', {
-        instId: idOf(symbol), tdMode: TD_MODE, side: bias === 1 ? 'sell' : 'buy', ...(await posSide(bias)),
+        instId: idOf(symbol), tdMode: TDM, side: bias === 1 ? 'sell' : 'buy', ...(await posSide(bias)),
         ordType: 'market', sz: await contracts(symbol, qty), reduceOnly: true,
       });
       return r[0].ordId;

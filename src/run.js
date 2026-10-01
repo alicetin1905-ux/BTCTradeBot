@@ -101,7 +101,7 @@ function exchangeClient() {
     return require('./okx').createClient({
       apiKey: process.env.OKX_API_KEY, apiSecret: process.env.OKX_API_SECRET,
       passphrase: process.env.OKX_API_PASSPHRASE, base: process.env.OKX_API_BASE,
-      instrument: config.OKX_INSTRUMENT, symbol: config.SYMBOL, marginCcy: process.env.OKX_MARGIN_CCY,
+      instrument: config.OKX_INSTRUMENT, symbol: config.SYMBOL, marginCcy: process.env.OKX_MARGIN_CCY, marginMode: process.env.OKX_MARGIN_MODE,
     });
   }
   return require('./bybit').createClient({ env: MODE, apiKey: process.env.BYBIT_API_KEY, apiSecret: process.env.BYBIT_API_SECRET });

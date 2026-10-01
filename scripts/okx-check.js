@@ -60,9 +60,9 @@ async function main() {
   const instrument = (process.env.OKX_INSTRUMENT || '').trim().toUpperCase() || require('../config').OKX_INSTRUMENT;
   const client = createClient({
     apiKey: haveKeys ? key : 'dummy-key', apiSecret: haveKeys ? secret : 'dummy',
-    passphrase: haveKeys ? pass : 'dummy', base, instrument,
+    passphrase: haveKeys ? pass : 'dummy', base, instrument, marginMode: process.env.OKX_MARGIN_MODE,
   });
-  if (haveKeys) console.log(`  instrument: ${instrument}${client.spot ? ' (spot: long-only, no leverage)' : /-SWAP$/.test(instrument) ? ' (perpetual swap)' : ' (future)'}`);
+  if (haveKeys) console.log(`  instrument: ${instrument}${client.spot ? ' (spot: long-only, no leverage)' : (/-SWAP$/.test(instrument) ? ' (perpetual swap' : ' (future') + `, ${client.marginMode} margin)`}`);
   try {
     const w = await client.getWallet();
     const a = await client.accountInfo();

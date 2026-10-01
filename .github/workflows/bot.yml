@@ -56,6 +56,8 @@ jobs:
           # EEA account: no USDT, no perpetual swaps. The USD-settled BTC
           # future (perpetual-style, to 2031), margined in USDC, max 10x.
           OKX_INSTRUMENT: ${{ vars.OKX_INSTRUMENT || 'BTC-USD_UM_XPERP-310328' }}
+          # Isolated margin, as set in the OKX app (each position's margin kept apart).
+          OKX_MARGIN_MODE: ${{ vars.OKX_MARGIN_MODE || 'isolated' }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           TRADEBOT_HALT: ${{ vars.TRADEBOT_HALT }}
         run: |
