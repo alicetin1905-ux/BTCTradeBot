@@ -1,6 +1,6 @@
 # BTC backtest 2021-01-01 → 2026-10-01
 
-Generated 2026-10-01 19:04 UTC by `node scripts/backtest.js` — the live signal code (`src/signal.js`) replayed on OKX BTC-USDT-SWAP 1H candles.
+Generated 2026-10-01 19:09 UTC by `node scripts/backtest.js` — the live signal code (`src/signal.js`) replayed on OKX BTC-USDT-SWAP 1H candles.
 
 - **trades … in mkt**: the whole period, compounding from 2000 USDT with the variant's % risk; *in mkt* = share of the time a position is open.
 - **year columns**: net USDT for that calendar year alone, fresh 2000 USDT each year and a fixed $ risk (the variant's % of 2000), so years compare fairly.
@@ -39,6 +39,11 @@ trail 4 ATR                                                       552   28    65
 risk 1%                                                           555   29    209   15.8  1.45    71% |    410    169   1229    199     47    529 |   1808 1.88    776 1.31
 risk 1.5%                                                         555   29    392   22.7  1.41    71% |    615    254   1843    299     71    794 |   2712 1.88   1163 1.31
 risk 3%                                                           555   29    851   39.9  1.25    71% |   1230    506   3182    598   -144   1485 |   5424 1.88   2270 1.31
+risk 5%                                                           554   29    884   59.3  1.13    70% |   2051    828   3974    821   -654   1584 |   9042 1.88   2050 1.17
+risk 10% (position still capped at 2x balance)                    551   29   1260   69.3  1.09    70% |   3942    951   4325    514   -951   1155 |  16786 1.82    251 1.02
+risk 10%, position cap 5x balance                                 499   28   1126   82.7  1.04    63% |   4042   1717   9304   1615   -686   5186 |  18022 1.87   7282 1.30
+risk 10%, cap 5x, no daily loss limit                             555   29    898   87.7  1.03    71% |   4101   1692   9304   1779  -1381   5186 |  18081 1.88   7098 1.29
+risk 5%, cap 5x                                                   552   29   3579   56.8  1.23    70% |   2051    847   6129    997    263   2646 |   9041 1.88   3878 1.31
 -- breakout strategy (earlier live setups) --
 breakout 15, long+short (until the flip)                          424   34    374   32.2  1.35    76% |   -110    120   2113   1472     16    731 |   2033 1.41   2207 1.51
 breakout 20, long-only (first setup)                              179   36    324   26.0  1.70    35% |    267   -386   2511    941   -105    447 |   2392 2.22   1282 1.70
