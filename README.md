@@ -1,77 +1,86 @@
 # BTCTradeBot
 
-A trading bot for **BTC only** (the BTC-USDT perpetual) on an **OKX Demo
-Trading** account: mainnet prices, demo funds. It can trade on **Bybit Demo
-Trading** instead (`EXCHANGE=bybit` in `.env`). It's built on the same engine
-as [TradeBot](https://github.com/alicetin1905-ux/TradeBot): stop on the
-exchange, state committed to this repo, a phone dashboard, ntfy alerts and a
-bot-down alarm. The signal is different.
+A trading bot for **BTC only** on an **OKX Demo Trading** account: mainnet
+prices, demo funds. It runs on GitHub Actions (no computer needed) and trades
+the EEA site's USD-settled BTC future with USDC margin at 10x. It can also
+trade the BTC-USDT perpetual, or **Bybit Demo Trading** (`EXCHANGE=bybit`).
 
-## Why not TradeBot's ATLAS signal?
+It's built on the same engine as
+[TradeBot](https://github.com/alicetin1905-ux/TradeBot): stop on the exchange,
+state committed to this repo, a phone dashboard, ntfy alerts and a bot-down
+alarm.
 
-TradeBot's ATLAS score with its T1/T2/T3 exits **loses money on BTC**. It lost
-in every variant tried over 2021–2026 (27 of them: other scores, targets,
-stops, risk; `backtest/ATLAS_ON_BTC.md`). TradeBot's own
-`COIN_WF.md` shows the same thing: BTC was positive in 1 of 7 years, with a
-profit factor of 0.88. That's why TradeBot only uses BTC as a filter.
+## How the signal was found
 
-What does work on BTC is **trend following on 4H candles with a trailing
-stop**. `backtest/RESEARCH.md` compares Donchian breakouts, EMA crosses and
-Supertrend flips, on 4H and 1D candles, long-only and long+short. Parameters
-were picked on 2021–2023 and then checked on 2024–2026. Nearly every 4H parameter set
-made money in both periods (all but a few EMA sets with a daily-trend filter);
-on 1D it was about half. The 4H Donchian breakout
-was the most robust: 188 of 192 nearby settings made money in both periods
-(`backtest/DONCHIAN.md`), so the result doesn't hinge on one lucky number.
+1. **TradeBot's rules don't work on BTC.** Its ATLAS score with T1/T2/T3
+   targets **loses money on BTC** in every variant tried, 27 in total
+   (`backtest/ATLAS_ON_BTC.md`, and TradeBot's own `COIN_WF.md`: 1 of 7 years
+   positive). That's why TradeBot only uses BTC as a filter.
+2. **Trend following on 4H with a trailing stop does work.** Donchian
+   breakouts, EMA crosses and Supertrend all made money before and after 2024
+   on 4H candles (`RESEARCH.md`, `DONCHIAN.md`). 1H loses to fees
+   (`FREQUENCY.md`). The breakout was the first live signal.
+3. **The ATLAS score works when used as a fast swing, with a trailing stop
+   instead of fixed targets.** Trade when the score swings from −25 to +25
+   (or back) within 12 hours. This made more than the breakout (+581% vs
+   +374%) with a smaller worst drop (25% vs 32%). The same setting is chosen
+   when picking on 2021–2023 alone, and it held up on 2024–2026
+   (`ATLAS_FLIP.md`). This is the live signal now.
 
-## The rules (`config.js`, `src/signal.js`)
+## The rules (`config.js`, `src/flip.js`)
 
-- **Signal:** closed 4H candles only (00/04/08/12/16/20 UTC), nothing repaints.
-- **Entry:** long when a 4H candle **closes above the highest high of the
-  previous 15 candles**, short when it **closes below their lowest low**. It's a market order with the stop attached, placed
-  on the run right after the close (within 60 min, `ENTRY_FRESH_MIN`). It
-  doesn't chase an old breakout, and makes one attempt per breakout candle.
-- **Initial stop:** 2 × ATR(14) below the entry (`STOP_ATR`).
-- **Trailing stop:** after every 4H close the stop moves up to *best close
-  since entry − 3 × ATR* (`TRAIL_ATR`). It only ever tightens, and it's set on
-  the exchange, so it works while the Mac is off.
-- **Exit:** a 4H close back through the opposite side of the 15-candle channel
-  (`EXIT_N`) closes at market, if the stop hasn't already.
-- **Direction:** long and short (`DIRECTION: "both"`), about 74 trades a
-  year. `"long"` with a 20-candle channel was the first setup: about 31 trades
-  a year, a smaller worst drop (26% vs 32%) and a little less return
-  (`backtest/FREQUENCY.md`).
+- **Signal: the ATLAS score swinging fast.** The score is TradeBot's ATLAS
+  score (`src/atlasScore.js`, ~25 indicators, −100 to +100), computed on
+  closed 4H candles (00/04/08/12/16/20 UTC). Nothing repaints.
+  - **Long** when the score closes at **+25 or higher** and was at **−25 or
+    lower** within the previous **3 candles (12h)**: a fast swing from
+    bearish to bullish.
+  - **Short** is the mirror image.
+  - Settings: `FLIP_SCORE`, `FLIP_WINDOW`, `DIRECTION`.
+- **Price and volume only.** The score is calculated without the
+  funding / open interest / order book / taker-flow inputs, which have no
+  history. So the live score is exactly the one the backtest used.
+- **Entry:** a market order with the stop attached, on the run right after the
+  4H close (within 60 min, `ENTRY_FRESH_MIN`). One attempt per signal candle.
+- **Initial stop:** 2 × ATR(14) from the entry (`STOP_ATR`).
+- **Trailing stop:** after every 4H close the stop moves to *best close since
+  entry ∓ 3 × ATR* (`TRAIL_ATR`). It only ever tightens, and it sits on the
+  exchange, so it works between runs.
+- **Exit:** an opposite swing closes the position at market, and the bot
+  reverses into the new direction. Otherwise the trailing stop exits.
 - **Size:** each trade risks **2% of the balance** at its initial stop
   (`RISK_PCT`). Position value is capped at 2× the balance (`MAX_POSITION_X`),
-  at 10× leverage, cross margin (`LEVERAGE`). One position at a time.
-- **Balance:** the bot's own 2000 USDT allocation, moved by its realized P&L
-  and BTC funding payments. A bigger demo wallet still trades like 2000 USDT.
+  at 10× leverage, isolated margin. One position at a time.
+- **Balance:** the bot's own 2000 USDT/USDC allocation, moved by its realized
+  P&L and funding payments. A bigger demo wallet still trades like 2000.
 - **Safety:**
-  - `TRADEBOT_HALT=1` in `.env` stops new entries (an open position keeps its trailing stop).
+  - `TRADEBOT_HALT=1` stops new entries (an open position keeps its trailing stop).
   - The daily loss limit (10%) stops entries until 00:00 UTC.
   - `close-all` and `reset` are available as remote commands.
   - There is **no real-money mode**. The OKX client sends
     `x-simulated-trading: 1` on every request, so OKX refuses real-account
     keys. The Bybit client only knows `api-demo.bybit.com`.
+- **The earlier signal** is still built in: the 4H channel breakout
+  (`"STRATEGY": "breakout"`, `src/signal.js`).
 
-Expect it to be wrong often. About 1 trade in 3 wins: most breakouts fail and
-cost a little, and a few long trends pay for all of them. Long flat or losing
-stretches are normal (2021 and 2025 in the backtest were roughly flat).
+Expect it to be wrong often. Only about 1 trade in 3 wins: most swings fade
+and cost a little, and a few long trends pay for all of them.
 
 ## Backtest (`node scripts/backtest.js` → `backtest/REPORT.md`)
 
-The backtest runs the live signal code (`src/signal.js`) hour by hour on OKX
-BTC 1H history since 2021: the same `BTC-USDT-SWAP` the bot trades on OKX. It
-charges a 0.055% taker fee on each side (Bybit's; OKX's base rate of 0.05% is
-slightly cheaper) and funding of about 0.01% per 8h, which longs pay.
+The backtest runs the live signal code (`src/flip.js` with `src/atlasScore.js`)
+hour by hour on OKX BTC 1H history since 2021. It charges a 0.055% taker fee
+on each side and funding of about 0.01% per 8h, which longs pay.
 
 | | Trades | Win % | Return | Worst drop | Profit factor |
 |---|---:|---:|---:|---:|---:|
-| **Live: long + short, 15-candle channel, 2% risk** | 424 (~74/yr) | 34 | **+374%** | 32% | 1.35 |
-| + 0.05% slippage per side | 424 | 33 | +250% | 36% | 1.27 |
-| First setup: long-only, 20-candle channel | 179 (~31/yr) | 36 | +324% | 26% | 1.70 |
-| Live with risk 1.5% | 424 | 34 | +252% | 25% | 1.38 |
-| 1H signals instead of 4H | 1771 | 29 | −88% | 92% | 0.90 |
+| **Live: ATLAS flip ±25 within 12h, long + short** | 347 (~60/yr) | 31 | **+581%** | 25% | 1.47 |
+| + 0.05% slippage per side | 347 | 29 | +433% | 26% | 1.38 |
+| Flip within 16h | 416 (~72/yr) | 30 | +459% | 28% | 1.39 |
+| Flip within 20h | 467 (~81/yr) | 30 | +403% | 31% | 1.34 |
+| Breakout 15, long + short (the previous live setup) | 424 (~74/yr) | 34 | +374% | 32% | 1.35 |
+| Breakout 20, long-only (the first setup) | 179 (~31/yr) | 36 | +324% | 26% | 1.70 |
+| Breakout 15 on 1H signals | 1771 | 29 | −88% | 92% | 0.90 |
 
 These are compounding results, 2021-01 → 2026-09, starting from 2000 USDT.
 
@@ -79,13 +88,19 @@ Year by year, starting each year fresh with 2000 USDT at a fixed $40 risk per tr
 
 | | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 (to Sep) |
 |---|---:|---:|---:|---:|---:|---:|
-| Bot (net USDT) | −110 | +120 | +2113 | +1472 | +16 | +731 |
-| Buy & hold 2000 USDT | +1197 | −1284 | +3113 | +2425 | −128 | −90 |
+| ATLAS flip (live) | +727 | +101 | +2222 | +896 | −48 | +1023 |
+| Buy & hold 2000 USDT | +1197 | −1284 | +3113 | +2425 | −128 | −94 |
 
-Before 2024 it made +2033 (profit factor 1.41); from 2024, +2207 (1.51). The
-breakout family was chosen on 2021–2023 only (`RESEARCH.md`, `DONCHIAN.md`).
-The move to long+short with a 15-candle channel came later, to trade more
-often (`FREQUENCY.md`), and looked at the whole period.
+**Out-of-sample check:** choosing the setting on 2021–2023 alone picks exactly
+±25 within 3 candles (profit factor 1.93). On 2024–2026, which that choice
+never saw, it made +1870 with a profit factor of 1.49. 27 of 35 neighbouring
+settings are profitable in both periods (`backtest/ATLAS_FLIP.md`).
+
+Other research behind the choice:
+- `ATLAS_ON_BTC.md`: TradeBot's ATLAS rules lose on BTC.
+- `RESEARCH.md`, `DONCHIAN.md`: breakouts.
+- `FREQUENCY.md`: 1H/2H/4H comparison.
+- `ATLAS_FLIP.md`: the flip, and combining it with the breakout (worse).
 
 It's still an approximation: no slippage in the main line, funding is
 estimated, and fills come at candle closes.
@@ -274,7 +289,8 @@ the next breakout. `reset` also restarts the tracking from 2000 USDT.
 
 | Path | What |
 |---|---|
-| `src/signal.js` | the breakout / exit / trailing-stop logic (shared with the backtest) |
+| `src/flip.js`, `src/atlasScore.js` | the ATLAS flip signal (live and backtest) and the ATLAS score |
+| `src/signal.js` | the breakout signal and the trailing-stop rule |
 | `src/exchange.js` | reconcile, exit, trail, enter; P&L and funding booking (exchange-neutral) |
 | `src/run.js` | one run / sync / close-all / reset, state files, remote commands |
 | `src/market.js` | 4H candles from the trading exchange, the other one as a fallback |

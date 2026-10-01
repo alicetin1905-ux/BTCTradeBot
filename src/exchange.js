@@ -9,7 +9,7 @@
 //      - exit signal (a 4H close through the exit channel) -> close at market
 //      - trail the stop: best close since entry -/+ TRAIL_ATR x ATR, moved on
 //        the exchange only when it tightens
-//      - no position and a fresh breakout -> market entry with the stop
+//      - no position and a fresh entry signal (breakout or ATLAS flip) -> market entry with the stop
 //        attached in the same order
 //
 // The stop lives ON the exchange, so it keeps working if this machine goes
@@ -142,8 +142,10 @@ async function manage({ client, st, live, sig, events, now }) {
   const last = sig[sig.length - 1];
   if (last) pos.lastExitCheckT = Math.max(pos.lastExitCheckT || 0, last.t);
   if (exitOn) {
-    const ch = pos.bias === 1 ? `below the ${config.EXIT_N}-candle low ${px(exitOn.exitLower)}` : `above the ${config.EXIT_N}-candle high ${px(exitOn.exitUpper)}`;
-    await closeAtMarket(client, st, pos, live, `exit signal: 4H close ${px(exitOn.close)} ${ch}`, events, now);
+    const why = exitOn.exitLower == null && exitOn.score != null
+      ? `exit signal: ATLAS score swung ${exitOn.flipFrom > 0 ? '+' : ''}${exitOn.flipFrom} → ${exitOn.score > 0 ? '+' : ''}${exitOn.score} against the ${pos.bias === 1 ? 'long' : 'short'}`
+      : `exit signal: 4H close ${px(exitOn.close)} ${pos.bias === 1 ? `below the ${config.EXIT_N}-candle low ${px(exitOn.exitLower)}` : `above the ${config.EXIT_N}-candle high ${px(exitOn.exitUpper)}`}`;
+    await closeAtMarket(client, st, pos, live, why, events, now);
     return true;
   }
 
@@ -182,11 +184,11 @@ function entryBlock(st, s, now, { halt = false, live = null } = {}) {
   if (!s) return 'not enough candle history yet';
   if (st.position) return 'a position is open';
   if (live) return 'a BTCUSDT position the bot didn\'t open is on the account — left alone';
-  if (!s.enter) return 'no breakout on the last 4H close';
-  if (!signal.allowed(s.enter, config.DIRECTION)) return 'short breakout, but the bot trades long-only (DIRECTION)';
+  if (!s.enter) return `no ${config.STRATEGY === 'atlas-flip' ? 'ATLAS flip' : 'breakout'} on the last 4H close`;
+  if (!signal.allowed(s.enter, config.DIRECTION)) return 'short signal, but the bot trades long-only (DIRECTION)';
   if (st.meta && st.meta.lastEntryCandle === s.t) return 'already entered on this 4H candle';
   const ago = now - (s.t + TF_MS);
-  if (config.ENTRY_FRESH_MIN != null && ago > config.ENTRY_FRESH_MIN * 60000) return `breakout candle closed ${Math.round(ago / 60000)} min ago — entries only right after a 4H close`;
+  if (config.ENTRY_FRESH_MIN != null && ago > config.ENTRY_FRESH_MIN * 60000) return `signal candle closed ${Math.round(ago / 60000)} min ago — entries only right after a 4H close`;
   if (halt) return 'trading halted (TRADEBOT_HALT)';
   if (dailyLossHit(st, now)) return `daily loss limit (${config.EXECUTION.DAILY_LOSS_LIMIT_PCT}%) reached — no new entries until 00:00 UTC`;
   return null;
@@ -215,7 +217,7 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
     return;
   }
   const stopLoss = stopRound(mark * (1 - bias * stopDist), inst.tickSize, bias);
-  st.meta = { ...st.meta, lastEntryCandle: s.t }; // one attempt per breakout candle, even if the order fails
+  st.meta = { ...st.meta, lastEntryCandle: s.t }; // one attempt per signal candle, even if the order fails
 
   await client.setLeverage(SYMBOL, P.LEVERAGE);
   const entryId = await client.openMarket({ symbol: SYMBOL, bias, qty, stopLoss });
@@ -235,12 +237,12 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
     stop: stopLoss, initialStop: stopLoss, ext: s.close, trailed: false,
     entryCandleT: s.t, lastExitCheckT: s.t, openedAt: now, orders: { entry: entryId }, tickSize: inst.tickSize,
     notional: pos.size * entry, margin: (pos.size * entry) / P.LEVERAGE, riskAmt: pos.size * Math.abs(entry - stopLoss),
-    atrAtEntry: s.atr, breakout: bias === 1 ? s.upper : s.lower,
+    atrAtEntry: s.atr, breakout: bias === 1 ? s.upper : s.lower, score: s.score ?? null, flipFrom: s.flipFrom ?? null,
     markPrice: pos.markPrice || entry, unrealisedPnl: pos.unrealisedPnl || 0, exchangeStop: pos.stopLoss || stopLoss,
   };
   events.push({
     type: 'enter', bias, entry, stop: stopLoss, qty: pos.size, notional: pos.size * entry,
-    riskAmt: st.position.riskAmt, breakout: st.position.breakout, close: s.close,
+    riskAmt: st.position.riskAmt, breakout: st.position.breakout, score: s.score ?? null, flipFrom: s.flipFrom ?? null, close: s.close,
   });
 }
 

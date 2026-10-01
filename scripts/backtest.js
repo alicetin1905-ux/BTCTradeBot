@@ -22,6 +22,7 @@ const path = require('path');
 process.env.TRADEBOT_SETTINGS = 'off'; // config.js defaults, not the live control/settings.json
 const config = require('../config');
 const signal = require('../src/signal');
+const flip = require('../src/flip');
 
 const ROOT = path.join(__dirname, '..');
 const CACHE = path.join(ROOT, 'backtest', 'cache');
@@ -88,6 +89,7 @@ function bucket(h1, hours) {
 /* ---------------- simulation ---------------- */
 
 const LIVE = {
+  strategy: config.STRATEGY, flipScore: config.FLIP_SCORE, flipWindow: config.FLIP_WINDOW,
   channelN: config.CHANNEL_N, exitN: config.EXIT_N, atrLen: config.ATR_LEN, direction: config.DIRECTION,
   stopAtr: config.STOP_ATR, trailAtr: config.TRAIL_ATR,
   start: config.PORTFOLIO.STARTING_BALANCE, riskPct: config.PORTFOLIO.RISK_PCT, maxX: config.PORTFOLIO.MAX_POSITION_X,
@@ -95,9 +97,25 @@ const LIVE = {
 };
 
 // from / to (ms): which breakout candles may open trades (open ones run on).
+// ATLAS flip signals (src/flip.js, the live code) for 4H candles, with UTC daily
+// candles built from the same 1H history for the daily pivot. Scoring every
+// candle takes ~20 s, so each threshold/window is computed once.
+const flipCache = new Map();
+let flipDaily = null; // set by main(): bucket(h1, 24)
+function flipSeries(h4, threshold, window) {
+  const key = `${h4.length}:${h4[0].t}:${threshold}:${window}`;
+  if (!flipCache.has(key)) {
+    if (!flipDaily) throw new Error('flip backtest needs daily candles (setFlipDaily)');
+    flipCache.set(key, flip.series(h4, flipDaily, { threshold, window }, 0));
+  }
+  return flipCache.get(key);
+}
+function setFlipDaily(d1) { flipDaily = d1; flipCache.clear(); }
+
 function simulate(h1, h4, rules, from = -Infinity, to = Infinity) {
   const R = { ...LIVE, ...rules };
-  const sig = signal.series(h4, { channelN: R.channelN, exitN: R.exitN, atrLen: R.atrLen });
+  const sig = R.strategy === 'atlas-flip' ? flipSeries(h4, R.flipScore, R.flipWindow)
+    : signal.series(h4, { channelN: R.channelN, exitN: R.exitN, atrLen: R.atrLen });
   const at = new Map(); // 1H candle open time whose close is the 4H close -> signal
   const tfMs = (R.tfHours || 4) * HOUR; // signal candle length (the candles passed in are this long)
   for (const s of sig) if (s) at.set(s.t + tfMs - HOUR, s);
@@ -165,24 +183,21 @@ function simulate(h1, h4, rules, from = -Infinity, to = Infinity) {
 
 /* ---------------- variants ---------------- */
 
+const BO = { strategy: 'breakout' };
 const VARIANTS = [
-  ['A  live: long+short, 15/15, stop 2 ATR, trail 3 ATR, 2% risk', {}],
-  ['-- direction / channel --', null],
-  ['previous: long-only, 20/20', { direction: 'long', channelN: 20, exitN: 20 }],
-  ['long-only, 15/15', { direction: 'long' }],
-  ['long + short, 20/20', { channelN: 20, exitN: 20 }],
+  ['A  live: ATLAS flip ±25 within 3 candles (12h), long+short', {}],
+  ['-- ATLAS flip variants --', null],
+  ['window 2 candles (8h)', { flipWindow: 2 }],
+  ['window 4 candles (16h)', { flipWindow: 4 }],
+  ['window 5 candles (20h)', { flipWindow: 5 }],
+  ['window 6 candles (24h)', { flipWindow: 6 }],
+  ['score ±20', { flipScore: 20 }],
+  ['score ±30', { flipScore: 30 }],
+  ['score ±35', { flipScore: 35 }],
+  ['long-only', { direction: 'long' }],
   ['-- costs --', null],
   ['+ 0.05% slippage per side', { slippage: 0.0005 }],
   ['no funding (fees only)', { funding: false }],
-  ['-- breakout channel --', null],
-  ['channel 10', { channelN: 10, exitN: 10 }],
-  ['channel 20', { channelN: 20, exitN: 20 }],
-  ['channel 30', { channelN: 30, exitN: 30 }],
-  ['exit channel 10', { exitN: 10 }],
-  ['exit channel 20', { exitN: 20 }],
-  ['-- timeframe --', null],
-  ['2H signals', { tfHours: 2 }],
-  ['1H signals', { tfHours: 1 }],
   ['-- stops --', null],
   ['initial stop 1.5 ATR', { stopAtr: 1.5 }],
   ['initial stop 2.5 ATR', { stopAtr: 2.5 }],
@@ -192,6 +207,11 @@ const VARIANTS = [
   ['risk 1%', { riskPct: 1 }],
   ['risk 1.5%', { riskPct: 1.5 }],
   ['risk 3%', { riskPct: 3 }],
+  ['-- breakout strategy (earlier live setups) --', null],
+  ['breakout 15, long+short (until the flip)', { ...BO }],
+  ['breakout 20, long-only (first setup)', { ...BO, direction: 'long', channelN: 20, exitN: 20 }],
+  ['breakout 15, 2H signals', { ...BO, tfHours: 2 }],
+  ['breakout 15, 1H signals', { ...BO, tfHours: 1 }],
 ];
 
 async function main() {
@@ -199,6 +219,7 @@ async function main() {
   const h1all = await fetchHistory(FROM - 90 * DAY);
   const h1 = h1all.filter(c => c.t >= FROM - 90 * DAY);
   const h4 = bucket(h1, 4);
+  setFlipDaily(bucket(h1, 24));
   const byTf = { 4: h4 };
   const candlesFor = (r) => byTf[r.tfHours || 4] || (byTf[r.tfHours] = bucket(h1, r.tfHours));
   const last = h1[h1.length - 1].t;
@@ -272,4 +293,4 @@ async function main() {
 }
 
 if (require.main === module) main().catch((e) => { console.error(e); process.exit(1); });
-module.exports = { simulate, bucket, LIVE };
+module.exports = { simulate, bucket, setFlipDaily, LIVE };

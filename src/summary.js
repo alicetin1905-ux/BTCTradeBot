@@ -3,7 +3,7 @@
 //            last 24h, win rate, the open position. Sent once a day by the
 //            first full run at/after config.NOTIFY.DAILY_SUMMARY_HOUR (local time).
 //   status — equity, the open position's live P&L from Bybit and its stop,
-//            or where the next breakout would be. Quiet (low priority).
+//            or what would trigger the next trade. Quiet (low priority).
 'use strict';
 
 const config = require('../config');
@@ -45,7 +45,7 @@ function build(st, now) {
     `Balance $${a.balance.toFixed(2)} (${money(since)} since ${last.date ? 'yesterday' : 'start'}; started $${a.startingBalance.toFixed(0)})`,
     `Last 24h realized: ${money(day)}`,
     pos.length ? `All trades: ${wins}W / ${losses}L (${Math.round((wins / pos.length) * 100)}% win)` : 'No closed trades yet',
-    st.position ? positionLine(st.position) : 'Flat — waiting for a breakout',
+    st.position ? positionLine(st.position) : 'Flat — waiting for the next signal',
   ];
   return { title: `BTC bot daily · ${money(since)}`, message: lines.join('\n'), tags: ['bar_chart'] };
 }
@@ -75,7 +75,11 @@ function status(st) {
   const s = st.signal;
   const lines = [];
   if (p) lines.push(positionLine(p));
-  else if (s) {
+  else if (s && s.upper == null) {
+    const X = config.FLIP_SCORE, h = config.FLIP_WINDOW * 4;
+    lines.push(`Flat · 4H close ${px(s.close)} · ATLAS score ${s.score > 0 ? '+' : ''}${s.score}`);
+    lines.push(`Long on a swing from −${X} to +${X} within ${h}h` + (config.DIRECTION === 'both' ? ', short on the mirror' : ''));
+  } else if (s) {
     lines.push(`Flat · 4H close ${px(s.close)}`);
     lines.push(`Long above ${px(s.upper)} (${(((s.upper / s.close) - 1) * 100).toFixed(1)}% away)` +
       (config.DIRECTION === 'both' ? ` · short below ${px(s.lower)}` : ''));

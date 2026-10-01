@@ -29,7 +29,17 @@ const config = module.exports = {
   // other one as a fallback), or 'bybit' / 'okx'.
   MARKET_DATA: null,
 
-  // The signal (src/signal.js): 4H Donchian channel breakout.
+  // Which signal trades, on closed 4H candles:
+  //   'atlas-flip'  the ATLAS score swings from <= -FLIP_SCORE to >= +FLIP_SCORE
+  //                 (or back) within FLIP_WINDOW candles (src/flip.js) — live
+  //   'breakout'    Donchian channel breakout (src/signal.js) — the first setup
+  // backtest/REPORT.md (+ research in ATLAS_FLIP.md): ±25 within 3 candles (12h), long and short:
+  // ~60 trades a year, +581% 2021-26, worst drop 25% (breakout: 74, +374%, 32%).
+  STRATEGY: 'atlas-flip',
+  FLIP_SCORE: 25,
+  FLIP_WINDOW: 3,
+
+  // The breakout signal (src/signal.js), when STRATEGY is 'breakout'.
   CHANNEL_N: 15,       // enter when a 4H close breaks the high (low) of the previous 15 candles
   EXIT_N: 15,          // exit when a 4H close breaks the opposite side of the previous 15 candles
   ATR_LEN: 14,

@@ -11,6 +11,7 @@ const crypto = require('crypto');
 const config = require('../config');
 // These tests were written for long-only 20/20 channels; pin that so changing
 // the live defaults in config.js doesn't change what's tested.
+config.STRATEGY = 'breakout';
 config.DIRECTION = 'long';
 config.CHANNEL_N = 20;
 config.EXIT_N = 20;
@@ -676,8 +677,9 @@ test('OKX spot through the bot: entry, trailed stop, stop hit booked with fees o
   const savedLev = config.PORTFOLIO.LEVERAGE, savedX = config.PORTFOLIO.MAX_POSITION_X;
   Object.assign(config.PORTFOLIO, { LEVERAGE: 1, MAX_POSITION_X: 1 }); // as run.js sets them for spot
   try {
-    const now0 = Date.now() - 60000;
-    const Tn = Math.floor(now0 / TF) * TF - TF;
+    // A run 1 minute after the last 4H close (the fake stamps fills with the real clock, so stay before it).
+    const Tn = Math.floor(Date.now() / TF) * TF - TF;
+    const now0 = Tn + TF + 60000;
     await exchange.runExchange({ client, st, sig: [S(Tn, 100000, { enter: 1 })], events: [], now: now0 });
     const pos = st.position;
     assert.equal(pos.entry, 100000);
@@ -782,4 +784,76 @@ test('entry read-back: a position that shows up a moment late is still tracked',
   assert.equal(st.position.qty, 0.02);
   assert.equal(events.filter(e => e.type === 'error').length, 0);
   exchange.setReadbackMs(500);
+});
+
+/* ---------------- ATLAS flip strategy ---------------- */
+
+test('ATLAS flip rule: -25 or lower then +25 or higher within the window -> long; mirror -> short', () => {
+  const { swing } = require('../src/flip');
+  assert.deepEqual(swing(30, [-40, -10, 5], 25), { enter: 1, flipFrom: -40 });
+  assert.deepEqual(swing(25, [-25, 0, 10], 25), { enter: 1, flipFrom: -25 });   // exactly at the levels counts
+  assert.deepEqual(swing(24, [-60, 0, 10], 25), { enter: 0, flipFrom: null });  // not bullish enough yet
+  assert.deepEqual(swing(40, [-24, 0, 10], 25), { enter: 0, flipFrom: null });  // never bearish enough in the window
+  assert.deepEqual(swing(-31, [45, 20, 0], 25), { enter: -1, flipFrom: 45 });
+  assert.deepEqual(swing(-31, [10, 20, 0], 25), { enter: 0, flipFrom: null });
+});
+
+test('ATLAS flip series: the bot scores candles exactly like the backtest (same window, UTC days)', () => {
+  const { series, scoreAt } = require('../src/flip');
+  // A synthetic trend: 600 4H candles down, then up — enough history for the 400-candle window.
+  const c4 = [], d1 = [];
+  let p = 100000;
+  for (let i = 0; i < 600; i++) {
+    const t = Date.UTC(2026, 0, 1) + i * TF, o = p;
+    p *= i < 480 ? 0.999 : 1.006;
+    c4.push({ t, o, h: Math.max(o, p) * 1.002, l: Math.min(o, p) * 0.998, c: p, v: 100 + (i % 7) });
+  }
+  for (let i = 0; i < c4.length; i += 6) {
+    const g = c4.slice(i, i + 6);
+    if (g.length === 6) d1.push({ t: g[0].t, o: g[0].o, h: Math.max(...g.map(x => x.h)), l: Math.min(...g.map(x => x.l)), c: g[5].c, v: 1 });
+  }
+  const s = series(c4, d1, { threshold: 25, window: 3 }, 470); // the swing comes around candle 482
+  assert.equal(s.length, 130);
+  assert.ok(s.every(x => x && Number.isFinite(x.score) && x.atr > 0));
+  // The same candle scored on its own gives the same score (what a live run does for its last candle).
+  const last = scoreAt(c4, d1, c4.length - 1);
+  assert.equal(s[s.length - 1].score, last.score);
+  // Downtrend scores bearish, the later rally bullish, and the swing between them is an entry.
+  assert.ok(scoreAt(c4, d1, 470).score <= -25);
+  assert.ok(s.some(x => x.enter === 1));
+  assert.ok(s.every(x => x.upper === null && x.exitLong === (x.enter === -1)));
+});
+
+test('ATLAS flip through the bot: an opposite swing closes the long (and reverses), with the reason in words', async () => {
+  const saved = [config.DIRECTION, config.STRATEGY];
+  Object.assign(config, { DIRECTION: 'both', STRATEGY: 'atlas-flip' });
+  try {
+    const { ex, client } = fakeBybit();
+    const st = freshState();
+    const flipSig = (t, close, score, flipFrom, enter) => ({ t, close, atr: 1000, score, flipFrom, enter, exitLong: enter === -1, exitShort: enter === 1, upper: null, lower: null, exitUpper: null, exitLower: null });
+    const events = [];
+    await exchange.runExchange({ client, st, sig: [flipSig(T0, 100000, 30, -40, 1)], events, now: after(T0) });
+    assert.equal(st.position.bias, 1);
+    assert.equal(st.position.score, 30);
+    const notify = require('../src/notify');
+    assert.match(notify.messagesFor(events, st)[0].message, /ATLAS score swung -40 → \+30 within 12h/);
+    const t1 = T0 + TF;
+    ex.marks.BTCUSDT = 99000;
+    await exchange.runExchange({ client, st, sig: [flipSig(t1, 99000, -28, 35, -1)], events: [], now: after(t1) });
+    assert.match(st.trades[0].reason, /exit signal: ATLAS score swung \+35 → -28 against the long/);
+    assert.equal(st.position.bias, -1);
+    // Status push when flat describes the rule instead of a channel level.
+    const summary = require('../src/summary');
+    const m = summary.status({ account: { balance: 2000, startingBalance: 2000 }, position: null, signal: flipSig(t1, 99000, -12, null, 0) });
+    assert.match(m.message, /ATLAS score -12/);
+    assert.match(m.message, /swing from −25 to \+25 within 12h, short on the mirror/);
+  } finally { [config.DIRECTION, config.STRATEGY] = saved; }
+});
+
+test('settings: STRATEGY / FLIP_SCORE / FLIP_WINDOW are adjustable within limits', () => {
+  const { apply } = require('../src/settings');
+  const cfg = JSON.parse(JSON.stringify({ ...config, SETTINGS_APPLIED: undefined }));
+  const r = apply(cfg, { STRATEGY: 'breakout', FLIP_SCORE: 35, FLIP_WINDOW: 99 });
+  assert.deepEqual(r.applied, { STRATEGY: 'breakout', FLIP_SCORE: 35 });
+  assert.match(r.errors[0], /FLIP_WINDOW: must be between 1 and 12/);
 });

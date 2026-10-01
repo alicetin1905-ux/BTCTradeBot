@@ -19,7 +19,7 @@
 :root{
   --bg:#070a09; --panel:#0e1412; --panel2:#121a17; --line:#1b2320; --line2:#2a3630;
   --txt:#eef4f0; --dim:#9aaca4; --faint:#5d6c66;
-  --up:#35ffb0; --dn:#ff4d6a; --nt:#ffc857; --blue:#4d9fff; --btc:#f7931a;
+  --up:#35ffb0; --dn:#ff4d6a; --nt:#ffc857; --blue:#4d9fff; --btc:#f7931a; --violet:#b98bff;
   --mono:'JetBrains Mono','SF Mono',Consolas,monospace;
   --sans:'Inter',system-ui,sans-serif;
 }
@@ -66,6 +66,9 @@ dl.kv dd{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-n
 .note{font-size:12px;color:var(--dim);margin-top:10px;line-height:1.5}
 .meter{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:4px 0 2px}
 .meter i{display:block;height:100%;background:var(--nt);border-radius:3px}
+.scorebar{position:relative;height:10px;margin:12px 0 2px;border-radius:5px;background:linear-gradient(90deg,rgba(255,77,106,.35),var(--line) 50%,rgba(53,255,176,.35))}
+.scorebar .lv{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--nt);opacity:.8}
+.scorebar b{position:absolute;top:-4px;width:6px;height:18px;margin-left:-3px;border-radius:3px;background:var(--txt);box-shadow:0 0 0 2px var(--panel)}
 
 .chartbox{position:relative}
 .chartbox svg{display:block;width:100%;height:auto;touch-action:pan-y}
@@ -135,7 +138,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
 
 <footer>
   Demo funds on a demo trading account (OKX or Bybit) — a rehearsal of the strategy, not investment advice.
-  Long when a 4H close breaks the previous 20-candle high; initial stop 2×ATR, trailed to the best close − 3×ATR after every 4H close; out on a close below the 20-candle low.
+  Signal: the ATLAS score swinging from −25 to +25 within 12h (long) or back (short), on 4H closes; initial stop 2×ATR, trailed 3×ATR behind the best close after every 4H close; an opposite swing closes and reverses.
   Backtest: <a href="https://github.com/alicetin1905-ux/BTCTradeBot/blob/main/backtest/REPORT.md" target="_blank" rel="noopener">backtest/REPORT.md</a>.
   State refreshes every minute from the repo; the live price every 10 s.
 </footer>
@@ -277,6 +280,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     var nextClose = Math.floor(Date.now() / TF) * TF + TF;
     var mins = Math.max(0, Math.round((nextClose - Date.now()) / 60000));
     $('sigTag').textContent = 'next 4H close in ' + Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm';
+    if (s.upper == null && s.score != null) { el.innerHTML = flipSignalHtml(s, set); return; }
     var ref = S.live && S.live.px ? S.live.px : s.close;
     var away = (s.upper / ref - 1) * 100;
     // How far price has come from the exit channel toward the breakout level (0..100%).
@@ -297,6 +301,37 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     var a = S.account || {}, want = (a.settings && a.settings.MARKET_DATA) || a.exchange;
     if (s.source && want && s.source !== want) html += '<div class="note">Candles from ' + esc(EXCHANGE_NAME[s.source] || s.source) + ' (' + esc(EXCHANGE_NAME[want] || want) + ' failed).</div>';
     el.innerHTML = html;
+  }
+
+  // ATLAS flip: the score now, the last few, and whether a swing is armed.
+  function sgn(x) { return (x > 0 ? '+' : x < 0 ? '−' : '') + Math.abs(x); }
+  function flipSignalHtml(s, set) {
+    var X = set.FLIP_SCORE || 25, K = set.FLIP_WINDOW || 3, both = set.DIRECTION === 'both';
+    var scores = (s.chart || []).map(function (r) { return r[7]; }).filter(function (v) { return v != null; });
+    var recent = scores.slice(-(K + 1));
+    var prev = scores.slice(-K); // the window the NEXT close will look back on
+    var longArmed = prev.some(function (v) { return v <= -X; }), shortArmed = both && prev.some(function (v) { return v >= X; });
+    var pos = Math.max(0, Math.min(100, (s.score + 100) / 2));
+    var html = '<dl class="kv">' +
+      '<dt>Last 4H close</dt><dd>' + esc(px(s.close)) + ' <span class="faint">' + esc(when(s.closeT)) + '</span></dd>' +
+      '<dt>ATLAS score</dt><dd class="' + (s.score >= X ? 'up' : s.score <= -X ? 'dn' : '') + '" style="font-weight:700">' + esc(sgn(s.score)) + '</dd>' +
+      '<dt>Last ' + recent.length + ' closes</dt><dd>' + recent.map(function (v) { return esc(sgn(v)); }).join(' → ') + '</dd>' +
+      '<dt>Long when</dt><dd>' + esc('≥ +' + X + ' after ≤ −' + X + ' within ' + K * 4 + 'h') + '</dd>' +
+      (both ? '<dt>Short when</dt><dd>' + esc('≤ −' + X + ' after ≥ +' + X + ' within ' + K * 4 + 'h') + '</dd>' : '') +
+      '<dt>ATR (14 × 4H)</dt><dd>' + esc(px(s.atr)) + ' · ' + esc((s.atr / s.close * 100).toFixed(2)) + '%</dd>' +
+      '</dl>';
+    html += '<div class="scorebar" title="ATLAS score, −100 to +100; marks at ±' + X + '">' +
+      '<span class="lv" style="left:' + ((100 - X) / 2) + '%"></span><span class="lv" style="left:' + ((100 + X) / 2) + '%"></span>' +
+      '<b style="left:' + pos.toFixed(1) + '%"></b></div>' +
+      '<div class="note" style="margin-top:2px;display:flex;justify-content:space-between"><span>−100</span><span>0</span><span>+100</span></div>';
+    if (!S.position) {
+      var armed = longArmed && shortArmed ? 'both ways' : longArmed ? 'LONG' : shortArmed ? 'SHORT' : null;
+      html += '<div class="note">' + (armed
+        ? '<b class="' + (armed === 'SHORT' ? 'dn' : 'up') + '">' + armed + ' armed</b> — the score was ' + (longArmed ? '≤ −' + X : '≥ +' + X) + ' in the last ' + K * 4 + 'h; a 4H close at ' + (armed === 'SHORT' ? '≤ −' : '≥ +') + X + ' enters.'
+        : 'Not armed — the score hasn’t been at ±' + X + ' in the last ' + K * 4 + 'h.') + '</div>';
+      if (s.wait) html += '<div class="note">Waiting: ' + esc(s.wait) + '</div>';
+    }
+    return html;
   }
 
   /* ---- charts: plain SVG, crosshair + tooltip ---- */
@@ -332,20 +367,25 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     var box = $('pxBox');
     var s = S.signal;
     if (!s || !s.chart || !s.chart.length) { box.innerHTML = '<div class="empty">No candles yet.</div>'; $('pxLegend').innerHTML = ''; return; }
-    var rows = s.chart.map(function (r) { return { t: r[0], o: r[1], h: r[2], l: r[3], c: r[4], up: r[5], ex: r[6] }; });
+    var rows = s.chart.map(function (r) { return { t: r[0], o: r[1], h: r[2], l: r[3], c: r[4], up: r[5], ex: r[6], sc: r[7] }; });
+    var flipMode = rows.some(function (r) { return r.sc != null; }) && rows[rows.length - 1].up == null;
+    var fset = (S.account && S.account.settings) || {}, FX = fset.FLIP_SCORE || 25;
     var p = S.position;
     box.innerHTML = '';
-    var W = Math.max(300, box.clientWidth || 1000), Hh = W < 600 ? 280 : 380, m = { l: 4, r: 74, t: 12, b: 26 };
+    var W = Math.max(300, box.clientWidth || 1000), Hp = W < 600 ? 260 : 340;
+    // Flip mode: an ATLAS score panel (−100..+100) under the price panel.
+    var Hs = flipMode ? (W < 600 ? 90 : 110) : 0, gap = flipMode ? 14 : 0, Hh = Hp + gap + Hs + 26, m = { l: 4, r: 74, t: 12, b: 26 };
     var lo = Infinity, hi = -Infinity;
     rows.forEach(function (r) { lo = Math.min(lo, r.l, r.ex || Infinity); hi = Math.max(hi, r.h, r.up || -Infinity); });
     if (p) { lo = Math.min(lo, p.stop, p.entry); hi = Math.max(hi, p.stop, p.entry); }
     var pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
     var n = rows.length, cw = (W - m.l - m.r) / n;
     var X = function (i) { return m.l + cw * (i + 0.5); };
-    var Y = function (v) { return m.t + (hi - v) / (hi - lo) * (Hh - m.t - m.b); };
-    var svg = node('svg', { viewBox: '0 0 ' + W + ' ' + Hh, width: W, height: Hh, role: 'img', 'aria-label': 'BTC 4H candles with the breakout and exit channel' }, box);
+    var Y = function (v) { return m.t + (hi - v) / (hi - lo) * (Hp - m.t); };
+    var sTop = Hp + gap, YS = function (v) { return sTop + (100 - v) / 200 * Hs; };
+    var svg = node('svg', { viewBox: '0 0 ' + W + ' ' + Hh, width: W, height: Hh, role: 'img', 'aria-label': flipMode ? 'BTC 4H candles with the ATLAS score below' : 'BTC 4H candles with the breakout and exit channel' }, box);
     // Level labels (right edge) are placed first so price ticks can make room for them.
-    var p0 = S.position, labelYs = [Y(rows[rows.length - 1].up)].concat(p0 ? [Y(p0.entry), Y(p0.stop)] : []);
+    var p0 = S.position, labelYs = (rows[rows.length - 1].up != null ? [Y(rows[rows.length - 1].up)] : []).concat(p0 ? [Y(p0.entry), Y(p0.stop)] : []);
     niceTicks(lo, hi, W < 600 ? 4 : 5).forEach(function (v) {
       node('line', { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: 'var(--line)', 'stroke-width': 1 }, svg);
       if (labelYs.some(function (y) { return Math.abs(y - Y(v)) < 14; })) return;
@@ -386,7 +426,25 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       level(p.stop, 'var(--dn)', 'stop', '6 4');
     }
     var last = rows[rows.length - 1];
-    labels.push({ y: Y(last.up), text: 'breakout', color: 'var(--nt)' });
+    if (last.up != null) labels.push({ y: Y(last.up), text: 'breakout', color: 'var(--nt)' });
+    if (flipMode) {
+      // Score panel: zero line, the ±X trigger levels, the score line, its value at the right edge.
+      [100, 0, -100].forEach(function (v) { node('line', { x1: m.l, x2: W - m.r, y1: YS(v), y2: YS(v), stroke: 'var(--line)', 'stroke-width': 1 }, svg); });
+      [FX, -FX].forEach(function (v) {
+        node('line', { x1: m.l, x2: W - m.r, y1: YS(v), y2: YS(v), stroke: 'var(--nt)', 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }, svg);
+        var tl = node('text', { x: W - m.r + 8, y: YS(v) + 4, fill: 'var(--faint)', 'font-size': 11, 'font-family': 'JetBrains Mono, monospace' }, svg);
+        tl.textContent = (v > 0 ? '+' : '−') + Math.abs(v);
+      });
+      var sd = '';
+      rows.forEach(function (r, i) { if (r.sc == null) return; sd += (sd ? 'L' : 'M') + X(i) + ' ' + YS(r.sc); });
+      node('path', { d: sd, fill: 'none', stroke: 'var(--violet)', 'stroke-width': 2, 'stroke-linejoin': 'round' }, svg);
+      rows.forEach(function (r, i) {
+        if (r.sc == null) return;
+        if (r.sc >= FX || r.sc <= -FX) node('circle', { cx: X(i), cy: YS(r.sc), r: 3, fill: r.sc > 0 ? 'var(--up)' : 'var(--dn)', stroke: 'var(--panel)', 'stroke-width': 1.5 }, svg);
+      });
+      var st = node('text', { x: m.l + 4, y: sTop + 12, fill: 'var(--dim)', 'font-size': 11, 'font-family': 'Inter, sans-serif' }, svg);
+      st.textContent = 'ATLAS score';
+    }
     labels.sort(function (a, b) { return a.y - b.y; });
     for (var k = 1; k < labels.length; k++) if (labels[k].y - labels[k - 1].y < 15) labels[k].y = labels[k - 1].y + 15;
     labels.forEach(function (L) {
@@ -406,15 +464,18 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       hair.setAttribute('x1', X(i)); hair.setAttribute('x2', X(i)); hair.setAttribute('opacity', 1);
       tipAt(box, tip, X(i) / sx, (ev.clientY - r.top), '<div class="faint" style="margin-bottom:3px">' + esc(when(c.t)) + ' – ' + esc(new Date(c.t + TF).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })) + '</div>' +
         row('close', px(c.c)) + row('high / low', px(c.h, 0) + ' / ' + px(c.l, 0)) +
-        (c.up != null ? row('breakout', px(c.up), '#ffc857') : '') + (c.ex != null ? row('exit', px(c.ex), '#9aaca4', true) : ''));
+        (c.up != null ? row('breakout', px(c.up), '#ffc857') : '') + (c.ex != null ? row('exit', px(c.ex), '#9aaca4', true) : '') +
+        (c.sc != null ? row('ATLAS score', sgn(c.sc), '#b98bff') : ''));
     }
     function leave() { hair.setAttribute('opacity', 0); tip.style.opacity = 0; }
     hit.addEventListener('pointermove', move);
     hit.addEventListener('pointerdown', move);
     hit.addEventListener('pointerleave', leave);
     $('chartTag').textContent = 'UTC';
-    $('pxLegend').innerHTML = '<span><i style="background:var(--nt)"></i>breakout level (' + esc((S.account && S.account.settings && S.account.settings.CHANNEL_N) || 20) + '-candle high)</span>' +
-      '<span><i style="background:var(--dim);opacity:.8"></i>exit level (' + esc((S.account && S.account.settings && S.account.settings.EXIT_N) || 20) + '-candle low)</span>' +
+    $('pxLegend').innerHTML = (flipMode
+      ? '<span><i style="background:var(--violet)"></i>ATLAS score (lower panel)</span><span><i style="background:var(--nt)"></i>±' + esc(FX) + ' trigger levels</span>'
+      : '<span><i style="background:var(--nt)"></i>breakout level (' + esc(fset.CHANNEL_N || 20) + '-candle high)</span>' +
+        '<span><i style="background:var(--dim);opacity:.8"></i>exit level (' + esc(fset.EXIT_N || 20) + '-candle low)</span>') +
       (p ? '<span><i style="background:var(--blue)"></i>entry</span><span><i style="background:var(--dn)"></i>stop</span>' : '');
   }
 
@@ -477,6 +538,9 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     MAX_POSITION_X: ['Max position value', function (v) { return v + '× balance'; }],
     LEVERAGE: ['Leverage', function (v) { return v + '×'; }],
     DAILY_LOSS_LIMIT_PCT: ['Daily loss limit', function (v) { return v + '%'; }],
+    STRATEGY: ['Signal', function (v) { return v === 'atlas-flip' ? 'ATLAS score fast flip' : 'channel breakout'; }],
+    FLIP_SCORE: ['Flip score level', function (v) { return '±' + v; }],
+    FLIP_WINDOW: ['Flip window', function (v) { return v + ' × 4H (' + v * 4 + 'h)'; }],
     DIRECTION: ['Direction', function (v) { return v === 'both' ? 'long + short' : 'long-only'; }],
     CHANNEL_N: ['Breakout channel', function (v) { return v + ' × 4H'; }],
     EXIT_N: ['Exit channel', function (v) { return v + ' × 4H'; }],

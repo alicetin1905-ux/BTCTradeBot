@@ -22,6 +22,7 @@ const path = require('path');
 const config = require('../config');
 const market = require('./market');
 const signal = require('./signal');
+const flip = require('./flip');
 const exchange = require('./exchange');
 const notify = require('./notify');
 const summary = require('./summary');
@@ -165,6 +166,18 @@ async function runCommands(client, st, events) {
 
 const sigParams = () => ({ channelN: config.CHANNEL_N, exitN: config.EXIT_N, atrLen: config.ATR_LEN });
 
+// The signal series for the closed 4H candles: ATLAS flip (scored for the
+// last 60 candles — the exit / trailing checks and the dashboard chart) or
+// the breakout channel.
+async function buildSignal(candles, now) {
+  if (config.STRATEGY === 'atlas-flip') {
+    const daily = await market.closedCandles(config.SYMBOL, 'D', 400, now);
+    if (daily.note) console.log(`daily candles from ${daily.source} (${market.primary()} failed: ${daily.note})`);
+    return flip.series(candles, daily.candles, { threshold: config.FLIP_SCORE, window: config.FLIP_WINDOW }, Math.max(0, candles.length - 60));
+  }
+  return signal.series(candles, sigParams());
+}
+
 async function run() {
   const client = exchangeClient(); // fail fast on missing keys
   const st = loadState();
@@ -175,7 +188,7 @@ async function run() {
   const now = Date.now();
   const { candles, source, note } = await market.closedCandles(config.SYMBOL, config.ENTRY_TF, 500, now);
   if (note) console.log(`candles from ${source} (${market.primary()} failed: ${note})`);
-  const sig = signal.series(candles, sigParams());
+  const sig = await buildSignal(candles, now);
   const halt = /^(1|true|yes)$/i.test(process.env.TRADEBOT_HALT || '');
   await exchange.runExchange({ client, st, sig, events, halt, now });
 
@@ -183,10 +196,12 @@ async function run() {
   st.signal = last && {
     ...last, closeT: last.t + market.TF_MS[config.ENTRY_TF], source, at: now,
     wait: exchange.entryBlock(st, last, now, { halt }),
-    // The last 60 closed candles + their channel, for the dashboard chart.
+    strategy: config.STRATEGY,
+    // The last 60 closed candles + their channel (breakout) or ATLAS score (flip), for the dashboard chart.
     chart: candles.slice(-60).map((k, i, a) => {
       const s = sig[sig.length - a.length + i];
-      return [k.t, k.o, k.h, k.l, k.c, s ? +s.upper.toFixed(1) : null, s ? +s.exitLower.toFixed(1) : null];
+      const r = (x) => (x == null ? null : +x.toFixed(1));
+      return [k.t, k.o, k.h, k.l, k.c, s ? r(s.upper) : null, s ? r(s.exitLower) : null, s && s.score != null ? s.score : null];
     }),
   };
   const daily = summary.due(st);
@@ -252,10 +267,11 @@ function reset() {
 function printSummary(events, st) {
   const quote = config.EXCHANGE !== 'okx' ? 'USDT' : require('./okx').isSpot(config.OKX_INSTRUMENT) ? config.OKX_INSTRUMENT.split('-')[1]
     : /^BTC-USD_/.test(config.OKX_INSTRUMENT) ? 'USDC' : 'USDT';
-  console.log(`\n=== BTCTradeBot [${config.EXCHANGE} ${MODE}${config.EXCHANGE === 'okx' ? ' ' + config.OKX_INSTRUMENT : ''}] (${P.STARTING_BALANCE} ${quote}, ${P.RISK_PCT}% risk, ${config.DIRECTION === 'both' ? 'long+short' : 'long-only'}) @ ${new Date().toISOString()} ===\n`);
+  console.log(`\n=== BTCTradeBot [${config.EXCHANGE} ${MODE}${config.EXCHANGE === 'okx' ? ' ' + config.OKX_INSTRUMENT : ''}] (${config.STRATEGY}, ${P.STARTING_BALANCE} ${quote}, ${P.RISK_PCT}% risk, ${config.DIRECTION === 'both' ? 'long+short' : 'long-only'}) @ ${new Date().toISOString()} ===\n`);
   for (const ev of events) {
     if (ev.type === 'enter') {
-      console.log(`ENTER ${ev.bias === 1 ? 'LONG' : 'SHORT'} ${ev.qty} BTC @ ${px(ev.entry)} | breakout ${px(ev.breakout)} | SL ${px(ev.stop)} | value $${fmt(ev.notional)} risk $${fmt(ev.riskAmt)}`);
+      const why = ev.breakout != null ? `breakout ${px(ev.breakout)}` : `ATLAS ${ev.flipFrom} → ${ev.score}`;
+      console.log(`ENTER ${ev.bias === 1 ? 'LONG' : 'SHORT'} ${ev.qty} BTC @ ${px(ev.entry)} | ${why} | SL ${px(ev.stop)} | value $${fmt(ev.notional)} risk $${fmt(ev.riskAmt)}`);
     } else if (ev.type === 'exit') {
       console.log(`EXIT — ${ev.reason} | pnl ${money(ev.pnl)}${ev.price ? ' @ ' + px(ev.price) : ''}`);
     } else {
@@ -263,7 +279,8 @@ function printSummary(events, st) {
     }
   }
   const s = st.signal;
-  if (s) console.log(`\n4H close ${px(s.close)} · breakout above ${px(s.upper)}${config.DIRECTION === 'both' ? ` / below ${px(s.lower)}` : ''} · ATR ${px(s.atr)}${s.wait ? ' · ' + s.wait : ''}`);
+  if (s && s.upper == null) console.log(`\n4H close ${px(s.close)} · ATLAS score ${s.score} (swing ±${config.FLIP_SCORE} within ${config.FLIP_WINDOW} candles) · ATR ${px(s.atr)}${s.wait ? ' · ' + s.wait : ''}`);
+  else if (s) console.log(`\n4H close ${px(s.close)} · breakout above ${px(s.upper)}${config.DIRECTION === 'both' ? ` / below ${px(s.lower)}` : ''} · ATR ${px(s.atr)}${s.wait ? ' · ' + s.wait : ''}`);
   const p = st.position;
   console.log(`balance $${fmt(st.account.balance)} (started $${fmt(st.account.startingBalance)})` +
     (p ? ` · ${p.bias === 1 ? 'long' : 'short'} ${p.qty} BTC @ ${px(p.entry)}, stop ${px(p.stop)}` : ' · flat'));

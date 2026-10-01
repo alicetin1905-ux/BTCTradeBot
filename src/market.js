@@ -11,7 +11,8 @@ let fetchImpl = (...a) => fetch(...a);
 function setFetch(f) { fetchImpl = f; } // tests
 
 const TF_MS = { '60': 3600000, '240': 4 * 3600000, D: 86400000 };
-const OKX_BAR = { '60': '1H', '240': '4H', D: '1D' };
+// OKX's plain '1D' bars start at Hong Kong midnight; '1Dutc' at UTC midnight (like Bybit's D and the backtest).
+const OKX_BAR = { '60': '1H', '240': '4H', D: '1Dutc' };
 
 async function json(url) {
   const r = await fetchImpl(url);
