@@ -14,8 +14,9 @@
     "LEVERAGE": 10,
     "DAILY_LOSS_LIMIT_PCT": 10,
     "STRATEGY": "atlas-flip",
-    "FLIP_SCORE": 25,
-    "FLIP_WINDOW": 4,
+    "SCORE_MODE": "graded",
+    "FLIP_SCORE": 10,
+    "FLIP_WINDOW": 2,
     "TREND_BAND_PCT": 10,
     "DIRECTION": "both",
     "CHANNEL_N": 15,
@@ -32,8 +33,9 @@
     "LEVERAGE": 10,
     "DAILY_LOSS_LIMIT_PCT": 10,
     "STRATEGY": "atlas-flip",
-    "FLIP_SCORE": 25,
-    "FLIP_WINDOW": 4,
+    "SCORE_MODE": "graded",
+    "FLIP_SCORE": 10,
+    "FLIP_WINDOW": 2,
     "TREND_BAND_PCT": 10,
     "DIRECTION": "both",
     "CHANNEL_N": 15,
@@ -48,6 +50,6 @@
   "mode": "demo",
   "exchange": "okx",
   "instrument": "BTC-USD_UM_XPERP-310328",
-  "updatedAt": 1790880904491,
-  "lastRunAt": 1790880904491
+  "updatedAt": 1790891661598,
+  "lastRunAt": 1790891661598
 }
