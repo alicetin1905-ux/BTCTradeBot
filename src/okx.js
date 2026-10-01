@@ -147,10 +147,16 @@ function createClient({ apiKey, apiSecret, passphrase, base = DEFAULT_BASE, fetc
       return { acctLv: c.acctLv, posMode: c.posMode };
     },
 
-    // BTC perpetuals this account may trade (account-level instrument list).
-    async tradableBtcSwaps() {
-      const rows = await request('GET', '/api/v5/account/instruments', { instType: 'SWAP' });
+    // BTC instruments this account may trade (account-level instrument list).
+    async tradableBtc(instType = 'SWAP') {
+      const rows = await request('GET', '/api/v5/account/instruments', { instType });
       return rows.filter(r => /^BTC-/.test(r.instId)).map(r => `${r.instId}${r.state && r.state !== 'live' ? ' (' + r.state + ')' : ''}`);
+    },
+
+    // Read-only "could I trade this?": OKX's max order size, or its refusal.
+    async maxSize(instId, tdMode) {
+      const r = (await request('GET', '/api/v5/account/max-size', { instId, tdMode }))[0] || {};
+      return { buy: num(r.maxBuy), sell: num(r.maxSell) };
     },
 
     // Where the coins are, for scripts/okx-check.js: the trading account's
