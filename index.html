@@ -70,6 +70,10 @@ dl.kv dd{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-n
 .scorebar .lv{position:absolute;top:-3px;bottom:-3px;width:2px;background:var(--nt);opacity:.8}
 .scorebar b{position:absolute;top:-4px;width:6px;height:18px;margin-left:-3px;border-radius:3px;background:var(--txt);box-shadow:0 0 0 2px var(--panel)}
 
+.tabs{display:flex;gap:8px;max-width:1080px;margin:12px auto 0;padding:0 16px}
+.tabs button{font:600 12px var(--sans);letter-spacing:.06em;padding:7px 14px;border-radius:999px;border:1px solid var(--line2);background:var(--panel);color:var(--dim);cursor:pointer}
+.tabs button.on{color:var(--txt);border-color:var(--btc);background:var(--panel2)}
+.tabs button small{font-family:var(--mono);font-weight:500;margin-left:6px}
 .chartbox{position:relative}
 .chartbox svg{display:block;width:100%;height:auto;touch-action:pan-y}
 .tip{position:absolute;pointer-events:none;background:var(--panel2);border:1px solid var(--line2);border-radius:8px;
@@ -96,9 +100,11 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
 </head>
 <body>
 <header class="top">
-  <div class="mark"><img src="icons/icon-192.png" alt=""><h1>BTCTRADEBOT</h1><span id="subtitle">demo · BTC perp · 4H breakout</span></div>
+  <div class="mark"><img src="icons/icon-192.png" alt=""><h1>BTCTRADEBOT</h1><span id="subtitle">demo · BTC + ETH futures · ATLAS flip</span></div>
   <div class="live"><small id="liveSrc">BTC</small><b id="livePx">—</b><small id="liveChg"></small></div>
 </header>
+
+<nav class="tabs" id="tabs"></nav>
 
 <main>
   <section class="tiles">
@@ -114,7 +120,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
   </div>
 
   <section class="card">
-    <h2>BTC 4H · last 60 candles <span class="tag" id="chartTag"></span></h2>
+    <h2><span id="chartTitle">BTC</span> 4H · last 60 candles <span class="tag" id="chartTag"></span></h2>
     <div class="chartbox" id="pxBox"></div>
     <div class="legend" id="pxLegend"></div>
   </section>
@@ -138,7 +144,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
 
 <footer>
   Demo funds on a demo trading account (OKX or Bybit) — a rehearsal of the strategy, not investment advice.
-  Signal: the ATLAS score swinging from −10 to +10 within 8h (long) or back (short), on 4H closes, ignored when price is over 10% from its 200-candle 4H average; initial stop 2×ATR, trailed 3×ATR behind the best close after every 4H close; an opposite swing closes and reverses.
+  Signal (BTC and ETH, each with its own position and stop, sharing one balance): the ATLAS score swinging from −10 to +10 within 8h (long) or back (short), on 4H closes, ignored when price is over 10% from its 200-candle 4H average; initial stop 2×ATR, trailed 3×ATR behind the best close after every 4H close; an opposite swing closes and reverses.
   Backtest: <a href="https://github.com/alicetin1905-ux/BTCTradeBot/blob/main/backtest/REPORT.md" target="_blank" rel="noopener">backtest/REPORT.md</a>.
   State refreshes every minute from the repo; the live price every 10 s.
 </footer>
@@ -148,7 +154,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
   'use strict';
   var RAW = 'https://raw.githubusercontent.com/alicetin1905-ux/BTCTradeBot/main/state/demo/';
   var TF = 4 * 3600000;
-  var S = { account: null, position: null, trades: [], signal: null, live: null };
+  var S = { account: null, position: null, trades: [], signal: null, live: null, coin: 'BTC', byCoin: {}, liveBy: {} };
 
   var $ = function (id) { return document.getElementById(id); };
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
@@ -169,9 +175,10 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' ' + d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
   }
 
-  async function load(name) {
+  // BTC's files are state/demo/<name>.json, the other coins' state/demo/<coin>/<name>.json.
+  async function load(name, coin) {
     try {
-      var res = await fetch(RAW + name + '.json?_=' + Date.now(), { cache: 'no-store' });
+      var res = await fetch(RAW + (coin && coin !== 'BTC' ? coin.toLowerCase() + '/' : '') + name + '.json?_=' + Date.now(), { cache: 'no-store' });
       if (!res.ok) return null;
       return await res.json();
     } catch (e) { return null; }
@@ -179,21 +186,20 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
 
   // Live price from the exchange the bot trades on, the other one if that
   // fails (Bybit is blocked in some countries).
-  async function bybitPrice() {
-    var d = await (await fetch('https://api.bybit.com/v5/market/tickers?category=linear&symbol=BTCUSDT', { cache: 'no-store' })).json();
+  async function bybitPrice(coin) {
+    var d = await (await fetch('https://api.bybit.com/v5/market/tickers?category=linear&symbol=' + coin + 'USDT', { cache: 'no-store' })).json();
     var t = d.result.list[0];
     return { px: +t.lastPrice, chg: +t.price24hPcnt * 100, src: 'Bybit' };
   }
-  async function okxPrice() {
-    var inst = (S.account && S.account.exchange === 'okx' && S.account.instrument) || 'BTC-USDT-SWAP';
-    if (/-\d{6}$/.test(inst)) inst = 'BTC-USDT-SWAP'; // demo-only future: show the real BTC price
+  async function okxPrice(coin) {
+    var inst = coin + '-USDT-SWAP'; // the demo-only futures are thin: show the real perpetual's price
     var o = (await (await fetch('https://www.okx.com/api/v5/market/ticker?instId=' + encodeURIComponent(inst), { cache: 'no-store' })).json()).data[0];
     return { px: +o.last, chg: (+o.last / +o.open24h - 1) * 100, src: 'OKX' };
   }
-  async function livePrice() {
+  async function livePrice(coin) {
     var order = S.account && S.account.exchange === 'bybit' ? [bybitPrice, okxPrice] : [okxPrice, bybitPrice];
     for (var i = 0; i < order.length; i++) {
-      try { var r = await order[i](); if (r && r.px) return r; } catch (e) { /* next */ }
+      try { var r = await order[i](coin); if (r && r.px) return r; } catch (e) { /* next */ }
     }
     return null;
   }
@@ -204,18 +210,24 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
   function positionsFromTrades(trades) {
     var g = {};
     trades.forEach(function (t) {
-      var k = t.openedAt;
-      g[k] = g[k] || { bias: t.bias, entry: t.entry, qty: 0, pnl: 0, openedAt: t.openedAt, closedAt: 0, exit: t.exit, reason: t.reason };
+      var k = (t.coin || '') + t.openedAt;
+      g[k] = g[k] || { coin: t.coin, bias: t.bias, entry: t.entry, qty: 0, pnl: 0, openedAt: t.openedAt, closedAt: 0, exit: t.exit, reason: t.reason };
       g[k].pnl += t.pnl; g[k].qty += t.qty;
       if (t.closedAt >= g[k].closedAt) { g[k].closedAt = t.closedAt; g[k].exit = t.exit; g[k].reason = t.reason; }
     });
     return Object.keys(g).map(function (k) { return g[k]; }).sort(function (a, b) { return a.closedAt - b.closedAt; });
   }
 
-  function livePnl(p) {
-    if (S.live && S.live.px) return (S.live.px - p.entry) * p.bias * p.qty;
+  function livePnl(p, coin) {
+    var l = S.liveBy[coin || S.coin];
+    if (l && l.px) return (l.px - p.entry) * p.bias * p.qty;
     return p.unrealisedPnl || 0;
   }
+  // Open P&L over every coin's position.
+  function openPnl() {
+    return Object.keys(S.byCoin).reduce(function (sum, c) { var p = S.byCoin[c].position; return sum + (p ? livePnl(p, c) : 0); }, 0);
+  }
+  function coinList() { return (S.account && S.account.coins) || ['BTC']; }
 
   function renderTiles() {
     var a = S.account;
@@ -224,12 +236,11 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       $('tEqS').textContent = 'no data yet — appears after the first run';
       return;
     }
-    var p = S.position;
-    var u = p ? livePnl(p) : 0;
+    var u = openPnl(), n = Object.keys(S.byCoin).filter(function (c) { return S.byCoin[c].position; }).length;
     var eq = a.balance + u;
     $('tEq').textContent = usd(eq);
     $('tEq').className = 'v';
-    $('tEqS').textContent = pct((eq / a.startingBalance - 1) * 100) + ' vs ' + usd(a.startingBalance) + (p ? ' · open ' + signed(u) : '');
+    $('tEqS').textContent = pct((eq / a.startingBalance - 1) * 100) + ' vs ' + usd(a.startingBalance) + (n ? ' · open ' + signed(u) : '');
     var real = a.balance - a.startingBalance;
     $('tPnl').innerHTML = '<span class="' + cls(real) + '">' + esc(signed(real)) + '</span>';
     var f = a.funding && a.funding.total ? ' · funding ' + signed(a.funding.total) : '';
@@ -250,10 +261,11 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     if (!S.account) { el.innerHTML = '<div class="empty">No data yet — it appears after the first run pushes state/demo/ (see README).</div>'; return; }
     if (!p) {
       $('posTag').textContent = '';
-      el.innerHTML = '<div class="state"><span class="pill flat">FLAT</span><span class="dim" style="font-size:13px">No position — the bot waits for the next breakout.</span></div>';
+      el.innerHTML = '<div class="state"><span class="pill flat">FLAT</span><span class="dim" style="font-size:13px">No ' + esc(S.coin) + ' position — the bot waits for the next flip.</span></div>';
       return;
     }
     var u = livePnl(p), mark = S.live && S.live.px ? S.live.px : p.markPrice;
+    var coin = S.coin;
     var toStop = mark ? (mark - p.stop) * p.bias / mark * 100 : null;
     var locked = (p.stop - p.entry) * p.bias * p.qty;
     $('posTag').textContent = 'opened ' + ago(p.openedAt);
@@ -261,7 +273,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       '<div class="state"><span class="pill ' + (p.bias === 1 ? 'long' : 'short') + '">' + (p.bias === 1 ? 'LONG' : 'SHORT') + '</span>' +
       '<b class="' + cls(u) + '" style="font-size:20px">' + esc(signed(u)) + '</b><span class="dim num" style="font-size:12px">' + esc(pct(u / p.notional * 100 * 1)) + ' of position</span></div>' +
       '<dl class="kv">' +
-      '<dt>Size</dt><dd>' + esc(p.qty) + ' BTC · ' + esc(usd(p.qty * p.entry)) + '</dd>' +
+      '<dt>Size</dt><dd>' + esc(p.qty) + ' ' + esc(coin) + ' · ' + esc(usd(p.qty * p.entry)) + '</dd>' +
       '<dt>Entry</dt><dd>' + esc(px(p.entry)) + '</dd>' +
       '<dt>Price now</dt><dd>' + esc(px(mark)) + '</dd>' +
       '<dt>Stop ' + (p.trailed ? '(trailed)' : '(initial)') + '</dt><dd class="' + (locked >= 0 ? 'up' : 'dn') + '">' + esc(px(p.stop)) + '</dd>' +
@@ -270,7 +282,8 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       '<dt>Risk when opened</dt><dd>' + esc(usd(p.riskAmt)) + '</dd>' +
       (p.funding ? '<dt>Funding so far</dt><dd class="' + cls(p.funding) + '">' + esc(signed(p.funding)) + '</dd>' : '') +
       '</dl>' +
-      '<div class="note">The stop sits on ' + esc(EXCHANGE_NAME[S.account.exchange] || 'the exchange') + ' and trails after every 4H close; the bot also exits on a 4H close below the ' + esc(S.account.settings ? S.account.settings.EXIT_N : 20) + '-candle low.</div>';
+      '<div class="note">The stop sits on ' + esc(EXCHANGE_NAME[S.account.exchange] || 'the exchange') + ' and trails after every 4H close' +
+      (S.signal && S.signal.upper == null && S.signal.score != null ? '; an opposite ATLAS swing closes the position (and reverses it).' : '; the bot also exits on a 4H close below the ' + esc(S.account.settings ? S.account.settings.EXIT_N : 20) + '-candle low.') + '</div>';
   }
 
   function renderSignal() {
@@ -383,14 +396,14 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     var X = function (i) { return m.l + cw * (i + 0.5); };
     var Y = function (v) { return m.t + (hi - v) / (hi - lo) * (Hp - m.t); };
     var sTop = Hp + gap, YS = function (v) { return sTop + (100 - v) / 200 * Hs; };
-    var svg = node('svg', { viewBox: '0 0 ' + W + ' ' + Hh, width: W, height: Hh, role: 'img', 'aria-label': flipMode ? 'BTC 4H candles with the ATLAS score below' : 'BTC 4H candles with the breakout and exit channel' }, box);
+    var svg = node('svg', { viewBox: '0 0 ' + W + ' ' + Hh, width: W, height: Hh, role: 'img', 'aria-label': flipMode ? S.coin + ' 4H candles with the ATLAS score below' : S.coin + ' 4H candles with the breakout and exit channel' }, box);
     // Level labels (right edge) are placed first so price ticks can make room for them.
     var p0 = S.position, labelYs = (rows[rows.length - 1].up != null ? [Y(rows[rows.length - 1].up)] : []).concat(p0 ? [Y(p0.entry), Y(p0.stop)] : []);
     niceTicks(lo, hi, W < 600 ? 4 : 5).forEach(function (v) {
       node('line', { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: 'var(--line)', 'stroke-width': 1 }, svg);
       if (labelYs.some(function (y) { return Math.abs(y - Y(v)) < 14; })) return;
       var t = node('text', { x: W - m.r + 8, y: Y(v) + 4, fill: 'var(--faint)', 'font-size': 11, 'font-family': 'JetBrains Mono, monospace' }, svg);
-      t.textContent = (v / 1000).toFixed(v % 1000 ? 1 : 0) + 'k';
+      t.textContent = hi > 20000 ? (v / 1000).toFixed(v % 1000 ? 1 : 0) + 'k' : Math.round(v).toLocaleString('en-US');
     });
     // Day labels at 00:00 UTC (every other day when narrow).
     var dayStep = cw * 6 < 46 ? 2 : 1;
@@ -525,9 +538,9 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     var el = $('trades');
     $('trTag').textContent = pos.length ? 'newest first' : '';
     if (!pos.length) { el.innerHTML = '<div class="empty">No closed trades yet.</div>'; return; }
-    el.innerHTML = '<table><thead><tr><th class="l">Closed</th><th class="l">Side</th><th>Entry</th><th>Exit</th><th>BTC</th><th>P&amp;L</th><th class="l">Why</th></tr></thead><tbody>' +
+    el.innerHTML = '<table><thead><tr><th class="l">Closed</th><th class="l">Coin</th><th class="l">Side</th><th>Entry</th><th>Exit</th><th>Size</th><th>P&amp;L</th><th class="l">Why</th></tr></thead><tbody>' +
       pos.slice(0, 100).map(function (t) {
-        return '<tr><td class="l">' + esc(when(t.closedAt)) + '</td><td class="l ' + (t.bias === 1 ? 'up' : 'dn') + '">' + (t.bias === 1 ? 'long' : 'short') + '</td>' +
+        return '<tr><td class="l">' + esc(when(t.closedAt)) + '</td><td class="l">' + esc(t.coin || 'BTC') + '</td><td class="l ' + (t.bias === 1 ? 'up' : 'dn') + '">' + (t.bias === 1 ? 'long' : 'short') + '</td>' +
           '<td>' + esc(px(t.entry)) + '</td><td>' + esc(px(t.exit)) + '</td><td>' + esc(+t.qty.toFixed(3)) + '</td>' +
           '<td class="' + cls(t.pnl) + '">' + esc(signed(t.pnl)) + '</td><td class="l">' + esc(t.reason) + '</td></tr>';
       }).join('') + '</tbody></table>';
@@ -567,26 +580,53 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     var l = S.live;
     if (!l) return;
     $('livePx').textContent = px(l.px, 0);
-    $('liveSrc').textContent = 'BTC · ' + l.src;
+    $('liveSrc').textContent = S.coin + ' · ' + l.src;
     $('liveChg').innerHTML = '<span class="' + cls(l.chg) + '">' + esc(pct(l.chg)) + '</span> 24h';
   }
 
   function renderAll() {
     var ex = S.account && EXCHANGE_NAME[S.account.exchange];
-    var inst = S.account && S.account.instrument;
-    var market = !inst || inst === 'BTCUSDT' || /-SWAP$/.test(inst) ? 'BTC perp' : /-\d{6}$/.test(inst) ? 'BTC future ' + inst.replace(/^BTC-/, '') : inst + ' spot';
-    $('subtitle').textContent = (ex ? ex + ' ' : '') + 'demo · ' + market + ' · 4H breakout';
-    renderTiles(); renderPosition(); renderSignal(); renderPriceChart(); renderEquity(); renderTrades(); renderSettings(); renderLive();
+    $('subtitle').textContent = (ex ? ex + ' ' : '') + 'demo · ' + coinList().join(' + ') + ' futures · ATLAS flip';
+    $('chartTitle').textContent = S.coin;
+    renderTabs(); renderTiles(); renderPosition(); renderSignal(); renderPriceChart(); renderEquity(); renderTrades(); renderSettings(); renderLive();
   }
 
+  function select(coin) {
+    S.coin = coin;
+    var c = S.byCoin[coin] || {};
+    S.position = c.position || null; S.signal = c.signal || null; S.live = S.liveBy[coin] || null;
+  }
+  function renderTabs() {
+    var el = $('tabs'), coins = coinList();
+    if (coins.length < 2) { el.innerHTML = ''; return; }
+    el.innerHTML = coins.slice().sort(function (a, b) { return a === 'BTC' ? -1 : b === 'BTC' ? 1 : a < b ? -1 : 1; }).map(function (c) {
+      var p = (S.byCoin[c] || {}).position;
+      return '<button type="button" data-coin="' + esc(c) + '"' + (c === S.coin ? ' class="on"' : '') + '>' + esc(c) +
+        (p ? '<small class="' + (p.bias === 1 ? 'up' : 'dn') + '">' + (p.bias === 1 ? 'long' : 'short') + '</small>' : '<small>flat</small>') + '</button>';
+    }).join('');
+    Array.prototype.forEach.call(el.querySelectorAll('button'), function (b) {
+      b.onclick = function () { select(b.getAttribute('data-coin')); renderAll(); refreshLive(); };
+    });
+  }
   async function refreshState() {
-    var r = await Promise.all(['account', 'position', 'trades', 'signal'].map(load));
-    S.account = r[0]; S.position = r[1]; S.trades = r[2] || []; S.signal = r[3];
+    S.account = await load('account');
+    var coins = coinList();
+    var r = await Promise.all(coins.map(function (c) { return Promise.all(['position', 'trades', 'signal'].map(function (n) { return load(n, c); })); }));
+    S.byCoin = {}; S.trades = [];
+    coins.forEach(function (c, i) {
+      S.byCoin[c] = { position: r[i][0], trades: r[i][1] || [], signal: r[i][2] };
+      (r[i][1] || []).forEach(function (t) { var x = {}; for (var k in t) x[k] = t[k]; x.coin = c; S.trades.push(x); });
+    });
+    if (!S.byCoin[S.coin]) S.coin = coins[0];
+    select(S.coin);
     renderAll();
   }
   async function refreshLive() {
-    var l = await livePrice();
-    if (l) { S.live = l; renderLive(); renderTiles(); renderPosition(); }
+    var coins = coinList();
+    var r = await Promise.all(coins.map(function (c) { return livePrice(c); }));
+    coins.forEach(function (c, i) { if (r[i]) S.liveBy[c] = r[i]; });
+    S.live = S.liveBy[S.coin] || null;
+    if (S.live) { renderLive(); renderTiles(); renderPosition(); renderSignal(); }
   }
 
   refreshState(); refreshLive();

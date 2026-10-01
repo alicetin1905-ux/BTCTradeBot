@@ -13,6 +13,7 @@ const config = require('../config');
 // the live defaults in config.js doesn't change what's tested.
 config.STRATEGY = 'breakout';
 config.DIRECTION = 'long';
+config.PORTFOLIO.RISK_PCT = 2;
 config.CHANNEL_N = 20;
 config.EXIT_N = 20;
 const signal = require('../src/signal');
@@ -401,10 +402,16 @@ test('ntfy alerts: entry, exit and a quiet trailed-stop note; holds and placehol
 test('status push: flat shows the next breakout level; a position shows its live P&L and stop', () => {
   const summary = require('../src/summary');
   const flat = summary.status({ account: { balance: 2000, startingBalance: 2000 }, position: null, signal: { close: 100000, upper: 103000, lower: 95000 } });
-  assert.match(flat.message, /Long above 103,000 \(3.0% away\)/);
+  assert.match(flat.message, /BTC flat · 4H close 100,000 · long above 103,000/);
   const open = summary.status({ account: { balance: 2000, startingBalance: 2000 }, position: { bias: 1, qty: 0.02, entry: 100000, stop: 103000, trailed: true, unrealisedPnl: 100 } });
-  assert.equal(open.title, 'BTC bot $2100.00 (+5.0%)');
-  assert.match(open.message, /Long 0.02 BTC @ 100,000 · \+\$100.00 · stop 103,000 \(trailed\)/);
+  assert.equal(open.title, 'Bot $2100.00 (+5.0%)');
+  assert.match(open.message, /BTC long 0.02 @ 100,000 · \+\$100.00 · stop 103,000 \(trailed\)/);
+  // Two coins: the peer's position and the combined equity.
+  const both = summary.status({ account: { balance: 2000, startingBalance: 2000 }, position: { bias: 1, qty: 0.02, entry: 100000, stop: 98000, unrealisedPnl: 100 },
+    peers: { ETH: { position: { bias: -1, qty: 1, entry: 4000, stop: 4200, unrealisedPnl: -30 }, trades: [], signal: null } } });
+  assert.equal(both.title, 'Bot $2070.00 (+3.5%)');
+  assert.match(both.message, /BTC long 0.02 @ 100,000/);
+  assert.match(both.message, /ETH short 1 @ 4,000 · -\$30.00 · stop 4,200/);
   const at = (h) => Date.UTC(2026, 8, 24, h, 1);
   assert.deepEqual([0, 1, 4, 11, 12, 20, 23].map(h => summary.statusDue(at(h))), [true, false, true, false, true, true, false]);
 });
@@ -845,7 +852,7 @@ test('ATLAS flip through the bot: an opposite swing closes the long (and reverse
     // Status push when flat describes the rule instead of a channel level.
     const summary = require('../src/summary');
     const m = summary.status({ account: { balance: 2000, startingBalance: 2000 }, position: null, signal: flipSig(t1, 99000, -12, null, 0) });
-    assert.match(m.message, /ATLAS score -12/);
+    assert.match(m.message, /ATLAS -12/);
     assert.match(m.message, /swing from −10 to \+10 within 8h, short on the mirror/);
   } finally { [config.DIRECTION, config.STRATEGY] = saved; }
 });
@@ -874,4 +881,17 @@ test('ATLAS flip trend band: a swing far from the 200-candle average is ignored,
     assert.equal(far.enter, 0); assert.equal(far.blocked, true); assert.equal(far.exitShort, false);
     assert.equal(run(120, null).enter, 1);               // band off: trades
   } finally { atlas.analyse = real; }
+});
+
+test('daily loss limit counts the other coins\' trades too', () => {
+  const now = Date.UTC(2026, 9, 1, 12);
+  const sig = { t: now - 4 * 3600000 - 600000, close: 100000, atr: 1000, enter: 1, upper: 99000, lower: 90000 };
+  const st = freshState();
+  st.account.balance = 2000;
+  assert.equal(exchange.entryBlock(st, sig, now), null);
+  // ETH lost 12% of the balance today: no BTC entry either.
+  st.peers = { ETH: { trades: [{ closedAt: now - 3600000, pnl: -240 }] } };
+  assert.match(exchange.entryBlock(st, sig, now), /daily loss limit/);
+  st.peers = { ETH: { trades: [{ closedAt: now - 3600000, pnl: -100 }] } };
+  assert.equal(exchange.entryBlock(st, sig, now), null);
 });

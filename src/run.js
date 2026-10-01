@@ -1,5 +1,6 @@
 #!/usr/bin/env node
-// BTCTradeBot — trades BTC only, on a demo account: OKX Demo Trading
+// BTCTradeBot — trades BTC and ETH (config.COINS), one process per coin
+// (COIN=ETH node src/run.js), on a demo account: OKX Demo Trading
 // (x-simulated-trading) or Bybit Demo Trading (api-demo.bybit.com) — mainnet
 // prices, demo funds — via src/exchange.js. config.EXCHANGE / EXCHANGE in .env.
 // Signal: 4H Donchian breakout with an ATR trailing stop (src/signal.js).
@@ -12,7 +13,7 @@
 //   node src/run.js --sync       sync the position and fills only — no market
 //                                data, no new entries; state is written only
 //                                if something changed
-//   node src/run.js --close-all  cancel orders + close the BTC position on the exchange
+//   node src/run.js --close-all  cancel orders + close this coin's position on the exchange
 //   node src/run.js --reset      back to the starting balance (tracking only,
 //                                doesn't touch the exchange; scripts/reset.sh does both)
 'use strict';
@@ -39,6 +40,10 @@ if (process.env.EXCHANGE) config.EXCHANGE = process.env.EXCHANGE.trim().toLowerC
 if (process.env.OKX_INSTRUMENT && process.env.OKX_INSTRUMENT.trim()) config.OKX_INSTRUMENT = process.env.OKX_INSTRUMENT.trim().toUpperCase();
 // What the position lives on, e.g. "okx:BTC-USDC" — switching it with a position open is refused.
 config.MARKET_ID = config.EXCHANGE === 'okx' ? `okx:${config.OKX_INSTRUMENT}` : 'bybit';
+const COIN = config.COIN;
+const COINS = config.COINS.includes(COIN) ? config.COINS : [...config.COINS, COIN];
+// The coin that runs last sends the combined daily / status pushes and is the only one that resets the shared balance.
+const LEAD = COIN === COINS[COINS.length - 1];
 // Spot: long-only, never more than the cash at hand.
 if (config.EXCHANGE === 'okx' && require('./okx').isSpot(config.OKX_INSTRUMENT)) {
   if (config.DIRECTION !== 'long') console.log(`${config.OKX_INSTRUMENT} is spot: trading long-only (DIRECTION "${config.DIRECTION}" ignored)`);
@@ -52,25 +57,46 @@ if (!['okx', 'bybit'].includes(config.EXCHANGE)) {
 }
 
 const P = config.PORTFOLIO;
-const DIR = path.join(__dirname, '..', 'state', 'demo');
-const FILES = ['account', 'position', 'trades', 'closing', 'signal', 'seenOrderIds', 'summary', 'commandsDone', 'meta'];
+const ROOT = path.join(__dirname, '..', 'state', 'demo');
+// BTC keeps state/demo/ (the dashboard and history started there); the other coins use state/demo/<coin>/.
+const dirOf = (coin) => (coin === 'BTC' ? ROOT : path.join(ROOT, coin.toLowerCase()));
+const DIR = dirOf(COIN);
+// One balance for all coins (account, daily summary); everything else is per coin.
+const SHARED = ['account', 'summary'];
+const OWN = ['position', 'trades', 'closing', 'signal', 'seenOrderIds', 'commandsDone', 'meta'];
+const FILES = [...SHARED, ...OWN];
 if (Object.keys(config.SETTINGS_APPLIED).length) console.log('settings.json:', JSON.stringify(config.SETTINGS_APPLIED));
 for (const e of config.SETTINGS_ERRORS) console.log('settings.json ignored —', e);
 
 /* ---------------- persistence ---------------- */
 
-function readJson(name, fallback) {
-  try { return JSON.parse(fs.readFileSync(path.join(DIR, name + '.json'), 'utf8')); } catch (e) { return fallback; }
+const homeOf = (name) => (SHARED.includes(name) ? ROOT : DIR);
+function readJson(name, fallback, dir = homeOf(name)) {
+  try { return JSON.parse(fs.readFileSync(path.join(dir, name + '.json'), 'utf8')); } catch (e) { return fallback; }
 }
 function writeJson(name, data) {
-  fs.mkdirSync(DIR, { recursive: true });
-  fs.writeFileSync(path.join(DIR, name + '.json'), JSON.stringify(data, null, 2) + '\n');
+  const dir = homeOf(name);
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, name + '.json'), JSON.stringify(data, null, 2) + '\n');
 }
 function freshAccount() {
   return { balance: P.STARTING_BALANCE, startingBalance: P.STARTING_BALANCE, fundingSince: Date.now(), funding: { total: 0 }, startedAt: Date.now() };
 }
+// The other coins' last state, read-only: their trades count toward the
+// shared daily loss limit, and their positions / signals go in the pushes.
+function loadPeers() {
+  const out = {};
+  for (const c of COINS) {
+    if (c === COIN) continue;
+    const d = dirOf(c);
+    out[c] = { position: readJson('position', null, d), trades: readJson('trades', [], d), signal: readJson('signal', null, d) };
+  }
+  return out;
+}
 function loadState() {
   return {
+    coin: COIN,
+    peers: loadPeers(),
     account: readJson('account', null) || freshAccount(),
     position: readJson('position', null),
     trades: readJson('trades', []),
@@ -89,7 +115,10 @@ function saveState(st, { fullRun = false } = {}) {
   st.account.settingsErrors = config.SETTINGS_ERRORS;
   st.account.mode = MODE;
   st.account.exchange = config.EXCHANGE;
-  st.account.instrument = config.EXCHANGE === 'okx' ? config.OKX_INSTRUMENT : 'BTCUSDT';
+  const inst = config.EXCHANGE === 'okx' ? config.OKX_INSTRUMENT : config.SYMBOL;
+  if (COIN === 'BTC') st.account.instrument = inst; // the dashboard's header
+  st.account.instruments = { ...(st.account.instruments || {}), [COIN]: inst };
+  st.account.coins = COINS;
   st.account.updatedAt = Date.now();
   if (fullRun) st.account.lastRunAt = Date.now(); // the watchdog checks full runs, not syncs
   for (const k of FILES) writeJson(k, st[k]);
@@ -136,7 +165,7 @@ async function runCommands(client, st, events) {
       events.push(...evs);
       const failed = evs.filter(e => e.type === 'error');
       if (failed.length) {
-        await notify.push([{ title: `BTC ${c.action} failed — retrying`, message: failed.map(e => e.reason).join('\n'), tags: ['warning'] }]);
+        await notify.push([{ title: `${COIN} ${c.action} failed — retrying`, message: failed.map(e => e.reason).join('\n'), tags: ['warning'] }]);
         continue; // retried next sync
       }
       if (c.action === 'reset') {
@@ -144,13 +173,13 @@ async function runCommands(client, st, events) {
         st.position = null; st.closing = []; st.summary = null; st.meta = {};
         if (c.clearHistory) st.trades = [];
         await notify.push([{
-          title: `BTC bot reset to ${P.STARTING_BALANCE} USDT`,
+          title: `${COIN} reset (balance back to ${P.STARTING_BALANCE} USDT)`,
           message: `Position closed, tracking restarted${c.clearHistory ? ', trade history cleared' : ''}. Trading continues from the next 4H close.`,
           tags: ['arrows_counterclockwise'],
         }]);
       } else {
         await notify.push([{
-          title: 'BTC position closed',
+          title: `${COIN} position closed`,
           message: `${evs.some(e => e.type === 'info') ? 'Closed at market' : 'Nothing was open'}; orders cancelled. The bot keeps running and can enter again on the next breakout.`,
           tags: ['octagonal_sign'],
         }]);
@@ -204,10 +233,11 @@ async function run() {
       return [k.t, k.o, k.h, k.l, k.c, s ? r(s.upper) : null, s ? r(s.exitLower) : null, s && s.score != null ? s.score : null];
     }),
   };
-  const daily = summary.due(st);
+  // Combined daily / status pushes come from the lead coin only (it runs last, so the others' state is fresh).
+  const daily = LEAD ? summary.due(st) : null;
   // Status push once per due hour, however many runs that hour has.
   const hour = Math.floor(now / 3600000);
-  const status = !daily && config.NOTIFY.HOURLY_STATUS && summary.statusDue(now) && st.meta.lastStatusHour !== hour;
+  const status = LEAD && !daily && config.NOTIFY.HOURLY_STATUS && summary.statusDue(now) && st.meta.lastStatusHour !== hour;
   if (status) st.meta = { ...st.meta, lastStatusHour: hour };
   saveState(st, { fullRun: true });
   printSummary(events, st);
@@ -266,12 +296,12 @@ function reset() {
 
 function printSummary(events, st) {
   const quote = config.EXCHANGE !== 'okx' ? 'USDT' : require('./okx').isSpot(config.OKX_INSTRUMENT) ? config.OKX_INSTRUMENT.split('-')[1]
-    : /^BTC-USD_/.test(config.OKX_INSTRUMENT) ? 'USDC' : 'USDT';
-  console.log(`\n=== BTCTradeBot [${config.EXCHANGE} ${MODE}${config.EXCHANGE === 'okx' ? ' ' + config.OKX_INSTRUMENT : ''}] (${config.STRATEGY}, ${P.STARTING_BALANCE} ${quote}, ${P.RISK_PCT}% risk, ${config.DIRECTION === 'both' ? 'long+short' : 'long-only'}) @ ${new Date().toISOString()} ===\n`);
+    : /-USD_/.test(config.OKX_INSTRUMENT) ? 'USDC' : 'USDT';
+  console.log(`\n=== BTCTradeBot ${COIN} [${config.EXCHANGE} ${MODE}${config.EXCHANGE === 'okx' ? ' ' + config.OKX_INSTRUMENT : ''}] (${config.STRATEGY}, ${P.STARTING_BALANCE} ${quote}, ${P.RISK_PCT}% risk, ${config.DIRECTION === 'both' ? 'long+short' : 'long-only'}) @ ${new Date().toISOString()} ===\n`);
   for (const ev of events) {
     if (ev.type === 'enter') {
       const why = ev.breakout != null ? `breakout ${px(ev.breakout)}` : `ATLAS ${ev.flipFrom} → ${ev.score}`;
-      console.log(`ENTER ${ev.bias === 1 ? 'LONG' : 'SHORT'} ${ev.qty} BTC @ ${px(ev.entry)} | ${why} | SL ${px(ev.stop)} | value $${fmt(ev.notional)} risk $${fmt(ev.riskAmt)}`);
+      console.log(`ENTER ${ev.bias === 1 ? 'LONG' : 'SHORT'} ${ev.qty} ${COIN} @ ${px(ev.entry)} | ${why} | SL ${px(ev.stop)} | value $${fmt(ev.notional)} risk $${fmt(ev.riskAmt)}`);
     } else if (ev.type === 'exit') {
       console.log(`EXIT — ${ev.reason} | pnl ${money(ev.pnl)}${ev.price ? ' @ ' + px(ev.price) : ''}`);
     } else {
@@ -283,7 +313,7 @@ function printSummary(events, st) {
   else if (s) console.log(`\n4H close ${px(s.close)} · breakout above ${px(s.upper)}${config.DIRECTION === 'both' ? ` / below ${px(s.lower)}` : ''} · ATR ${px(s.atr)}${s.wait ? ' · ' + s.wait : ''}`);
   const p = st.position;
   console.log(`balance $${fmt(st.account.balance)} (started $${fmt(st.account.startingBalance)})` +
-    (p ? ` · ${p.bias === 1 ? 'long' : 'short'} ${p.qty} BTC @ ${px(p.entry)}, stop ${px(p.stop)}` : ' · flat'));
+    (p ? ` · ${p.bias === 1 ? 'long' : 'short'} ${p.qty} ${COIN} @ ${px(p.entry)}, stop ${px(p.stop)}` : ' · flat'));
 }
 function fmt(x) { return (Math.round(x * 100) / 100).toLocaleString('en-US'); }
 function px(x) { return (+x).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }

@@ -3,7 +3,11 @@
 #   scripts/actions-run.sh run     full run (exit / trail / enter), then upload state/demo/
 #   scripts/actions-run.sh sync    sync the position and fills only, then upload
 #   scripts/actions-run.sh check   read-only OKX check (reachability, keys, account mode)
-#   scripts/actions-run.sh testtrade   open + close the smallest position (scripts/okx-testtrade.js)
+#   scripts/actions-run.sh testtrade   open + close the smallest position (scripts/okx-testtrade.js; COIN=ETH for another coin)
+# A run or sync goes through every coin in config.js COINS, one `node src/run.js`
+# process each (COIN=<coin>), BTC's instrument from OKX_INSTRUMENT, the others
+# from OKX_INSTRUMENT_<COIN> or <COIN>-USD_UM_XPERP-310328. One coin failing
+# doesn't stop the others; the exit status is non-zero if any failed.
 # Keys come from the repository's Actions secrets (OKX_API_KEY,
 # OKX_API_SECRET, OKX_API_PASSPHRASE). Until they're set, every run only does
 # the check, so nothing fails while you're still setting up.
@@ -17,7 +21,18 @@ if [ "$MODE" = "check" ]; then
   node scripts/okx-check.js
   exit $?
 fi
+BTC_INSTRUMENT="${OKX_INSTRUMENT:-BTC-USD_UM_XPERP-310328}"
+inst_for() {
+  local coin="$1" var="OKX_INSTRUMENT_$1"
+  if [ -n "${!var:-}" ]; then echo "${!var}"
+  elif [ "$coin" = "BTC" ]; then echo "$BTC_INSTRUMENT"
+  else echo "$coin-USD_UM_XPERP-310328"; fi
+}
+
 if [ "$MODE" = "testtrade" ]; then
+  export COIN="${COIN:-BTC}"
+  # An explicit instrument (workflow input) wins; otherwise this coin's own.
+  [ -n "${TESTTRADE_INSTRUMENT:-}" ] && export OKX_INSTRUMENT="$TESTTRADE_INSTRUMENT" || export OKX_INSTRUMENT="$(inst_for "$COIN")"
   node scripts/okx-testtrade.js
   exit $?
 fi
@@ -28,10 +43,17 @@ if [ -z "${OKX_API_KEY:-}" ] || [ -z "${OKX_API_SECRET:-}" ] || [ -z "${OKX_API_
 fi
 
 LOG="${RUNNER_TEMP:-/tmp}/btcbot-run.log"
+: > "$LOG"
 ARGS=()
 [ "$MODE" = "sync" ] && ARGS=(--sync)
-node src/run.js ${ARGS[@]+"${ARGS[@]}"} 2>&1 | tee "$LOG"
-STATUS=${PIPESTATUS[0]}
+STATUS=0
+for COIN in $(node -p "require('./config').COINS.join(' ')"); do
+  echo "::group::$COIN"
+  COIN="$COIN" OKX_INSTRUMENT="$(inst_for "$COIN")" node src/run.js ${ARGS[@]+"${ARGS[@]}"} 2>&1 | tee -a "$LOG"
+  S=${PIPESTATUS[0]}
+  echo "::endgroup::"
+  if [ "$S" != 0 ]; then echo "::error::$COIN run failed (exit $S)"; STATUS=$S; fi
+done
 
 # Phone alert when runs start failing (repeated every 6h) and when they recover.
 node scripts/actions-alert.js "$STATUS" "$LOG" || true

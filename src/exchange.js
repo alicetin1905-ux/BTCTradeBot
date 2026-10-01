@@ -13,8 +13,8 @@
 //        attached in the same order
 //
 // The stop lives ON the exchange, so it keeps working if this machine goes
-// down between runs. Only BTCUSDT is ever read, counted or touched: other
-// positions on the same account are left alone.
+// down between runs. Only this coin's symbol is ever read, counted or touched:
+// other positions on the same account are left alone.
 'use strict';
 
 const config = require('../config');
@@ -173,7 +173,9 @@ async function manage({ client, st, live, sig, events, now }) {
 
 function dailyLossHit(st, now) {
   const dayStart = Math.floor(now / DAY_MS) * DAY_MS;
-  const today = st.trades.filter(t => t.closedAt >= dayStart).reduce((s, t) => s + t.pnl, 0);
+  // The daily limit is for the whole account: the other coins' trades count too (st.peers, read-only).
+  const all = st.trades.concat(...Object.values(st.peers || {}).map(p => p.trades || []));
+  const today = all.filter(t => t.closedAt >= dayStart).reduce((s, t) => s + t.pnl, 0);
   const startOfDay = st.account.balance - today;
   return today < 0 && -today >= startOfDay * config.EXECUTION.DAILY_LOSS_LIMIT_PCT / 100;
 }
@@ -183,7 +185,7 @@ function dailyLossHit(st, now) {
 function entryBlock(st, s, now, { halt = false, live = null } = {}) {
   if (!s) return 'not enough candle history yet';
   if (st.position) return 'a position is open';
-  if (live) return 'a BTCUSDT position the bot didn\'t open is on the account — left alone';
+  if (live) return `a ${SYMBOL} position the bot didn't open is on the account — left alone`;
   if (s.blocked) return `ATLAS flip, but the 4H close is more than ${config.TREND_BAND_PCT}% from its 200-candle average — skipped`;
   if (!s.enter) return `no ${config.STRATEGY === 'atlas-flip' ? 'ATLAS flip' : 'breakout'} on the last 4H close`;
   if (!signal.allowed(s.enter, config.DIRECTION)) return 'short signal, but the bot trades long-only (DIRECTION)';
@@ -214,7 +216,7 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
   const mark = await client.getMarkPrice(SYMBOL);
   const qty = fixStep(floorStep(notional / mark, inst.qtyStep), inst.qtyStep);
   if (qty < inst.minOrderQty || qty * mark < (inst.minNotional || 0)) {
-    events.push({ type: 'hold', reason: `size ${qty} BTC is below ${client.label || 'the exchange'}'s minimum order` });
+    events.push({ type: 'hold', reason: `size ${qty} ${config.COIN} is below ${client.label || 'the exchange'}'s minimum order` });
     return;
   }
   const stopLoss = stopRound(mark * (1 - bias * stopDist), inst.tickSize, bias);
@@ -301,7 +303,7 @@ async function closeAll({ client, st, events, now = Date.now() }) {
     await client.cancelAll(SYMBOL);
     if (!live) return;
     const id = await client.closeMarket({ symbol: SYMBOL, bias: live.bias, qty: live.size });
-    events.push({ type: 'info', reason: `closed ${live.size} BTC at market` });
+    events.push({ type: 'info', reason: `closed ${live.size} ${config.COIN} at market` });
     const pos = st.position;
     if (pos) {
       pos.orders = { ...pos.orders, close: id };

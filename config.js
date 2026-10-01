@@ -2,9 +2,16 @@
 // control/settings.json can override the adjustable ones (src/settings.js)
 // without touching this file — these are the defaults.
 const config = module.exports = {
-  // The only coin this bot trades (USDT perpetual: BTCUSDT on Bybit,
-  // BTC-USDT-SWAP on OKX).
-  SYMBOL: 'BTCUSDT',
+  // The coins it trades, each on its own USD-settled future with its own
+  // position, stop and state (BTC in state/demo/, the others in
+  // state/demo/<coin>/), all sharing one balance. COINS is the run order:
+  // scripts/actions-run.sh runs `COIN=<coin> node src/run.js` for each, and
+  // the last one also sends the combined daily / status pushes.
+  COINS: ['ETH', 'BTC'],
+  // The coin this process handles (COIN env var, default BTC) and its symbol
+  // (USDT perpetual naming: BTCUSDT on Bybit, BTC-USDT-SWAP on OKX).
+  COIN: (process.env.COIN || 'BTC').trim().toUpperCase(),
+  get SYMBOL() { return this.COIN + 'USDT'; },
 
   // Where it trades, always in demo mode: 'okx' (OKX Demo Trading) or
   // 'bybit' (Bybit Demo Trading). EXCHANGE in .env overrides this; the keys
@@ -15,7 +22,7 @@ const config = module.exports = {
   // 'BTC-USD_UM_XPERP-310328' (perpetual-style, runs to 2031, max 10x); or a
   // spot pair such as 'BTC-USDC' (long-only, unleveraged). OKX_INSTRUMENT in
   // .env (or the GitHub workflow) overrides this.
-  OKX_INSTRUMENT: 'BTC-USDT-SWAP',
+  OKX_INSTRUMENT: `${(process.env.COIN || 'BTC').trim().toUpperCase()}-USDT-SWAP`,
 
   // Signal timeframe: closed 4H candles (UTC-aligned: 00/04/08/12/16/20).
   // backtest/RESEARCH.md: 1D breakouts were much weaker on BTC.
@@ -74,7 +81,7 @@ const config = module.exports = {
   // Money rules.
   PORTFOLIO: {
     STARTING_BALANCE: 2000, // USDT — the bot's allocation; it trades like a 2000 USDT account
-    RISK_PCT: 2,            // loss at the initial stop per trade, % of the balance
+    RISK_PCT: 1,            // loss at the initial stop per trade, % of the balance (per coin; backtest: BTC+ETH at 1% each = 183 trades/yr, +436%, worst drop 22%)
     MAX_POSITION_X: 2,      // position value at most this many x the balance (caps size on tight stops)
     LEVERAGE: 10,           // exchange leverage (cross margin); margin = position value / leverage.
                             // Sizing is by risk, so leverage changes the margin tied up, not the loss at the stop.

@@ -34,7 +34,7 @@ async function main() {
   console.log(`Test trade on ${instrument} (${client.spot ? 'spot' : `${client.marginMode} margin, ${lev}x`})`);
 
   if ((await client.getPositions())[S]) {
-    console.log('✗ A BTC position is already open on this instrument — not testing on top of it.');
+    console.log(`✗ A ${S} position is already open on this instrument — not testing on top of it.`);
     return 1;
   }
   const inst = await client.getInstrument(S);
@@ -63,13 +63,13 @@ async function testSide(client, inst, S, bias, lev, holdSec) {
 
     const ordId = await client.openMarket({ symbol: S, bias, qty, stopLoss: stop1 });
     opened = true;
-    console.log(`✓ 2. ${bias === 1 ? 'bought' : 'sold short'} ${qty} BTC at market (order ${ordId}), stop attached at ${px(stop1)} (mark was ${px(mark)})`);
+    console.log(`✓ 2. ${bias === 1 ? 'bought' : 'sold short'} ${qty} ${config.COIN} at market (order ${ordId}), stop attached at ${px(stop1)} (mark was ${px(mark)})`);
 
     let live = null;
     for (let i = 0; i < 10 && !(live && live.stopLoss); i++) { live = (await client.getPositions())[S]; if (!(live && live.stopLoss)) await sleep(500); }
     if (!live) throw new Error('no position showed up after the order');
     const sideOk = live.bias === bias;
-    console.log(`${live.stopLoss && sideOk ? '✓' : '✗'} 3. OKX shows: ${live.bias === 1 ? 'long' : 'short'} ${live.size} BTC @ ${px(live.avgPrice)}, stop ${live.stopLoss ? px(live.stopLoss) : 'MISSING'}`);
+    console.log(`${live.stopLoss && sideOk ? '✓' : '✗'} 3. OKX shows: ${live.bias === 1 ? 'long' : 'short'} ${live.size} ${config.COIN} @ ${px(live.avgPrice)}, stop ${live.stopLoss ? px(live.stopLoss) : 'MISSING'}`);
     if (!live.stopLoss || !sideOk) ok = false;
 
     await client.setStopLoss(S, stop2);
@@ -92,7 +92,7 @@ async function testSide(client, inst, S, bias, lev, holdSec) {
       await client.cancelAll(S);
       if (live) {
         const id = await client.closeMarket({ symbol: S, bias: live.bias, qty: live.size });
-        console.log(`✓ 5. stop cancelled, closed ${live.size} BTC at market (order ${id})`);
+        console.log(`✓ 5. stop cancelled, closed ${live.size} ${config.COIN} at market (order ${id})`);
       } else if (opened) {
         console.log('  5. position already gone (stop hit?) — orders cancelled');
       }

@@ -1,6 +1,7 @@
 name: BTC bot
 
-# Runs the bot on GitHub's servers — no Mac needed (scripts/actions-run.sh).
+# Runs the bot on GitHub's servers — no Mac needed (scripts/actions-run.sh),
+# for every coin in config.js COINS (BTC and ETH).
 #   :03 and :33  full run: exits, trailing stop, new entries after a 4H close
 #   :18 and :48  sync: books fills / stop-outs for the dashboard
 # Two full runs an hour so a late or skipped scheduled start (GitHub delays
@@ -26,9 +27,14 @@ on:
         options: [check, run, sync, testtrade]
         default: check
       instrument:
-        description: 'testtrade / check only: another OKX instrument to try (e.g. BTC-USDC); empty = the bot''s'
+        description: 'testtrade / check only: another OKX instrument to try (e.g. BTC-USDC); empty = the coin''s own'
         type: string
         default: ''
+      coin:
+        description: 'testtrade only: which coin (BTC or ETH)'
+        type: choice
+        options: [BTC, ETH]
+        default: BTC
 
 permissions:
   contents: write
@@ -60,6 +66,8 @@ jobs:
           # EEA account: no USDT, no perpetual swaps. The USD-settled BTC
           # future (perpetual-style, to 2031), margined in USDC, max 10x.
           OKX_INSTRUMENT: ${{ vars.OKX_INSTRUMENT || 'BTC-USD_UM_XPERP-310328' }}
+          # ETH's equivalent (default ETH-USD_UM_XPERP-310328); the coins traded are config.js COINS.
+          OKX_INSTRUMENT_ETH: ${{ vars.OKX_INSTRUMENT_ETH }}
           # Isolated margin, as set in the OKX app (each position's margin kept apart).
           OKX_MARGIN_MODE: ${{ vars.OKX_MARGIN_MODE || 'isolated' }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
@@ -69,5 +77,9 @@ jobs:
           elif [ "${{ github.event.schedule }}" = "18,48 * * * *" ]; then MODE=sync;
           else MODE=run; fi
           echo "mode: $MODE"
-          if [ -n "${{ inputs.instrument }}" ] && { [ "$MODE" = testtrade ] || [ "$MODE" = check ]; }; then export OKX_INSTRUMENT="${{ inputs.instrument }}"; fi
+          if [ -n "${{ inputs.instrument }}" ] && [ "$MODE" = check ]; then export OKX_INSTRUMENT="${{ inputs.instrument }}"; fi
+          if [ "$MODE" = testtrade ]; then
+            export COIN="${{ inputs.coin }}"
+            [ -n "${{ inputs.instrument }}" ] && export TESTTRADE_INSTRUMENT="${{ inputs.instrument }}"
+          fi
           bash scripts/actions-run.sh "$MODE"
