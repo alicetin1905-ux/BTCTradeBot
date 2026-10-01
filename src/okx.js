@@ -111,6 +111,11 @@ function diagnostics(request) {
       const rows = await request('GET', '/api/v5/account/instruments', { instType });
       return rows.filter(r => r.instId.startsWith(coin + '-')).map(r => `${r.instId}${r.state && r.state !== 'live' ? ' (' + r.state + ')' : ''}`);
     },
+    // Every perpetual-style (XPERP) future this account may trade.
+    async xperp() {
+      const rows = await request('GET', '/api/v5/account/instruments', { instType: 'FUTURES' });
+      return rows.filter(r => /XPERP/.test(r.instId)).map(r => r.instId);
+    },
     async tradableBtc(instType = 'SWAP') { return this.tradable('BTC', instType); },
 
     // Read-only "could I trade this?": OKX's max order size, or its refusal.

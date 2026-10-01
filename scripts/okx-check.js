@@ -77,6 +77,7 @@ async function main() {
     for (const t of ['SWAP', 'FUTURES', 'SPOT']) {
       try { console.log(`  BTC ${t} instruments this account can trade: ${(await client.tradableBtc(t)).join(', ') || 'none'}`); } catch (e) { console.log(`  (${t} list: ${e.message})`); }
     }
+    try { console.log(`  all XPERP futures this account can trade: ${(await client.xperp()).join(', ') || 'none'}`); } catch (e) { console.log(`  (XPERP list: ${e.message})`); }
     for (const coin of ['ETH', 'SOL']) {
       for (const t of ['FUTURES', 'SWAP']) {
         try {
