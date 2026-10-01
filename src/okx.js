@@ -147,6 +147,12 @@ function createClient({ apiKey, apiSecret, passphrase, base = DEFAULT_BASE, fetc
       return { acctLv: c.acctLv, posMode: c.posMode };
     },
 
+    // BTC perpetuals this account may trade (account-level instrument list).
+    async tradableBtcSwaps() {
+      const rows = await request('GET', '/api/v5/account/instruments', { instType: 'SWAP' });
+      return rows.filter(r => /^BTC-/.test(r.instId)).map(r => `${r.instId}${r.state && r.state !== 'live' ? ' (' + r.state + ')' : ''}`);
+    },
+
     // Where the coins are, for scripts/okx-check.js: the trading account's
     // currencies (USD value) and the funding account's USDT.
     async holdings() {

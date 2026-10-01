@@ -70,6 +70,7 @@ async function main() {
     const h = await client.holdings();
     console.log(`  trading account (≈ $${h.totalUsd.toFixed(0)}): ${h.trading.slice(0, 6).map(c => `${c.ccy} ${+c.eq.toFixed(4)}`).join(', ') || 'empty'}`);
     if (h.fundingUsdt != null) console.log(`  funding account USDT: ${h.fundingUsdt.toFixed(2)}`);
+    try { console.log(`  BTC perpetuals this account can trade: ${(await client.tradableBtcSwaps()).join(', ') || 'none'}`); } catch (e) { console.log(`  (instrument list: ${e.message})`); }
     console.log(`  account mode: ${MODES[a.acctLv] || a.acctLv} · position mode: ${a.posMode === 'long_short_mode' ? 'long/short' : 'net (one-way)'}`);
     if (a.acctLv === '2' && w.equity < 100) {
       console.log('✗ No USDT in the trading account — the bot trades BTC-USDT perpetuals, which need USDT as margin in Futures mode.\n' +
