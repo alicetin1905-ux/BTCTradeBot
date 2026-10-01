@@ -9,7 +9,7 @@
 
 const config = require('../config');
 
-function px(x) { return (+x).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
+const px = (x) => require('./format').price(x, 1);
 function money(x) { return `${x < 0 ? '-' : '+'}$${Math.abs(x).toFixed(2)}`; }
 
 // Turns run events into ntfy messages. Holds, info lines and the "P&L record

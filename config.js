@@ -7,7 +7,7 @@ const config = module.exports = {
   // state/demo/<coin>/), all sharing one balance. COINS is the run order:
   // scripts/actions-run.sh runs `COIN=<coin> node src/run.js` for each, and
   // the last one also sends the combined daily / status pushes.
-  COINS: ['ETH', 'BTC'],
+  COINS: ['NEAR', 'ETH', 'BTC'],
   // The coin this process handles (COIN env var, default BTC) and its symbol
   // (USDT perpetual naming: BTCUSDT on Bybit, BTC-USDT-SWAP on OKX).
   COIN: (process.env.COIN || 'BTC').trim().toUpperCase(),
@@ -87,7 +87,7 @@ const config = module.exports = {
   // Money rules.
   PORTFOLIO: {
     STARTING_BALANCE: 2000, // USDT — the bot's allocation; it trades like a 2000 USDT account
-    RISK_PCT: 2,            // loss at the initial stop per trade, % of the balance, per coin. Backtest BTC+ETH (graded, ±10/8h): 1% = +629%, 21% worst drop; 2% = +3,086%, 38%; 3% = +6,492%, 50%
+    RISK_PCT: 1.5,          // loss at the initial stop per trade, % of the balance, per coin. Backtest BTC+ETH+NEAR (graded, ±10/8h, ±90): 1% = +1,095%, 23% worst drop; 1.5% = +3,052%, 33%; 2% = +7,117%, 42%
     MAX_POSITION_X: 2,      // position value at most this many x the balance (caps size on tight stops)
     LEVERAGE: 10,           // exchange leverage (cross margin); margin = position value / leverage.
                             // Sizing is by risk, so leverage changes the margin tied up, not the loss at the stop.

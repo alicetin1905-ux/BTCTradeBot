@@ -317,7 +317,7 @@ async function closeAll({ client, st, events, now = Date.now() }) {
   }
 }
 
-function px(x) { return (+x).toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }); }
+const px = (x) => require('./format').price(x, 1);
 
 function setReadbackMs(ms) { ENTRY_READBACK_MS = ms; } // tests
 
