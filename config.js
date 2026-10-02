@@ -7,7 +7,7 @@ const config = module.exports = {
   // state/demo/<coin>/), all sharing one balance. COINS is the run order:
   // scripts/actions-run.sh runs `COIN=<coin> node src/run.js` for each, and
   // the last one also sends the combined daily / status pushes.
-  COINS: ['ETH', 'BTC'], // UNI was dropped on 2026-10-02 (too volatile for the fixed stop); its code path stays
+  COINS: ['HYPE', 'ETH', 'BTC'], // UNI was dropped on 2026-10-02 (too volatile for the fixed stop); its code path stays
   // Where each coin trades. BTC and ETH: the USD-settled futures (long + short,
   // 10x). NEAR: its futures are refused on the EEA site (OKX 51155, local
   // compliance), so it trades the SPOT pair NEAR-USDC: long only, no leverage,
@@ -105,7 +105,8 @@ const config = module.exports = {
   // A coin's own fixed-mode numbers (merged over FIXED for that coin). ETH: 667 margin = a 6,667 USDT position, so
   // the same -$100 / +$200 sit 1.5% / 3% away from the entry (BTC: 750 margin, 1.33% / 2.67%). UNI (4H candles ~3%)
   // uses FIXED until it gets its own.
-  COIN_FIXED: { ETH: { MARGIN: 667 } },
+  // HYPE (4H candles ~2%, 7-day range ~11%) gets the same as ETH.
+  COIN_FIXED: { ETH: { MARGIN: 667 }, HYPE: { MARGIN: 667 } },
 
   // Stops ('atr' mode), in ATRs of the 4H candles. Both live on the exchange as the position's
   // stop-loss, so they work while the machine running the bot is off.

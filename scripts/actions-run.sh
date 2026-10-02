@@ -29,6 +29,7 @@ inst_for() {
   # NEAR trades the spot pair: its futures are refused on the EEA site (OKX 51155).
   elif [ "$coin" = "NEAR" ]; then echo "NEAR-USDC"
   elif [ "$coin" = "UNI" ]; then echo "UNI-USD_UM_XPERP-310718"
+  elif [ "$coin" = "HYPE" ]; then echo "HYPE-USD_UM_XPERP-310801"
   else echo "$coin-USD_UM_XPERP-310328"; fi
 }
 
