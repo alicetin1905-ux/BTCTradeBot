@@ -78,13 +78,13 @@ async function main() {
       try { console.log(`  BTC ${t} instruments this account can trade: ${(await client.tradableBtc(t)).join(', ') || 'none'}`); } catch (e) { console.log(`  (${t} list: ${e.message})`); }
     }
     try { console.log(`  all XPERP futures this account can trade: ${(await client.xperp()).join(', ') || 'none'}`); } catch (e) { console.log(`  (XPERP list: ${e.message})`); }
-    for (const coin of ['ETH', 'SOL']) {
+    for (const coin of ['ETH', 'SOL', 'NEAR']) {
       for (const t of ['FUTURES', 'SWAP']) {
         try {
           const list = await client.tradable(coin, t);
           console.log(`  ${coin} ${t} instruments this account can trade: ${list.join(', ') || 'none'}`);
           for (const id of list.map(x => x.split(' ')[0]).filter(x => /XPERP/.test(x))) {
-            for (const tdMode of ['isolated']) {
+            for (const tdMode of ['isolated', 'cross']) {
               try { const m = await client.maxSize(id, tdMode); console.log(`  ${id} (${tdMode}): max buy ${m.buy}, max sell ${m.sell}`); } catch (e) { console.log(`  ${id} (${tdMode}): ${e.message.replace(/^.*-> /, '')}`); }
             }
           }
