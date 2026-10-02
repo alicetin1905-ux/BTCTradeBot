@@ -216,19 +216,21 @@ async function runCommands(client, st, events) {
               if (add * mark / lev > wallet.available * 0.95) throw new Error(`not enough free margin to add ${add} (${(add * mark / lev).toFixed(0)} needed, ${wallet.available.toFixed(0)} free)`);
               await client.setLeverage(S, lev);
               await client.addToPosition({ symbol: S, bias: pos.bias, qty: add });
-              st.meta.scaled[c.id] = { added: add, at: Date.now() };
+              st.meta.scaled[c.id] = { added: add, from: live0.size, at: Date.now() };
               events.push({ type: 'info', reason: `${COIN} position topped up by ${add} (${live0.size} → ${+(live0.size + add).toFixed(8)}) to reach ${F.MARGIN} margin x ${lev}` });
             } else {
-              st.meta.scaled[c.id] = { added: 0, at: Date.now() };
+              st.meta.scaled[c.id] = { added: 0, from: live0.size, at: Date.now() };
               events.push({ type: 'info', reason: `${COIN} position is already at the fixed size` });
             }
           }
           // The exchange's position list can lag the fill: wait for the new size.
-          const target = st.meta.scaled[c.id].added;
+          const sc = st.meta.scaled[c.id];
+          // Already topped up in an earlier run (from + added is the size to wait for), or just now.
+          const wantSize = (sc.from != null ? sc.from : pos.qty) + sc.added;
           let live = null;
           for (let i = 0; i < 12; i++) {
             live = (await client.getPositions())[S];
-            if (live && live.size >= pos.qty + target - 1e-9) break;
+            if (live && live.size >= wantSize - 1e-9) break;
             await new Promise(r => setTimeout(r, 500));
           }
           if (!live) throw new Error('no position on the exchange after the top-up');

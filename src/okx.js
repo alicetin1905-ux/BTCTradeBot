@@ -344,15 +344,35 @@ function createSwapClient(opts) {
       if ((mark - stopLoss) * live.bias <= 0) throw new Error(`stop ${stopLoss} is on the wrong side of the mark price ${mark}`);
       if ((takeProfit - mark) * live.bias <= 0) throw new Error(`take-profit ${takeProfit} is on the wrong side of the mark price ${mark}`);
       const current = await stopOrders(symbol);
-      const r = await request('POST', '/api/v5/trade/order-algo', {
+      // 1. A single existing stop / pair: change it in place (OKX allows only one whole-position TP/SL order, so a
+      //    second one can't be placed beside it — error 51088).
+      if (current.length === 1) {
+        try {
+          await request('POST', '/api/v5/trade/amend-algos', {
+            instId: idOf(symbol), algoId: current[0].algoId,
+            newSlTriggerPx: String(stopLoss), newSlOrdPx: '-1', newSlTriggerPxType: 'mark',
+            newTpTriggerPx: String(takeProfit), newTpOrdPx: '-1', newTpTriggerPxType: 'mark',
+          });
+          return current[0].algoId;
+        } catch (e) { /* not amendable that way: place a new pair below */ }
+      }
+      // 2. Place the pair next to the old stop; if OKX refuses two, replace the old one (a moment without it,
+      //    and a plain stop as the fallback if the pair then fails too).
+      const place = async () => (await request('POST', '/api/v5/trade/order-algo', {
         instId: idOf(symbol), tdMode: TDM, side: live.bias === 1 ? 'sell' : 'buy', ...(await posSide(live.bias)),
         ordType: 'oco',
         slTriggerPx: String(stopLoss), slOrdPx: '-1', slTriggerPxType: 'mark',
         tpTriggerPx: String(takeProfit), tpOrdPx: '-1', tpTriggerPxType: 'mark',
         closeFraction: '1', reduceOnly: true,
-      });
+      }))[0].algoId;
+      let id;
+      try { id = await place(); } catch (e) {
+        if (String(e.code) !== '51088' || !current.length) throw e;
+        await request('POST', '/api/v5/trade/cancel-algos', current.map(o => ({ algoId: o.algoId, instId: o.instId })));
+        try { return await place(); } catch (e2) { await placeStop(symbol, live.bias, stopLoss).catch(() => {}); throw e2; }
+      }
       if (current.length) await request('POST', '/api/v5/trade/cancel-algos', current.map(o => ({ algoId: o.algoId, instId: o.instId })));
-      return r[0].algoId;
+      return id;
     },
 
     async closeMarket({ symbol, bias, qty }) {
