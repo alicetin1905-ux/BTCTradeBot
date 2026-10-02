@@ -7,7 +7,7 @@ const config = module.exports = {
   // state/demo/<coin>/), all sharing one balance. COINS is the run order:
   // scripts/actions-run.sh runs `COIN=<coin> node src/run.js` for each, and
   // the last one also sends the combined daily / status pushes.
-  COINS: ['UNI', 'ETH', 'BTC'],
+  COINS: ['ETH', 'BTC'], // UNI was dropped on 2026-10-02 (too volatile for the fixed stop); its code path stays
   // Where each coin trades. BTC and ETH: the USD-settled futures (long + short,
   // 10x). NEAR: its futures are refused on the EEA site (OKX 51155, local
   // compliance), so it trades the SPOT pair NEAR-USDC: long only, no leverage,
