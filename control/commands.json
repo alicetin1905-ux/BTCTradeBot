@@ -1,3 +1,4 @@
 [
-  { "id": "2026-10-02-btc-exits", "action": "set-exits", "coin": "BTC", "slUsdt": 100, "tpUsdt": 200 }
+  { "id": "2026-10-02-btc-exits", "action": "set-exits", "coin": "BTC", "slUsdt": 100, "tpUsdt": 200 },
+  { "id": "2026-10-02-btc-scale", "action": "scale-to-fixed", "coin": "BTC" }
 ]

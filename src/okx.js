@@ -324,6 +324,16 @@ function createSwapClient(opts) {
       }
     },
 
+    // More of the same side onto an open position: a plain market order (the position's own
+    // stop / take-profit algo covers the whole position, so nothing is attached here).
+    async addToPosition({ symbol, bias, qty }) {
+      const r = await request('POST', '/api/v5/trade/order', {
+        instId: idOf(symbol), tdMode: TDM, side: bias === 1 ? 'buy' : 'sell', ...(await posSide(bias)),
+        ordType: 'market', sz: await contracts(symbol, qty),
+      });
+      return r[0].ordId;
+    },
+
     // Puts a stop-loss AND a take-profit on an open position as one OCO algo
     // order (whole position), replacing whatever stop is there. The new pair is
     // placed first, the old stop cancelled after, so the position always has one.

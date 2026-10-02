@@ -1033,3 +1033,14 @@ test('OKX setExits: one OCO algo with stop-loss and take-profit on the whole pos
   await assert.rejects(okxClient(g).setExits('BTCUSDT', { stopLoss: 81000, takeProfit: 85000 }), /wrong side/);
   assert.ok(!g.S.calls.some(x => x.path === '/api/v5/trade/order-algo'));
 });
+
+test('OKX addToPosition: a plain same-side market order with no algo attached', async () => {
+  const f = fakeOkx();
+  await okxClient(f).addToPosition({ symbol: 'BTCUSDT', bias: 1, qty: 0.0365 });
+  const body = f.S.calls.find(x => x.path === '/api/v5/trade/order').body;
+  assert.deepEqual(body, { instId: 'BTC-USDT-SWAP', tdMode: 'cross', side: 'buy', ordType: 'market', sz: '3.65' });
+  const g = fakeOkx({ posMode: 'long_short_mode' });
+  await okxClient(g).addToPosition({ symbol: 'BTCUSDT', bias: -1, qty: 0.02 });
+  const b2 = g.S.calls.find(x => x.path === '/api/v5/trade/order').body;
+  assert.deepEqual([b2.side, b2.posSide, b2.sz, b2.attachAlgoOrds], ['sell', 'short', '2', undefined]);
+});

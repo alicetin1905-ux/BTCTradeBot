@@ -190,6 +190,68 @@ async function runCommands(client, st, events) {
       ran = true;
       continue;
     }
+    if (c.action === 'scale-to-fixed') {
+      // { "id": "...", "action": "scale-to-fixed", "coin": "BTC" }: the open position of that coin is topped up with a market order
+      // to FIXED.MARGIN x leverage of position value, then gets the fixed stop-loss / take-profit for its TOTAL size (-SL_USDT / +TP_USDT).
+      // Safe to retry: the top-up is made once (remembered in meta), the exits are redone until they stick.
+      if (c.coin && String(c.coin).toUpperCase() !== COIN) continue;
+      const pos = st.position;
+      const F = config.FIXED, lev = P.LEVERAGE, S = SYMBOL_OF(COIN);
+      if (!pos) {
+        events.push({ type: 'info', reason: `scale-to-fixed ${c.id}: no ${COIN} position is open — nothing to do` });
+      } else if (typeof client.addToPosition !== 'function' || typeof client.setExits !== 'function') {
+        events.push({ type: 'error', reason: `scale-to-fixed ${c.id}: this exchange client can't do it` });
+      } else {
+        try {
+          st.meta = st.meta || {};
+          st.meta.scaled = st.meta.scaled || {};
+          if (!st.meta.scaled[c.id]) {
+            const inst = await client.getInstrument(S), mark = await client.getMarkPrice(S);
+            const live0 = (await client.getPositions())[S];
+            if (!live0) throw new Error('no position on the exchange');
+            const want = (F.MARGIN * lev) / mark - live0.size;
+            const add = +(Math.floor(want / inst.qtyStep + 1e-6) * inst.qtyStep).toFixed(8);
+            const wallet = await client.getWallet();
+            if (add >= inst.minOrderQty) {
+              if (add * mark / lev > wallet.available * 0.95) throw new Error(`not enough free margin to add ${add} (${(add * mark / lev).toFixed(0)} needed, ${wallet.available.toFixed(0)} free)`);
+              await client.setLeverage(S, lev);
+              await client.addToPosition({ symbol: S, bias: pos.bias, qty: add });
+              st.meta.scaled[c.id] = { added: add, at: Date.now() };
+              events.push({ type: 'info', reason: `${COIN} position topped up by ${add} (${live0.size} → ${+(live0.size + add).toFixed(8)}) to reach ${F.MARGIN} margin x ${lev}` });
+            } else {
+              st.meta.scaled[c.id] = { added: 0, at: Date.now() };
+              events.push({ type: 'info', reason: `${COIN} position is already at the fixed size` });
+            }
+          }
+          // The exchange's position list can lag the fill: wait for the new size.
+          const target = st.meta.scaled[c.id].added;
+          let live = null;
+          for (let i = 0; i < 12; i++) {
+            live = (await client.getPositions())[S];
+            if (live && live.size >= pos.qty + target - 1e-9) break;
+            await new Promise(r => setTimeout(r, 500));
+          }
+          if (!live) throw new Error('no position on the exchange after the top-up');
+          const tick = pos.tickSize || 0.1;
+          const stop = exchange.stopRound(live.avgPrice - pos.bias * F.SL_USDT / live.size, tick, pos.bias);
+          const tp = +(Math.round((live.avgPrice + pos.bias * F.TP_USDT / live.size) / tick) * tick).toFixed(8);
+          await client.setExits(S, { stopLoss: stop, takeProfit: tp });
+          Object.assign(pos, {
+            qty: live.size, qtyTotal: live.size, entry: live.avgPrice, notional: live.size * live.avgPrice, margin: live.size * live.avgPrice / lev,
+            riskAmt: live.size * Math.abs(live.avgPrice - stop), stop, initialStop: stop, exchangeStop: stop, takeProfit: tp, fixed: true, trailed: false,
+          });
+          events.push({ type: 'info', reason: `${COIN} ${live.size} @ ${px(live.avgPrice)}: stop ${px(stop)} (−$${F.SL_USDT}), take-profit ${px(tp)} (+$${F.TP_USDT})` });
+          await notify.push([{ title: `${COIN} position scaled to the fixed size`, message: `${live.size} ${COIN} @ ${px(live.avgPrice)} ($${Math.round(live.size * live.avgPrice)} of position, $${Math.round(live.size * live.avgPrice / lev)} margin at ${lev}x)\nStop ${px(stop)} (−$${F.SL_USDT}) · take-profit ${px(tp)} (+$${F.TP_USDT})`, tags: ['dart'] }]);
+        } catch (err) {
+          events.push({ type: 'error', reason: `scale-to-fixed ${c.id}: ${err.message} — retrying next run` });
+          ran = true;
+          continue; // not marked done
+        }
+      }
+      st.commandsDone.push(c.id);
+      ran = true;
+      continue;
+    }
     if (c.action === 'close-all' || c.action === 'reset') {
       const evs = [];
       await exchange.closeAll({ client, st, events: evs });
