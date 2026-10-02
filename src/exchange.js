@@ -253,12 +253,12 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
     stop: stopLoss, initialStop: stopLoss, takeProfit, fixed, ext: s.close, trailed: false,
     entryCandleT: s.t, lastExitCheckT: s.t, openedAt: now, orders: { entry: entryId }, tickSize: inst.tickSize,
     notional: pos.size * entry, margin: (pos.size * entry) / P.LEVERAGE, riskAmt: pos.size * Math.abs(entry - stopLoss),
-    atrAtEntry: s.atr, breakout: bias === 1 ? s.upper : s.lower, score: s.score ?? null, flipFrom: s.flipFrom ?? null,
+    atrAtEntry: s.atr, breakout: bias === 1 ? s.upper : s.lower, score: s.score ?? null, flipFrom: s.flipFrom ?? null, jump: !!s.jump,
     markPrice: pos.markPrice || entry, unrealisedPnl: pos.unrealisedPnl || 0, exchangeStop: pos.stopLoss || stopLoss,
   };
   events.push({
     type: 'enter', bias, entry, stop: stopLoss, takeProfit, fixed, qty: pos.size, notional: pos.size * entry,
-    riskAmt: st.position.riskAmt, breakout: st.position.breakout, score: s.score ?? null, flipFrom: s.flipFrom ?? null, close: s.close,
+    riskAmt: st.position.riskAmt, breakout: st.position.breakout, score: s.score ?? null, flipFrom: s.flipFrom ?? null, jump: !!s.jump, close: s.close,
   });
 }
 

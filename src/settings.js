@@ -68,6 +68,8 @@ const FIELDS = {
   FLIP_SCORE: { at: ['FLIP_SCORE'], check: num(10, 90, { int: true }), label: 'ATLAS flip: score level (swing from -X to +X)' },
   FLIP_WINDOW: { at: ['FLIP_WINDOW'], check: num(1, 12, { int: true }), label: 'ATLAS flip: within this many 4H candles' },
   EXTREME_SCORE: { at: ['EXTREME_SCORE'], check: num(50, 100, { int: true, nullable: true }), label: 'ATLAS flip: also enter when the score closes at +/- this level (null = off)' },
+  JUMP_SCORE: { at: ['JUMP_SCORE'], check: num(5, 100, { int: true, nullable: true }), label: 'ATLAS flip: also enter when the score jumps by this much in one 4H candle (null = off)' },
+  JUMP_MIN_SCORE: { at: ['JUMP_MIN_SCORE'], check: num(0, 90, { int: true }), label: 'ATLAS flip: a jump entry needs the score to end at +/- this level or beyond' },
   TREND_BAND_PCT: { at: ['TREND_BAND_PCT'], check: num(2, 50, { nullable: true }), label: 'ATLAS flip: skip swings when the 4H close is more than this % from its 200-candle average (null = off)' },
   DIRECTION: { at: ['DIRECTION'], check: oneOf('long', 'both'), label: 'Trade direction ("long" = long-only, "both" = longs and shorts)' },
   CHANNEL_N: { at: ['CHANNEL_N'], check: num(5, 100, { int: true }), label: 'Breakout channel (4H candles)' },

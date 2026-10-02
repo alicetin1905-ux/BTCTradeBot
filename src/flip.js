@@ -8,6 +8,10 @@
 //                or lower), having been inside the level on the candle before:
 //                a strong-trend entry in the same direction (and the same
 //                reversal), also ignored outside the trend band
+//   jump         or the score jumps by JUMP_SCORE or more in ONE 4H candle while it
+//                ends at +JUMP_MIN_SCORE or more (25 -> 45 is long; a jump that ends
+//                near zero is ignored; the mirror is short): a fast build-up before it reaches
+//                the extreme level. The trend band applies to it as well
 //   trend band   a swing is ignored (no entry, no reversal) when the 4H close
 //                is more than TREND_BAND_PCT % away from its 200-candle 4H
 //                average — chasing an over-extended move, or fading a strong
@@ -79,11 +83,12 @@ function trendMa(c4, i) {
 
 // Signal entries for c4[from..] (needs `window` scored candles before `from`).
 // Returns one entry per candle (null where it can't be scored):
-//   { t, close, atr, score, flipFrom, enter, exitLong, exitShort, ma, blocked, extreme }
+//   { t, close, atr, score, flipFrom, enter, exitLong, exitShort, ma, blocked, extreme, jump }
 // flipFrom: the opposite extreme within the window that made the swing (null on an extreme entry).
 // extreme: the entry is the ±extremeScore one, not a swing.
+// jump: the entry is the one-candle score jump (jumpScore); flipFrom is the score on the candle before.
 // blocked: a swing / extreme happened but the trend band (trendBandPct, null = off) ruled it out.
-function series(c4, d1, { threshold, window, trendBandPct = null, extremeScore = null, scoreMode = config.SCORE_MODE }, from = 0) {
+function series(c4, d1, { threshold, window, trendBandPct = null, extremeScore = null, jumpScore = null, jumpMin = 0, scoreMode = config.SCORE_MODE }, from = 0) {
   const start = Math.max(221, from - window);
   const dj = { j: -1 };
   const scored = [];
@@ -101,13 +106,19 @@ function series(c4, d1, { threshold, window, trendBandPct = null, extremeScore =
       if (s.score >= extremeScore && before.score < extremeScore) { enter = 1; extreme = true; }
       else if (s.score <= -extremeScore && before.score > -extremeScore) { enter = -1; extreme = true; }
     }
+    let jump = false;
+    if (!enter && jumpScore != null && before) {
+      const d = s.score - before.score;
+      if (d >= jumpScore && s.score >= jumpMin) { enter = 1; jump = true; flipFrom = before.score; }
+      else if (d <= -jumpScore && s.score <= -jumpMin) { enter = -1; jump = true; flipFrom = before.score; }
+    }
     const ma = trendMa(c4, start + k);
     let blocked = false;
     if (enter && trendBandPct != null && ma != null && Math.abs((s.close / ma - 1) * 100) > trendBandPct) {
-      enter = 0; flipFrom = null; extreme = false; blocked = true;
+      enter = 0; flipFrom = null; extreme = false; jump = false; blocked = true;
     }
     out.push({
-      ...s, flipFrom, enter, exitLong: enter === -1, exitShort: enter === 1, ma, blocked, extreme,
+      ...s, flipFrom, enter, exitLong: enter === -1, exitShort: enter === 1, ma, blocked, extreme, jump,
       // No channel in this strategy (src/signal.js fields, for shared code).
       upper: null, lower: null, exitUpper: null, exitLower: null,
     });

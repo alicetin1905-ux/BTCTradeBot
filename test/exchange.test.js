@@ -866,7 +866,7 @@ test('ATLAS flip through the bot: an opposite swing closes the long (and reverse
     const summary = require('../src/summary');
     const m = summary.status({ account: { balance: 2000, startingBalance: 2000 }, position: null, signal: flipSig(t1, 99000, -12, null, 0) });
     assert.match(m.message, /ATLAS -12/);
-    assert.match(m.message, /swing from −10 to \+10 within 8h or a score of \+80, short on the mirror/);
+    assert.match(m.message, /swing from −10 to \+10 within 8h or a score of \+80 or a \+20 jump in one 4H candle, short on the mirror/);
   } finally { [config.DIRECTION, config.STRATEGY] = saved; }
 });
 
@@ -930,6 +930,29 @@ test('ATLAS flip extreme entry: a close at +/-EXTREME_SCORE enters once (fresh c
     assert.equal(s.enter, 0); assert.equal(s.blocked, true);
     s = run([-40, -5, 10, 30]);                        // an ordinary swing still enters as before
     assert.equal(s.enter, 1); assert.equal(s.extreme, false); assert.equal(s.flipFrom, -40);
+  } finally { atlas.analyse = real; }
+});
+
+test('ATLAS flip jump entry: +/-JUMP_SCORE in one 4H candle enters when it ends on that side of zero', () => {
+  const atlas = require('../src/atlasScore'), flip = require('../src/flip');
+  const real = atlas.analyse;
+  atlas.analyse = ({ candles }) => { const c = candles[240]; return { score: c[c.length - 2].v, atr: 1 }; };
+  try {
+    const run = (scores, closeNow = 100, jumpScore = 20) => {
+      const c4 = Array.from({ length: 260 }, (_, i) => ({ t: i * 14400000, o: 100, h: 100, l: 100, c: 100, v: 0 }));
+      scores.forEach((v, i) => { c4[260 - scores.length + i].v = v; });
+      c4[259].c = closeNow;
+      return flip.series(c4, [], { threshold: 25, window: 3, trendBandPct: 10, extremeScore: 80, jumpScore, jumpMin: 30 }, 255).find(s => s && s.t === 259 * 14400000);
+    };
+    let s = run([20, 25, 45]);                          // 25 -> 45: long
+    assert.equal(s.enter, 1); assert.equal(s.jump, true); assert.equal(s.extreme, false); assert.equal(s.flipFrom, 25); assert.equal(s.exitShort, true);
+    assert.equal(run([20, 25, 44]).enter, 0);           // +19: not enough
+    s = run([-20, -25, -45]); assert.equal(s.enter, -1); assert.equal(s.jump, true);   // short mirror
+    assert.equal(run([80, 80, 53]).enter, 0);           // -27 but still bullish: no short
+    assert.equal(run([-30, -30, -8]).enter, 0);         // +22 but still bearish: no long
+    assert.equal(run([-8, -8, 14]).enter, 0);           // +22 but ends under +30: a wobble around zero
+    assert.equal(run([20, 25, 45], 100, null).enter, 0);              // off
+    s = run([20, 25, 45], 120); assert.equal(s.enter, 0); assert.equal(s.blocked, true); assert.equal(s.jump, false);  // trend band
   } finally { atlas.analyse = real; }
 });
 

@@ -26,7 +26,9 @@ function messagesFor(events, st) {
           ? `4H close ${px(ev.close)} broke the ${config.CHANNEL_N}-candle ${ev.bias === 1 ? 'high' : 'low'} ${px(ev.breakout)}\n`
           : ev.flipFrom == null
             ? `ATLAS score reached ${ev.score > 0 ? '+' : ''}${ev.score} (extreme level ±${config.EXTREME_SCORE}, 4H close ${px(ev.close)})\n`
-            : `ATLAS score swung ${ev.flipFrom > 0 ? '+' : ''}${ev.flipFrom} → ${ev.score > 0 ? '+' : ''}${ev.score} within ${config.FLIP_WINDOW * 4}h (4H close ${px(ev.close)})\n`) +
+            : ev.jump
+              ? `ATLAS score jumped ${ev.flipFrom > 0 ? '+' : ''}${ev.flipFrom} → ${ev.score > 0 ? '+' : ''}${ev.score} in one 4H candle (jump level ${config.JUMP_SCORE}, 4H close ${px(ev.close)})\n`
+              : `ATLAS score swung ${ev.flipFrom > 0 ? '+' : ''}${ev.flipFrom} → ${ev.score > 0 ? '+' : ''}${ev.score} within ${config.FLIP_WINDOW * 4}h (4H close ${px(ev.close)})\n`) +
           (ev.takeProfit
             ? `Stop ${px(ev.stop)} · take profit ${px(ev.takeProfit)} (fixed) · ${ev.qty} ${config.COIN} ($${ev.notional.toFixed(0)}) · loss at stop $${ev.riskAmt.toFixed(0)}`
             : `Stop ${px(ev.stop)} (trails ${config.TRAIL_ATR}x ATR) · ${ev.qty} ${config.COIN} ($${ev.notional.toFixed(0)}) · loss at stop $${ev.riskAmt.toFixed(0)}`),

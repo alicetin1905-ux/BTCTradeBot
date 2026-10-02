@@ -74,6 +74,13 @@ const config = module.exports = {
   // entries and the weaker the result). 80 chosen by the owner so that a steady
   // climb to +80 (BTC 2026-10-02: 8 -> 80 in a day, no swing) is traded.
   EXTREME_SCORE: 80,
+  // Also enter when the score jumps by this much or more in ONE 4H candle and
+  // ends strong (BTC 2026-10-01: 25 -> 45 at 18-22h, then
+  // 56, 71, 75, 80 - the climb was visible 16h before the extreme level). The
+  // trend band applies. null = off. Chosen by the owner, forward-tested only.
+  JUMP_SCORE: 20,
+  // ...and the score ends at +JUMP_MIN_SCORE or more (-JUMP_MIN_SCORE or less for a short), so a wobble around zero (-8 -> +14) is not an entry.
+  JUMP_MIN_SCORE: 30,
   // Ignore a swing when the 4H close is more than this % from its 200-candle
   // 4H average (null = off). Backtest: PF 1.47 -> 1.56-1.61, better in both
   // halves and across the score/window grid; the losses were counter-trend

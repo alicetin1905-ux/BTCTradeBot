@@ -337,8 +337,8 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       '<dt>Last 4H close</dt><dd>' + esc(px(s.close)) + ' <span class="faint">' + esc(when(s.closeT)) + '</span></dd>' +
       '<dt>ATLAS score</dt><dd class="' + (s.score >= X ? 'up' : s.score <= -X ? 'dn' : '') + '" style="font-weight:700">' + esc(sgn(s.score)) + '</dd>' +
       '<dt>Last ' + recent.length + ' closes</dt><dd>' + recent.map(function (v) { return esc(sgn(v)); }).join(' → ') + '</dd>' +
-      '<dt>Long when</dt><dd>' + esc('≥ +' + X + ' after ≤ −' + X + ' within ' + K * 4 + 'h' + (set.EXTREME_SCORE ? ', or ≥ +' + set.EXTREME_SCORE : '')) + '</dd>' +
-      (both ? '<dt>Short when</dt><dd>' + esc('≤ −' + X + ' after ≥ +' + X + ' within ' + K * 4 + 'h' + (set.EXTREME_SCORE ? ', or ≤ −' + set.EXTREME_SCORE : '')) + '</dd>' : '') +
+      '<dt>Long when</dt><dd>' + esc('≥ +' + X + ' after ≤ −' + X + ' within ' + K * 4 + 'h' + (set.EXTREME_SCORE ? ', or ≥ +' + set.EXTREME_SCORE : '') + (set.JUMP_SCORE ? ', or +' + set.JUMP_SCORE + ' in one 4H candle' : '')) + '</dd>' +
+      (both ? '<dt>Short when</dt><dd>' + esc('≤ −' + X + ' after ≥ +' + X + ' within ' + K * 4 + 'h' + (set.EXTREME_SCORE ? ', or ≤ −' + set.EXTREME_SCORE : '') + (set.JUMP_SCORE ? ', or −' + set.JUMP_SCORE + ' in one 4H candle' : '')) + '</dd>' : '') +
       '<dt>ATR (14 × 4H)</dt><dd>' + esc(px(s.atr)) + ' · ' + esc((s.atr / s.close * 100).toFixed(2)) + '%</dd>' +
       '</dl>';
     html += '<div class="scorebar" title="ATLAS score, −100 to +100; marks at ±' + X + '">' +
@@ -569,6 +569,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     STRATEGY: ['Signal', function (v) { return v === 'atlas-flip' ? 'ATLAS score fast flip' : 'channel breakout'; }],
     FLIP_SCORE: ['Flip score level', function (v) { return '±' + v; }],
     FLIP_WINDOW: ['Flip window', function (v) { return v + ' × 4H (' + v * 4 + 'h)'; }],
+    JUMP_SCORE: ['Jump entry', function (v) { return v == null ? 'off' : '±' + v + ' in one 4H candle'; }],
     EXTREME_SCORE: ['Extreme entry', function (v) { return v == null ? 'off' : 'score ±' + v; }],
     TREND_BAND_PCT: ['Trend band (vs 200-candle average)', function (v) { return v == null ? 'off' : '±' + v + '%'; }],
     DIRECTION: ['Direction', function (v) { return v === 'both' ? 'long + short' : 'long-only'; }],
