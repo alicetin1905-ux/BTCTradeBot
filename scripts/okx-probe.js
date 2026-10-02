@@ -9,21 +9,31 @@
 require('../src/env').loadEnv();
 const { transport } = require('../src/okx');
 
-const INST = (process.env.INSTRUMENT || process.env.OKX_INSTRUMENT || '').trim().toUpperCase();
+// One instrument, or several separated by commas (then only the plain isolated order is tried on each).
+const INSTS = (process.env.INSTRUMENT || process.env.OKX_INSTRUMENT || '').split(',').map(x => x.trim().toUpperCase()).filter(Boolean);
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
 async function main() {
-  if (!INST) throw new Error('INSTRUMENT is not set');
-  const { request, publicGet } = transport({
+  if (!INSTS.length) throw new Error('INSTRUMENT is not set');
+  const t = transport({
     apiKey: process.env.OKX_API_KEY, apiSecret: process.env.OKX_API_SECRET, passphrase: process.env.OKX_API_PASSPHRASE, base: process.env.OKX_API_BASE,
   });
+  let ok = 0;
+  for (const inst of INSTS) {
+    try { ok += (await probe(t, inst, INSTS.length === 1)) === 0 ? 1 : 0; } catch (e) { console.log(`✗ ${inst}: ${e.message.replace(/^.*-> /, '')}`); }
+  }
+  console.log(`\n${ok} of ${INSTS.length} instruments accepted an order`);
+  return ok ? 0 : 1;
+}
+
+async function probe({ request, publicGet }, INST, full) {
   const i = (await publicGet('/api/v5/public/instruments', { instType: 'FUTURES', instId: INST }))[0];
   console.log(`${INST}: ${i ? `ctVal ${i.ctVal} ${i.ctValCcy}, lotSz ${i.lotSz}, minSz ${i.minSz}, state ${i.state}, lever ${i.lever}` : 'NOT LISTED (public)'}`);
   const mark = +(await publicGet('/api/v5/public/mark-price', { instType: 'FUTURES', instId: INST }))[0].markPx;
   console.log(`mark ${mark}`);
   let anyOk = false;
-  for (const tdMode of ['isolated', 'cross']) {
-    for (const withStop of [false, true]) {
+  for (const tdMode of full ? ['isolated', 'cross'] : ['isolated']) {
+    for (const withStop of full ? [false, true] : [false]) {
       const label = `${tdMode}, ${withStop ? 'with stop-loss attached' : 'plain market order'}`;
       const order = { instId: INST, tdMode, side: 'buy', ordType: 'market', sz: String(i ? i.minSz : 1) };
       if (tdMode === 'cross') order.ccy = 'USDC';
