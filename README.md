@@ -118,8 +118,8 @@ account with the `testtrade` workflow (coin = ETH, NEAR).
   Needs a win rate above about 35% to break even. Set `TRADE_MODE` to `atr` for
   the earlier rules (2% risk, ATR stop that trails) described below. Settings:
   `FIXED_MARGIN`, `FIXED_SL_USDT`, `FIXED_TP_USDT`; `COIN_FIXED` gives one coin its own
-  numbers (live: **ETH and HYPE 667 margin** = a 6,667 position, so −100 / +200 are 1.5% / 3%
-  away; BTC uses 750 margin, 1.33% / 2.67%). HYPE: `HYPE-USD_UM_XPERP-310801`. NEAR (spot, no leverage) was
+  numbers (live: **ETH 667 margin** = a 6,667 position, so −100 / +200 are 1.5% / 3% away;
+  **HYPE 400 margin** = 4,000, so 2.5% / 5% away; BTC 750 margin, 1.33% / 2.67%). HYPE: `HYPE-USD_UM_XPERP-310801`. NEAR (spot, no leverage) was
   taken out of `COINS` because 5,000 USDT of position doesn't fit a spot buy.
 - **Initial stop ('atr' mode):** 2 × ATR(14) from the entry (`STOP_ATR`).
 - **Trailing stop:** after every 4H close the stop moves to *best close since
