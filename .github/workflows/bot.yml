@@ -1,7 +1,7 @@
 name: BTC bot
 
 # Runs the bot on GitHub's servers — no Mac needed (scripts/actions-run.sh),
-# for every coin in config.js COINS (BTC, ETH and NEAR).
+# for every coin in config.js COINS (BTC, ETH, NEAR and UNI).
 #   :03 and :33  full run: exits, trailing stop, new entries after a 4H close
 #   :18 and :48  sync: books fills / stop-outs for the dashboard
 # Two full runs an hour so a late or skipped scheduled start (GitHub delays
@@ -33,7 +33,7 @@ on:
       coin:
         description: 'testtrade only: which coin'
         type: choice
-        options: [BTC, ETH, NEAR]
+        options: [BTC, ETH, NEAR, UNI]
         default: BTC
 
 permissions:
@@ -69,6 +69,7 @@ jobs:
           # ETH's equivalent (default ETH-USD_UM_XPERP-310328); the coins traded are config.js COINS.
           OKX_INSTRUMENT_ETH: ${{ vars.OKX_INSTRUMENT_ETH }}
           OKX_INSTRUMENT_NEAR: ${{ vars.OKX_INSTRUMENT_NEAR }}
+          OKX_INSTRUMENT_UNI: ${{ vars.OKX_INSTRUMENT_UNI }}
           # Isolated margin, as set in the OKX app (each position's margin kept apart).
           OKX_MARGIN_MODE: ${{ vars.OKX_MARGIN_MODE || 'isolated' }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}

@@ -7,7 +7,7 @@ const config = module.exports = {
   // state/demo/<coin>/), all sharing one balance. COINS is the run order:
   // scripts/actions-run.sh runs `COIN=<coin> node src/run.js` for each, and
   // the last one also sends the combined daily / status pushes.
-  COINS: ['NEAR', 'ETH', 'BTC'],
+  COINS: ['UNI', 'NEAR', 'ETH', 'BTC'],
   // Where each coin trades. BTC and ETH: the USD-settled futures (long + short,
   // 10x). NEAR: its futures are refused on the EEA site (OKX 51155, local
   // compliance), so it trades the SPOT pair NEAR-USDC: long only, no leverage,
@@ -16,7 +16,8 @@ const config = module.exports = {
   // Backtest NEAR spot: 19 trades/yr, PF 1.41, profitable every year.
   // A coin's own risk per trade (% of the balance); the others use PORTFOLIO.RISK_PCT.
   // BTC+ETH at 2% + NEAR at 1%: 139 trades/yr, +4,247%, worst drop 37% (BTC+ETH alone: 120, +3,692%, 32%).
-  COIN_RISK_PCT: { NEAR: 1 },
+  // UNI (USD-settled future, long + short) at 1%: BTC+ETH+UNI 164 trades/yr, +4,377%, worst drop 35%, PF 1.56 (UNI's edge is the weakest: PF 0.96 before 2024, 1.62 since).
+  COIN_RISK_PCT: { NEAR: 1, UNI: 1 },
   // The coin this process handles (COIN env var, default BTC) and its symbol
   // (USDT perpetual naming: BTCUSDT on Bybit, BTC-USDT-SWAP on OKX).
   COIN: (process.env.COIN || 'BTC').trim().toUpperCase(),
