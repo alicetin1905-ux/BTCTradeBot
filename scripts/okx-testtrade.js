@@ -50,8 +50,9 @@ async function main() {
 async function testSide(client, inst, S, bias, lev, holdSec) {
   const side = bias === 1 ? 'long' : 'short';
   console.log(`\n— ${side} —`);
-  const qty = inst.minOrderQty;
   const mark = await client.getMarkPrice(S);
+  // The smallest lot, except on spot where OKX also has a minimum order value (a cheap coin's lot is worth cents): about $10.
+  const qty = client.spot ? Math.max(inst.minOrderQty, +(Math.ceil(10 / mark / inst.qtyStep) * inst.qtyStep).toFixed(8)) : inst.minOrderQty;
   // Stops 2% then 1.5% away on the losing side, on the tick, away from the price.
   const lvl = (pct) => { const x = mark * (1 - bias * pct) / inst.tickSize; return +((bias === 1 ? Math.floor(x) : Math.ceil(x)) * inst.tickSize).toFixed(4); };
   const stop1 = lvl(0.02), stop2 = lvl(0.015);
