@@ -92,14 +92,16 @@ const config = module.exports = {
   DIRECTION: 'both',
 
   // How a trade is sized and exited (the entry signals above are the same):
-  //   'fixed' — every trade uses FIXED.MARGIN USDT of margin at PORTFOLIO.LEVERAGE (500 x 10x = $5000
+  //   'fixed' — every trade uses FIXED.MARGIN USDT of margin at PORTFOLIO.LEVERAGE (750 x 10x = $7500
   //             of position), a stop-loss at -FIXED.SL_USDT and a take-profit at +FIXED.TP_USDT of that
-  //             position (-$100 / +$200 = 2% / 4% away), both on the exchange as one OCO pair. No trailing,
-  //             no signal exit. A trade that loses = 5% of a 2000 balance, one that wins = +10%.
+  //             position (-$100 / +$200 = 1.33% / 2.67% away), both on the exchange as one OCO pair. No
+  //             trailing, no signal exit. A trade that loses = 5% of a 2000 balance, one that wins = +10%.
+  //             Chosen (2026-10-02) for a sideways BTC: bounces of about 2-2.7%, 4H candles about 1%.
+  //             With 2000 USDC of margin, two such trades fit at once; a third is cut to the free margin.
   //   'atr'   — the earlier rules: RISK_PCT of the balance at a 2 x ATR stop that trails 3 x ATR.
   // Spot coins (NEAR-USDC) can't be leveraged and keep the 'atr' rules.
   TRADE_MODE: 'fixed',
-  FIXED: { MARGIN: 500, SL_USDT: 100, TP_USDT: 200 },
+  FIXED: { MARGIN: 750, SL_USDT: 100, TP_USDT: 200 },
 
   // Stops ('atr' mode), in ATRs of the 4H candles. Both live on the exchange as the position's
   // stop-loss, so they work while the machine running the bot is off.

@@ -109,9 +109,9 @@ account with the `testtrade` workflow (coin = ETH, NEAR).
   history. So the live score is exactly the one the backtest used.
 - **Entry:** a market order with the stop attached, on the run right after the
   4H close (within 3 h, `ENTRY_FRESH_MIN`, so late GitHub runs don't miss it). One attempt per signal candle.
-- **Position rules (`TRADE_MODE`, live: `fixed`):** every trade uses **500 USDT of
-  margin at 10x = 5,000 USDT of position**, a **stop-loss at −100 USDT** (2% away)
-  and a **take-profit at +200 USDT** (4% away), attached to the entry order as one
+- **Position rules (`TRADE_MODE`, live: `fixed`):** every trade uses **750 USDT of
+  margin at 10x = 7,500 USDT of position**, a **stop-loss at −100 USDT** (1.33% away)
+  and a **take-profit at +200 USDT** (2.67% away), attached to the entry order as one
   OCO pair on OKX. No trailing, no signal exit: whichever is hit first closes the
   trade. A loss is 5% of a 2,000 balance, a win +10% (fees come on top, about
   5.5 USDT per round trip). The entry signals are the same flip / ±80 as below.

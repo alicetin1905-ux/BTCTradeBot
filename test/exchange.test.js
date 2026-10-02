@@ -15,6 +15,8 @@ config.STRATEGY = 'breakout';
 config.DIRECTION = 'long';
 config.PORTFOLIO.RISK_PCT = 2;
 config.TRADE_MODE = 'atr'; // these tests are about the ATR rules; fixed mode has its own tests at the end
+const FIXED_DEFAULTS = { ...config.FIXED };
+config.FIXED = { MARGIN: 500, SL_USDT: 100, TP_USDT: 200 }; // pinned: the fixed-mode tests below use this size
 config.CHANNEL_N = 20;
 config.EXIT_N = 20;
 const signal = require('../src/signal');
@@ -1056,4 +1058,23 @@ test('OKX addToPosition: a plain same-side market order with no algo attached', 
   await okxClient(g).addToPosition({ symbol: 'BTCUSDT', bias: -1, qty: 0.02 });
   const b2 = g.S.calls.find(x => x.path === '/api/v5/trade/order').body;
   assert.deepEqual([b2.side, b2.posSide, b2.sz, b2.attachAlgoOrds], ['sell', 'short', '2', undefined]);
+});
+
+test('fixed mode follows the configured margin: 750 x 10x = $7500, stop-loss -$100 (1.33%), take-profit +$200 (2.67%)', async () => {
+  config.TRADE_MODE = 'fixed'; config.FIXED = { MARGIN: 750, SL_USDT: 100, TP_USDT: 200 };
+  try {
+    const { ex, client } = fakeBybit();
+    const st = freshState();
+    const sig = { t: T0, close: 100000, atr: 1000, score: 30, flipFrom: -40, enter: 1, exitLong: false, exitShort: false, upper: null, lower: null, exitUpper: null, exitLower: null };
+    await exchange.runExchange({ client, st, sig: [sig], events: [], now: after(T0) });
+    const p = st.position, mark = ex.marks.BTCUSDT;
+    assert.ok(Math.abs(p.qty * mark - 7500) < 75, 'about $7500: ' + p.qty * mark);
+    assert.ok(Math.abs((mark - p.stop) / mark - 0.01333) < 0.0005, 'stop 1.33% away');
+    assert.ok(Math.abs((p.takeProfit - mark) / mark - 0.02667) < 0.0005, 'target 2.67% away');
+    assert.ok(Math.abs(p.qty * (mark - p.stop) - 100) < 2 && Math.abs(p.qty * (p.takeProfit - mark) - 200) < 4);
+  } finally { config.TRADE_MODE = 'atr'; config.FIXED = { MARGIN: 500, SL_USDT: 100, TP_USDT: 200 }; }
+});
+
+test('the shipped fixed-mode defaults are 750 margin, -100 stop, +200 target', () => {
+  assert.deepEqual(FIXED_DEFAULTS, { MARGIN: 750, SL_USDT: 100, TP_USDT: 200 });
 });
