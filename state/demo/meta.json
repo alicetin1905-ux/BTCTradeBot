@@ -1,4 +1,10 @@
 {
   "lastStatusHour": 497472,
-  "lastEntryCandle": 1790928000000
+  "lastEntryCandle": 1790928000000,
+  "scaled": {
+    "2026-10-02-btc-scale": {
+      "added": 0.0368,
+      "at": 1790961641782
+    }
+  }
 }
