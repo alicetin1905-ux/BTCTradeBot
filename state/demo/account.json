@@ -7,13 +7,17 @@
   },
   "startedAt": 1790814227992,
   "fundingError": null,
-  "exchangeEquity": 1990.88778998261,
+  "exchangeEquity": 1989.92951251761,
   "settings": {
     "RISK_PCT": 2,
     "COIN_RISK_PCT": {
       "NEAR": 1,
       "UNI": 1
     },
+    "TRADE_MODE": "fixed",
+    "FIXED_MARGIN": 500,
+    "FIXED_SL_USDT": 100,
+    "FIXED_TP_USDT": 200,
     "MAX_POSITION_X": 2,
     "LEVERAGE": 10,
     "DAILY_LOSS_LIMIT_PCT": 10,
@@ -38,6 +42,10 @@
       "NEAR": 1,
       "UNI": 1
     },
+    "TRADE_MODE": "fixed",
+    "FIXED_MARGIN": 500,
+    "FIXED_SL_USDT": 100,
+    "FIXED_TP_USDT": 200,
     "MAX_POSITION_X": 2,
     "LEVERAGE": 10,
     "DAILY_LOSS_LIMIT_PCT": 10,
@@ -60,8 +68,8 @@
   "mode": "demo",
   "exchange": "okx",
   "instrument": "BTC-USD_UM_XPERP-310328",
-  "updatedAt": 1790953327803,
-  "lastRunAt": 1790952439611,
+  "updatedAt": 1790954131988,
+  "lastRunAt": 1790954131988,
   "instruments": {
     "ETH": "ETH-USD_UM_XPERP-310328",
     "BTC": "BTC-USD_UM_XPERP-310328",
@@ -70,7 +78,6 @@
   },
   "coins": [
     "UNI",
-    "NEAR",
     "ETH",
     "BTC"
   ]
