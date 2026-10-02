@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Bot runs for cron on the Mac (see README / scripts/setup-mac.sh).
-#   scripts/btc-run.sh            full hourly run on the demo account (OKX or Bybit, .env EXCHANGE)
+#   scripts/btc-run.sh            full hourly run on the demo account (OKX, .env), for every coin in config.js COINS
 #   scripts/btc-run.sh sync       quick sync of the position/fills only
 # Pulls the latest code, runs the bot, and — if PUSH_STATE=1 — commits
 # state/demo/ back to GitHub for the dashboard. Logs: logs/demo.log.
@@ -32,7 +32,11 @@ trap 'rm -rf "$LOCK"' EXIT
 {
   if [ ${#ARGS[@]} -eq 0 ]; then echo "=== $(date -u +%Y-%m-%dT%H:%M:%SZ) ==="; fi
   git pull --rebase --autostash -q || echo "git pull failed — running current checkout"
-  TRADEBOT_MODE=demo node src/run.js ${ARGS[@]+"${ARGS[@]}"}
+  # .env holds the keys (OKX_API_*, OKX_API_BASE, OKX_MARGIN_MODE, NTFY_TOPIC): load it for the shell too, so the
+  # instrument defaults in scripts/lib-coins.sh see OKX_INSTRUMENT. Then every coin in config.js COINS, one process each.
+  set -a; [ -f .env ] && . ./.env; set +a
+  . scripts/lib-coins.sh
+  run_all_coins ${ARGS[@]+"${ARGS[@]}"} || echo "at least one coin failed — see above"
 
   if [ "${PUSH_STATE:-0}" = "1" ]; then
     git add state/demo/

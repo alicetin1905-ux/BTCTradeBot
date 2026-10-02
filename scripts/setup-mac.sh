@@ -2,7 +2,7 @@
 # One-time setup on the Mac that runs the BTC bot:
 #   - git identity + a GitHub token for THIS repo only, so runs can push state/demo/
 #   - first upload of state/demo/ so the dashboard fills
-#   - cron: full run hourly at :02, quick sync every 5 minutes
+#   - cron: full run every 30 min (:02 and :32), quick sync every 5 minutes (all coins in config.js)
 # Safe to run again, and safe next to TradeBot on the same Mac: it only
 # replaces its own btc-run.sh cron lines, and keeps its token in its own
 # file (~/.btctradebot-git-credentials), so TradeBot's saved token and cron
@@ -68,7 +68,7 @@ RUN="$REPO_DIR/scripts/btc-run.sh"
 OTHER_JOBS="$(crontab -l 2>/dev/null | grep -v 'btc-run\.sh' || true)"
 {
   [ -n "$OTHER_JOBS" ] && printf '%s\n' "$OTHER_JOBS"
-  echo "2 * * * *   PUSH_STATE=1 $RUN"
+  echo "2,32 * * * * PUSH_STATE=1 $RUN"
   echo "*/5 * * * * PUSH_STATE=1 $RUN sync"
 } | crontab -
 echo "✓ Schedule installed:"

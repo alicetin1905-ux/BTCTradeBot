@@ -21,17 +21,7 @@ if [ "$MODE" = "check" ]; then
   node scripts/okx-check.js
   exit $?
 fi
-BTC_INSTRUMENT="${OKX_INSTRUMENT:-BTC-USD_UM_XPERP-310328}"
-inst_for() {
-  local coin="$1" var="OKX_INSTRUMENT_$1"
-  if [ -n "${!var:-}" ]; then echo "${!var}"
-  elif [ "$coin" = "BTC" ]; then echo "$BTC_INSTRUMENT"
-  # NEAR trades the spot pair: its futures are refused on the EEA site (OKX 51155).
-  elif [ "$coin" = "NEAR" ]; then echo "NEAR-USDC"
-  elif [ "$coin" = "UNI" ]; then echo "UNI-USD_UM_XPERP-310718"
-  elif [ "$coin" = "HYPE" ]; then echo "HYPE-USD_UM_XPERP-310801"
-  else echo "$coin-USD_UM_XPERP-310328"; fi
-}
+. scripts/lib-coins.sh
 
 if [ "$MODE" = "probe" ]; then
   # Diagnostic: which orders does OKX accept on one instrument (workflow input "instrument").
@@ -56,7 +46,7 @@ LOG="${RUNNER_TEMP:-/tmp}/btcbot-run.log"
 ARGS=()
 [ "$MODE" = "sync" ] && ARGS=(--sync)
 STATUS=0
-for COIN in $(node -p "require('./config').COINS.join(' ')"); do
+for COIN in $(coins_list); do
   echo "::group::$COIN"
   COIN="$COIN" OKX_INSTRUMENT="$(inst_for "$COIN")" node src/run.js ${ARGS[@]+"${ARGS[@]}"} 2>&1 | tee -a "$LOG"
   S=${PIPESTATUS[0]}
