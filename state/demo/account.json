@@ -1,5 +1,5 @@
 {
-  "balance": 2000,
+  "balance": 1896.09714817,
   "startingBalance": 2000,
   "fundingSince": 1790814227992,
   "funding": {
@@ -7,7 +7,7 @@
   },
   "startedAt": 1790814227992,
   "fundingError": null,
-  "exchangeEquity": 1949.42133977561,
+  "exchangeEquity": 1895.7709699956101,
   "settings": {
     "RISK_PCT": 2,
     "COIN_RISK_PCT": {
@@ -84,8 +84,8 @@
   "mode": "demo",
   "exchange": "okx",
   "instrument": "BTC-USD_UM_XPERP-310328",
-  "updatedAt": 1790965325795,
-  "lastRunAt": 1790965325795,
+  "updatedAt": 1790967463577,
+  "lastRunAt": 1790967463577,
   "instruments": {
     "ETH": "ETH-USD_UM_XPERP-310328",
     "BTC": "BTC-USD_UM_XPERP-310328",

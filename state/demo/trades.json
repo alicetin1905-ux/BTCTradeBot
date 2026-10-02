@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "symbol": "BTCUSDT",
+    "bias": 1,
+    "entry": 85141.67533936651,
+    "exit": 84050.9,
+    "qty": 0.0884,
+    "pnl": -103.90285182999999,
+    "reason": "stop loss",
+    "openedAt": 1790952436397,
+    "closedAt": 1790966408599,
+    "initialStop": 84010.4
+  }
+]
