@@ -35,9 +35,9 @@ async function main() {
     }
     for (const p of (await t.request('GET', '/api/v5/account/positions', { instType: 'FUTURES', instId: id })).filter(q => +q.pos)) {
       const n = +p.pos;
-      // A thin demo book can leave a market order pending: cross the spread with a limit price 30% through the mark instead.
+      // A thin demo book can leave a market order pending: cross the spread with a limit price 1.5% through the mark (OKX rejects prices further out).
       const mk = +(await publicGet('/api/v5/public/mark-price', { instType: 'FUTURES', instId: id }))[0].markPx;
-      await t.request('POST', '/api/v5/trade/order', { instId: id, tdMode: p.mgnMode, side: n > 0 ? 'sell' : 'buy', ordType: 'ioc', px: String(+(mk * (n > 0 ? 0.7 : 1.3)).toPrecision(6)), sz: String(Math.abs(n)), reduceOnly: true, ...(p.mgnMode === 'cross' ? { ccy: 'USDC' } : {}) });
+      await t.request('POST', '/api/v5/trade/order', { instId: id, tdMode: p.mgnMode, side: n > 0 ? 'sell' : 'buy', ordType: 'ioc', px: String(+(mk * (n > 0 ? 0.985 : 1.015)).toPrecision(6)), sz: String(Math.abs(n)), reduceOnly: true, ...(p.mgnMode === 'cross' ? { ccy: 'USDC' } : {}) });
       console.log(`closed ${p.pos} contracts on ${id}`);
     }
     await sleep(2000);
