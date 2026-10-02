@@ -59,6 +59,8 @@ if (!['okx', 'bybit'].includes(config.EXCHANGE)) {
 const P = config.PORTFOLIO;
 // A coin with its own risk per trade (config.COIN_RISK_PCT, e.g. NEAR 1%).
 if (config.COIN_RISK_PCT && config.COIN_RISK_PCT[COIN] != null) P.RISK_PCT = config.COIN_RISK_PCT[COIN];
+// ...and its own fixed-mode margin / stop-loss / take-profit (config.COIN_FIXED, e.g. ETH 667 margin).
+if (config.COIN_FIXED && config.COIN_FIXED[COIN]) Object.assign(config.FIXED, config.COIN_FIXED[COIN]);
 const ROOT = path.join(__dirname, '..', 'state', 'demo');
 // BTC keeps state/demo/ (the dashboard and history started there); the other coins use state/demo/<coin>/.
 const dirOf = (coin) => (coin === 'BTC' ? ROOT : path.join(ROOT, coin.toLowerCase()));

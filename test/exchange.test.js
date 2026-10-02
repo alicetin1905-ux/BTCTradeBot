@@ -946,7 +946,7 @@ test('price text keeps the decimals a cheap coin needs (NEAR 4.807), BTC / ETH a
 
 test('settings: COIN_RISK_PCT gives single coins their own risk, validated', () => {
   const { apply, current } = require('../src/settings');
-  const cfg = JSON.parse(JSON.stringify({ PORTFOLIO: { RISK_PCT: 2, MAX_POSITION_X: 2, LEVERAGE: 10, STARTING_BALANCE: 2000 }, EXECUTION: { DAILY_LOSS_LIMIT_PCT: 10 }, NOTIFY: { STATUS_EVERY_H: 4 }, COIN_RISK_PCT: { NEAR: 1 }, TRADE_MODE: 'fixed', FIXED: { MARGIN: 500, SL_USDT: 100, TP_USDT: 200 }, STRATEGY: 'atlas-flip', FLIP_SCORE: 10, FLIP_WINDOW: 2, EXTREME_SCORE: 90, TREND_BAND_PCT: 10, DIRECTION: 'both', CHANNEL_N: 15, EXIT_N: 15, STOP_ATR: 2, TRAIL_ATR: 3, ENTRY_FRESH_MIN: 180, MARKET_DATA: null, SCORE_MODE: 'graded' }));
+  const cfg = JSON.parse(JSON.stringify({ PORTFOLIO: { RISK_PCT: 2, MAX_POSITION_X: 2, LEVERAGE: 10, STARTING_BALANCE: 2000 }, EXECUTION: { DAILY_LOSS_LIMIT_PCT: 10 }, NOTIFY: { STATUS_EVERY_H: 4 }, COIN_RISK_PCT: { NEAR: 1 }, COIN_FIXED: { ETH: { MARGIN: 667 } }, TRADE_MODE: 'fixed', FIXED: { MARGIN: 500, SL_USDT: 100, TP_USDT: 200 }, STRATEGY: 'atlas-flip', FLIP_SCORE: 10, FLIP_WINDOW: 2, EXTREME_SCORE: 90, TREND_BAND_PCT: 10, DIRECTION: 'both', CHANNEL_N: 15, EXIT_N: 15, STOP_ATR: 2, TRAIL_ATR: 3, ENTRY_FRESH_MIN: 180, MARKET_DATA: null, SCORE_MODE: 'graded' }));
   assert.deepEqual(current(cfg).COIN_RISK_PCT, { NEAR: 1 });
   let r = apply(cfg, { COIN_RISK_PCT: { NEAR: 0.5, ETH: 3 } });
   assert.deepEqual(cfg.COIN_RISK_PCT, { NEAR: 0.5, ETH: 3 }); assert.equal(r.errors.length, 0);
@@ -1077,4 +1077,27 @@ test('fixed mode follows the configured margin: 750 x 10x = $7500, stop-loss -$1
 
 test('the shipped fixed-mode defaults are 750 margin, -100 stop, +200 target', () => {
   assert.deepEqual(FIXED_DEFAULTS, { MARGIN: 750, SL_USDT: 100, TP_USDT: 200 });
+});
+
+test('settings: COIN_FIXED is validated; ETH 667 margin puts -$100 / +$200 at 1.5% / 3% of the entry', async () => {
+  const { apply } = require('../src/settings');
+  const cfg = JSON.parse(JSON.stringify({ PORTFOLIO: { RISK_PCT: 2, MAX_POSITION_X: 2, LEVERAGE: 10, STARTING_BALANCE: 2000 }, EXECUTION: { DAILY_LOSS_LIMIT_PCT: 10 }, NOTIFY: { STATUS_EVERY_H: 4 }, COIN_RISK_PCT: {}, COIN_FIXED: { ETH: { MARGIN: 667 } }, TRADE_MODE: 'fixed', FIXED: { MARGIN: 750, SL_USDT: 100, TP_USDT: 200 }, STRATEGY: 'atlas-flip', FLIP_SCORE: 10, FLIP_WINDOW: 2, EXTREME_SCORE: 80, TREND_BAND_PCT: 10, DIRECTION: 'both', CHANNEL_N: 15, EXIT_N: 15, STOP_ATR: 2, TRAIL_ATR: 3, ENTRY_FRESH_MIN: 180, MARKET_DATA: null, SCORE_MODE: 'graded' }));
+  let r = apply(cfg, { COIN_FIXED: { ETH: { MARGIN: 700, TP_USDT: 250 }, UNI: { SL_USDT: 50 } } });
+  assert.deepEqual(cfg.COIN_FIXED, { ETH: { MARGIN: 700, TP_USDT: 250 }, UNI: { SL_USDT: 50 } }); assert.equal(r.errors.length, 0);
+  r = apply(cfg, { COIN_FIXED: { ETH: { MARGIN: 99999 } } });
+  assert.match(r.errors[0], /COIN_FIXED: ETH.MARGIN must be a number between 10 and 5000/);
+  r = apply(cfg, { COIN_FIXED: { ETH: { LEVERAGE: 5 } } });
+  assert.match(r.errors[0], /not a setting/);
+  // The exchange side: with FIXED margin 667 the distances are 1.5% and 3%.
+  config.TRADE_MODE = 'fixed'; config.FIXED = { MARGIN: 667, SL_USDT: 100, TP_USDT: 200 };
+  try {
+    const { ex, client } = fakeBybit();
+    const st = freshState();
+    const sig = { t: T0, close: 100000, atr: 1000, score: 30, flipFrom: -40, enter: 1, exitLong: false, exitShort: false, upper: null, lower: null, exitUpper: null, exitLower: null };
+    await exchange.runExchange({ client, st, sig: [sig], events: [], now: after(T0) });
+    const p = st.position, mark = ex.marks.BTCUSDT;
+    assert.ok(Math.abs((mark - p.stop) / mark - 0.015) < 0.0005, 'stop 1.5% away');
+    assert.ok(Math.abs((p.takeProfit - mark) / mark - 0.03) < 0.0005, 'target 3% away');
+    assert.ok(Math.abs(p.qty * (mark - p.stop) - 100) < 2 && Math.abs(p.qty * (p.takeProfit - mark) - 200) < 4);
+  } finally { config.TRADE_MODE = 'atr'; config.FIXED = { MARGIN: 500, SL_USDT: 100, TP_USDT: 200 }; }
 });

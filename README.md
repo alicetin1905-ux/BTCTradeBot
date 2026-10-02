@@ -117,7 +117,9 @@ account with the `testtrade` workflow (coin = ETH, NEAR).
   5.5 USDT per round trip). The entry signals are the same flip / ±80 as below.
   Needs a win rate above about 35% to break even. Set `TRADE_MODE` to `atr` for
   the earlier rules (2% risk, ATR stop that trails) described below. Settings:
-  `FIXED_MARGIN`, `FIXED_SL_USDT`, `FIXED_TP_USDT`. NEAR (spot, no leverage) was
+  `FIXED_MARGIN`, `FIXED_SL_USDT`, `FIXED_TP_USDT`; `COIN_FIXED` gives one coin its own
+  numbers (live: **ETH 667 margin** = a 6,667 position, so −100 / +200 are 1.5% / 3% away;
+  BTC and UNI use 750 margin, 1.33% / 2.67%). NEAR (spot, no leverage) was
   taken out of `COINS` because 5,000 USDT of position doesn't fit a spot buy.
 - **Initial stop ('atr' mode):** 2 × ATR(14) from the entry (`STOP_ATR`).
 - **Trailing stop:** after every 4H close the stop moves to *best close since

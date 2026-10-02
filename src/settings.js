@@ -32,6 +32,21 @@ const coinMap = (min, max) => (v) => {
   }
   return { value: { ...v } };
 };
+// { "ETH": { "MARGIN": 667, "SL_USDT": 100, "TP_USDT": 200 } }: fixed-mode numbers for single coins (any of the three).
+const coinFixed = (v) => {
+  if (v === null) return { value: {} };
+  if (typeof v !== 'object' || Array.isArray(v)) return { error: 'must be an object like { "ETH": { "MARGIN": 667 } }' };
+  const lim = { MARGIN: [10, 5000], SL_USDT: [1, 2000], TP_USDT: [1, 5000] };
+  for (const [coin, o] of Object.entries(v)) {
+    if (!/^[A-Z0-9]{2,10}$/.test(coin)) return { error: `coin "${coin}" must be an upper-case ticker` };
+    if (!o || typeof o !== 'object' || Array.isArray(o)) return { error: `${coin} must be an object with MARGIN / SL_USDT / TP_USDT` };
+    for (const [k, x] of Object.entries(o)) {
+      if (!lim[k]) return { error: `${coin}.${k} is not a setting (MARGIN, SL_USDT, TP_USDT)` };
+      if (typeof x !== 'number' || !Number.isFinite(x) || x < lim[k][0] || x > lim[k][1]) return { error: `${coin}.${k} must be a number between ${lim[k][0]} and ${lim[k][1]}` };
+    }
+  }
+  return { value: JSON.parse(JSON.stringify(v)) };
+};
 const oneOf = (...opts) => (v) => (opts.includes(v) ? { value: v } : { error: `must be one of ${opts.map(o => JSON.stringify(o)).join(', ')}` });
 
 // Each field: where it lives in config, how it's checked, and a label.
@@ -40,6 +55,7 @@ const FIELDS = {
   RISK_PCT: { at: ['PORTFOLIO', 'RISK_PCT'], check: num(0.1, 10), label: 'Loss at the initial stop per trade (% of balance)' },
   COIN_RISK_PCT: { at: ['COIN_RISK_PCT'], check: coinMap(0.1, 10), label: 'Own risk per trade for single coins (% of balance), e.g. { "NEAR": 1 }; others use the line above' },
   TRADE_MODE: { at: ['TRADE_MODE'], check: oneOf('fixed', 'atr'), label: 'Position rules ("fixed" = fixed margin, stop-loss and take-profit in USDT; "atr" = risk % of the balance, ATR stop that trails)' },
+  COIN_FIXED: { at: ['COIN_FIXED'], check: coinFixed, label: 'Fixed mode: own margin / stop / target for single coins, e.g. { "ETH": { "MARGIN": 667 } }' },
   FIXED_MARGIN: { at: ['FIXED', 'MARGIN'], check: num(10, 5000), label: 'Fixed mode: margin per trade (USDT)' },
   FIXED_SL_USDT: { at: ['FIXED', 'SL_USDT'], check: num(1, 2000), label: 'Fixed mode: loss at the stop-loss (USDT)' },
   FIXED_TP_USDT: { at: ['FIXED', 'TP_USDT'], check: num(1, 5000), label: 'Fixed mode: gain at the take-profit (USDT)' },
@@ -69,7 +85,7 @@ function set(cfg, at, value) {
   const parent = at.slice(0, -1).reduce((o, k) => o[k], cfg);
   parent[at[at.length - 1]] = value; // mutate in place: modules hold references to PORTFOLIO etc.
 }
-const clone = (v) => (Array.isArray(v) ? v.slice() : v && typeof v === 'object' ? { ...v } : v);
+const clone = (v) => (Array.isArray(v) ? v.slice() : v && typeof v === 'object' ? JSON.parse(JSON.stringify(v)) : v);
 
 function current(cfg) {
   return Object.fromEntries(Object.entries(FIELDS).map(([k, f]) => [k, clone(get(cfg, f.at))]));

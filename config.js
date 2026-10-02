@@ -102,6 +102,10 @@ const config = module.exports = {
   // Spot coins (NEAR-USDC) can't be leveraged and keep the 'atr' rules.
   TRADE_MODE: 'fixed',
   FIXED: { MARGIN: 750, SL_USDT: 100, TP_USDT: 200 },
+  // A coin's own fixed-mode numbers (merged over FIXED for that coin). ETH: 667 margin = a 6,667 USDT position, so
+  // the same -$100 / +$200 sit 1.5% / 3% away from the entry (BTC: 750 margin, 1.33% / 2.67%). UNI (4H candles ~3%)
+  // uses FIXED until it gets its own.
+  COIN_FIXED: { ETH: { MARGIN: 667 } },
 
   // Stops ('atr' mode), in ATRs of the 4H candles. Both live on the exchange as the position's
   // stop-loss, so they work while the machine running the bot is off.
