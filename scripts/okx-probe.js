@@ -19,6 +19,18 @@ async function main() {
     apiKey: process.env.OKX_API_KEY, apiSecret: process.env.OKX_API_SECRET, passphrase: process.env.OKX_API_PASSPHRASE, base: process.env.OKX_API_BASE,
   });
   let ok = 0;
+  // "CLOSE:<instrument>" only flattens that instrument (and cancels its stops) instead of probing it.
+  for (const raw of INSTS.filter(x => x.startsWith('CLOSE:'))) {
+    const id = raw.slice(6);
+    for (const p of (await t.request('GET', '/api/v5/account/positions', { instType: 'FUTURES', instId: id })).filter(q => +q.pos)) {
+      await t.request('POST', '/api/v5/trade/close-position', { instId: id, mgnMode: p.mgnMode, ...(p.mgnMode === 'cross' ? { ccy: 'USDC' } : {}) });
+      console.log(`closed ${p.pos} contracts on ${id}`);
+    }
+    const left = (await t.request('GET', '/api/v5/account/positions', { instType: 'FUTURES', instId: id })).filter(q => +q.pos);
+    console.log(left.length ? `✗ still open on ${id}` : `✓ nothing open on ${id}`);
+  }
+  INSTS.splice(0, INSTS.length, ...INSTS.filter(x => !x.startsWith('CLOSE:')));
+  if (!INSTS.length) return 0;
   for (const inst of INSTS) {
     try { ok += (await probe(t, inst, INSTS.length === 1)) === 0 ? 1 : 0; } catch (e) { console.log(`✗ ${inst}: ${e.message.replace(/^.*-> /, '')}`); }
   }
