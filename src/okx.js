@@ -593,4 +593,4 @@ function createClient(opts) {
   return createSwapClient({ ...opts, instrument });
 }
 
-module.exports = { createClient, isSpot, sign, instIdOf, symbolOf, OkxError };
+module.exports = { createClient, isSpot, sign, instIdOf, symbolOf, OkxError, transport };

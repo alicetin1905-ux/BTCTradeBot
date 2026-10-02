@@ -24,7 +24,7 @@ on:
       action:
         description: 'run = full run, sync = fills only, check = test OKX connection and keys (no trading), testtrade = open + close the smallest position (real demo order)'
         type: choice
-        options: [check, run, sync, testtrade]
+        options: [check, run, sync, testtrade, probe]
         default: check
       instrument:
         description: 'testtrade / check only: another OKX instrument to try (e.g. BTC-USDC); empty = the coin''s own'
@@ -79,6 +79,7 @@ jobs:
           else MODE=run; fi
           echo "mode: $MODE"
           if [ -n "${{ inputs.instrument }}" ] && [ "$MODE" = check ]; then export OKX_INSTRUMENT="${{ inputs.instrument }}"; fi
+          if [ "$MODE" = probe ] && [ -n "${{ inputs.instrument }}" ]; then export TESTTRADE_INSTRUMENT="${{ inputs.instrument }}"; fi
           if [ "$MODE" = testtrade ]; then
             export COIN="${{ inputs.coin }}"
             [ -n "${{ inputs.instrument }}" ] && export TESTTRADE_INSTRUMENT="${{ inputs.instrument }}"

@@ -31,6 +31,11 @@ inst_for() {
   else echo "$coin-USD_UM_XPERP-310328"; fi
 }
 
+if [ "$MODE" = "probe" ]; then
+  # Diagnostic: which orders does OKX accept on one instrument (workflow input "instrument").
+  INSTRUMENT="${TESTTRADE_INSTRUMENT:-$OKX_INSTRUMENT}" node scripts/okx-probe.js
+  exit $?
+fi
 if [ "$MODE" = "testtrade" ]; then
   export COIN="${COIN:-BTC}"
   # An explicit instrument (workflow input) wins; otherwise this coin's own.
