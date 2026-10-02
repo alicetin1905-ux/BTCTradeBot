@@ -853,7 +853,7 @@ test('ATLAS flip through the bot: an opposite swing closes the long (and reverse
     const summary = require('../src/summary');
     const m = summary.status({ account: { balance: 2000, startingBalance: 2000 }, position: null, signal: flipSig(t1, 99000, -12, null, 0) });
     assert.match(m.message, /ATLAS -12/);
-    assert.match(m.message, /swing from −10 to \+10 within 8h or a score of \+90, short on the mirror/);
+    assert.match(m.message, /swing from −10 to \+10 within 8h or a score of \+80, short on the mirror/);
   } finally { [config.DIRECTION, config.STRATEGY] = saved; }
 });
 

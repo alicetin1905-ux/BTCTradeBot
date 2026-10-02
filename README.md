@@ -93,12 +93,13 @@ account with the `testtrade` workflow (coin = ETH, NEAR).
     lower** within the previous **2 candles (8h)**: a fast swing from
     bearish to bullish.
   - **Short** is the mirror image.
-  - **Extreme entry:** also enter when the score first closes at **+90 or
-    higher** (long) or **−90 or lower** (short), the candle before being
-    inside it, with the same trend band (`EXTREME_SCORE`, `null` = off). On
-    BTC + ETH at 2% risk it lifts +3,086% to +3,692% (PF 1.56 → 1.60, worst
-    drop 38% → 32%); on BTC alone it changes almost nothing (+662% → +668%).
-    Lower levels (75, 60) made it worse.
+  - **Extreme entry:** also enter when the score first closes at **+80 or
+    higher** (long) or **−80 or lower** (short), the candle before being
+    inside it, with the same trend band (`EXTREME_SCORE`, `null` = off). BTC + ETH
+    at 2% risk: flip only +3,086% (PF 1.56, worst drop 38%); entry at 90 +3,692%
+    (1.60, 32%); at 85 +3,514% (1.59, 32%); **at 80 +2,924% (1.56, 34%, live)**; at
+    75 +2,699% (1.51, 36%). A lower level trades steady climbs like BTC 8 → 80 in
+    a day (no swing), at the cost of later, weaker entries.
   - **Trend band:** a swing is ignored when the 4H close is more than 10 %
     from its 200-candle 4H average (`TREND_BAND_PCT`): the flip lost on
     counter-trend and over-extended entries.
