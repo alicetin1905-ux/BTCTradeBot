@@ -1,8 +1,8 @@
 # BTCTradeBot
 
-A trading bot for **BTC, ETH and NEAR** on an **OKX Demo Trading** account: mainnet
+A trading bot for **BTC, ETH, UNI and NEAR** on an **OKX Demo Trading** account: mainnet
 prices, demo funds. It runs on GitHub Actions (no computer needed) and trades
-the EEA site's USD-settled BTC and ETH futures with USDC margin at 10x, plus NEAR on spot. It can also
+the EEA site's USD-settled BTC, ETH and UNI futures with USDC margin at 10x, plus NEAR on spot. It can also
 trade the BTC-USDT perpetual, or **Bybit Demo Trading** (`EXCHANGE=bybit`).
 
 It's built on the same engine as
@@ -28,7 +28,7 @@ alarm.
    setting makes fewer, better trades (+834%, PF 1.56); ±10 / 8h was chosen
    for trade count (`ATLAS_FLIP.md`). This is the live signal now.
 
-## Coins: BTC, ETH and NEAR (`COINS` in `config.js`)
+## Coins: BTC, ETH, UNI and NEAR (`COINS` in `config.js`)
 
 The same rules run on **BTC, ETH and NEAR**, each with its own position, stop and
 state (BTC in `state/demo/`, the others in `state/demo/eth/`, `state/demo/near/`), sharing **one balance**
@@ -57,7 +57,13 @@ bot-tagged algo order, **1% risk** (`COIN_RISK_PCT`). The signal rules are the s
 (a short signal only closes the long). Backtest from 2021-03 (live signal):
 NEAR spot alone is profitable in every year and both halves (19 trades/yr,
 PF 1.41; with shorts on the futures it would be 37 trades/yr).
-XRP, DOGE, ETC and HYPE don't work with this signal and were left out.
+XRP, DOGE, ETC, HYPE, IOST and ONDO don't work with this signal and were left out
+(NEAR futures, IP, KAITO and ONDO are also refused by OKX's EEA compliance).
+
+**UNI was added as a future** (long + short, `UNI-USD_UM_XPERP-310718`, **1% risk**):
+UNI alone is PF 1.20 (0.96 before 2024, 1.62 since, the weakest edge of the four).
+BTC + ETH 2% + UNI 1%: 164 trades/yr, +4,377%, worst drop 35%, PF 1.56 (BTC + ETH
+alone: 120, +3,692%, 32%, 1.60).
 
 | | Trades/yr | Return | Worst drop | PF |
 |---|---:|---:|---:|---:|
