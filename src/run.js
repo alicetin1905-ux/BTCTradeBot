@@ -161,6 +161,35 @@ async function runCommands(client, st, events) {
   let ran = false;
   for (const c of Array.isArray(cmds) ? cmds : []) {
     if (!c || !c.id || st.commandsDone.includes(c.id)) continue;
+    if (c.action === 'set-exits') {
+      // { "id": "...", "action": "set-exits", "coin": "BTC", "slUsdt": 100, "tpUsdt": 200 }: the open position of that coin gets
+      // a stop-loss at -slUsdt and a take-profit at +tpUsdt (of its own size), as in TRADE_MODE 'fixed', and no more trailing.
+      if (c.coin && String(c.coin).toUpperCase() !== COIN) continue; // another coin's command: left for its own run
+      const pos = st.position;
+      if (!pos) {
+        events.push({ type: 'info', reason: `set-exits ${c.id}: no ${COIN} position is open — nothing to do` });
+      } else if (typeof client.setExits !== 'function') {
+        events.push({ type: 'error', reason: `set-exits ${c.id}: this exchange client can't place a take-profit` });
+        st.commandsDone.push(c.id); ran = true; continue;
+      } else {
+        const tick = pos.tickSize || 0.1;
+        const stop = exchange.stopRound(pos.entry - pos.bias * c.slUsdt / pos.qty, tick, pos.bias);
+        const tp = +(Math.round((pos.entry + pos.bias * c.tpUsdt / pos.qty) / tick) * tick).toFixed(8);
+        try {
+          await client.setExits(SYMBOL_OF(COIN), { stopLoss: stop, takeProfit: tp });
+        } catch (err) {
+          events.push({ type: 'error', reason: `set-exits ${c.id}: ${err.message} — retrying next run` });
+          continue; // not marked done: retried
+        }
+        const was = pos.stop;
+        Object.assign(pos, { stop, exchangeStop: stop, takeProfit: tp, fixed: true, trailed: false });
+        events.push({ type: 'info', reason: `${COIN} exits set: stop ${px(was)} → ${px(stop)} (−$${c.slUsdt}), take-profit ${px(tp)} (+$${c.tpUsdt})` });
+        await notify.push([{ title: `${COIN} stop-loss and take-profit set`, message: `Stop ${px(stop)} (−$${c.slUsdt}) · take-profit ${px(tp)} (+$${c.tpUsdt}) on the open ${pos.bias === 1 ? 'long' : 'short'}. No trailing from now on.`, tags: ['dart'] }]);
+      }
+      st.commandsDone.push(c.id);
+      ran = true;
+      continue;
+    }
     if (c.action === 'close-all' || c.action === 'reset') {
       const evs = [];
       await exchange.closeAll({ client, st, events: evs });
@@ -195,6 +224,7 @@ async function runCommands(client, st, events) {
   return ran;
 }
 
+const SYMBOL_OF = (coin) => coin + 'USDT';
 const sigParams = () => ({ channelN: config.CHANNEL_N, exitN: config.EXIT_N, atrLen: config.ATR_LEN });
 
 // The signal series for the closed 4H candles: ATLAS flip (scored for the

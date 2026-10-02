@@ -1011,3 +1011,25 @@ test('fixed mode: a stop-loss hit is booked as "stop loss"; spot coins keep the 
     assert.equal(st2.position.takeProfit, null);
   } finally { config.TRADE_MODE = 'atr'; }
 });
+
+test('OKX setExits: one OCO algo with stop-loss and take-profit on the whole position, new pair first, old stop cancelled after', async () => {
+  const f = fakeOkx({
+    positions: [{ instId: 'BTC-USDT-SWAP', pos: '2.21', posSide: 'net', avgPx: '86000', markPx: '86000', upl: '0' }],
+    algos: [{ ordType: 'conditional', algoId: 'old1', instId: 'BTC-USDT-SWAP', slTriggerPx: '84000' }],
+    mark: 86000,
+  });
+  const c = okxClient(f);
+  const id = await c.setExits('BTCUSDT', { stopLoss: 81485.1, takeProfit: 95059 });
+  assert.match(id, /^alg/);
+  const placed = f.S.calls.find(x => x.path === '/api/v5/trade/order-algo').body;
+  assert.deepEqual(placed, { instId: 'BTC-USDT-SWAP', tdMode: 'cross', side: 'sell', ordType: 'oco',
+    slTriggerPx: '81485.1', slOrdPx: '-1', slTriggerPxType: 'mark', tpTriggerPx: '95059', tpOrdPx: '-1', tpTriggerPxType: 'mark', closeFraction: '1', reduceOnly: true });
+  const order = f.S.calls.map(x => x.path);
+  assert.ok(order.indexOf('/api/v5/trade/order-algo') < order.indexOf('/api/v5/trade/cancel-algos'), 'placed before the old one is cancelled');
+  assert.deepEqual(f.S.calls.find(x => x.path === '/api/v5/trade/cancel-algos').body, [{ algoId: 'old1', instId: 'BTC-USDT-SWAP' }]);
+  // Wrong side of the mark: refused, nothing placed.
+  const g = fakeOkx({ positions: [{ instId: 'BTC-USDT-SWAP', pos: '2.21', posSide: 'net', avgPx: '86000', markPx: '86000', upl: '0' }], mark: 86000 });
+  await assert.rejects(okxClient(g).setExits('BTCUSDT', { stopLoss: 87000, takeProfit: 95000 }), /wrong side/);
+  await assert.rejects(okxClient(g).setExits('BTCUSDT', { stopLoss: 81000, takeProfit: 85000 }), /wrong side/);
+  assert.ok(!g.S.calls.some(x => x.path === '/api/v5/trade/order-algo'));
+});

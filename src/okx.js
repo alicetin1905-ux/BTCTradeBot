@@ -324,6 +324,27 @@ function createSwapClient(opts) {
       }
     },
 
+    // Puts a stop-loss AND a take-profit on an open position as one OCO algo
+    // order (whole position), replacing whatever stop is there. The new pair is
+    // placed first, the old stop cancelled after, so the position always has one.
+    async setExits(symbol, { stopLoss, takeProfit }) {
+      const live = (await this.getPositions())[symbol];
+      if (!live) throw new Error(`no ${symbol} position on OKX`);
+      const mark = await this.getMarkPrice(symbol);
+      if ((mark - stopLoss) * live.bias <= 0) throw new Error(`stop ${stopLoss} is on the wrong side of the mark price ${mark}`);
+      if ((takeProfit - mark) * live.bias <= 0) throw new Error(`take-profit ${takeProfit} is on the wrong side of the mark price ${mark}`);
+      const current = await stopOrders(symbol);
+      const r = await request('POST', '/api/v5/trade/order-algo', {
+        instId: idOf(symbol), tdMode: TDM, side: live.bias === 1 ? 'sell' : 'buy', ...(await posSide(live.bias)),
+        ordType: 'oco',
+        slTriggerPx: String(stopLoss), slOrdPx: '-1', slTriggerPxType: 'mark',
+        tpTriggerPx: String(takeProfit), tpOrdPx: '-1', tpTriggerPxType: 'mark',
+        closeFraction: '1', reduceOnly: true,
+      });
+      if (current.length) await request('POST', '/api/v5/trade/cancel-algos', current.map(o => ({ algoId: o.algoId, instId: o.instId })));
+      return r[0].algoId;
+    },
+
     async closeMarket({ symbol, bias, qty }) {
       const r = await request('POST', '/api/v5/trade/order', {
         instId: idOf(symbol), tdMode: TDM, side: bias === 1 ? 'sell' : 'buy', ...(await posSide(bias)),
