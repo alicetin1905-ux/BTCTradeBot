@@ -27,7 +27,9 @@ function messagesFor(events, st) {
           : ev.flipFrom == null
             ? `ATLAS score reached ${ev.score > 0 ? '+' : ''}${ev.score} (extreme level ±${config.EXTREME_SCORE}, 4H close ${px(ev.close)})\n`
             : `ATLAS score swung ${ev.flipFrom > 0 ? '+' : ''}${ev.flipFrom} → ${ev.score > 0 ? '+' : ''}${ev.score} within ${config.FLIP_WINDOW * 4}h (4H close ${px(ev.close)})\n`) +
-          `Stop ${px(ev.stop)} (trails ${config.TRAIL_ATR}x ATR) · ${ev.qty} ${config.COIN} ($${ev.notional.toFixed(0)}) · loss at stop $${ev.riskAmt.toFixed(0)}`,
+          (ev.takeProfit
+            ? `Stop ${px(ev.stop)} · take profit ${px(ev.takeProfit)} (fixed) · ${ev.qty} ${config.COIN} ($${ev.notional.toFixed(0)}) · loss at stop $${ev.riskAmt.toFixed(0)}`
+            : `Stop ${px(ev.stop)} (trails ${config.TRAIL_ATR}x ATR) · ${ev.qty} ${config.COIN} ($${ev.notional.toFixed(0)}) · loss at stop $${ev.riskAmt.toFixed(0)}`),
         tags: [ev.bias === 1 ? 'chart_with_upwards_trend' : 'chart_with_downwards_trend'],
       });
     } else if (ev.type === 'exit' && !/record pending/.test(ev.reason)) {

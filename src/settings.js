@@ -39,6 +39,10 @@ const FIELDS = {
   // Money
   RISK_PCT: { at: ['PORTFOLIO', 'RISK_PCT'], check: num(0.1, 10), label: 'Loss at the initial stop per trade (% of balance)' },
   COIN_RISK_PCT: { at: ['COIN_RISK_PCT'], check: coinMap(0.1, 10), label: 'Own risk per trade for single coins (% of balance), e.g. { "NEAR": 1 }; others use the line above' },
+  TRADE_MODE: { at: ['TRADE_MODE'], check: oneOf('fixed', 'atr'), label: 'Position rules ("fixed" = fixed margin, stop-loss and take-profit in USDT; "atr" = risk % of the balance, ATR stop that trails)' },
+  FIXED_MARGIN: { at: ['FIXED', 'MARGIN'], check: num(10, 5000), label: 'Fixed mode: margin per trade (USDT)' },
+  FIXED_SL_USDT: { at: ['FIXED', 'SL_USDT'], check: num(1, 2000), label: 'Fixed mode: loss at the stop-loss (USDT)' },
+  FIXED_TP_USDT: { at: ['FIXED', 'TP_USDT'], check: num(1, 5000), label: 'Fixed mode: gain at the take-profit (USDT)' },
   MAX_POSITION_X: { at: ['PORTFOLIO', 'MAX_POSITION_X'], check: num(0.1, 5), label: 'Max position value (x balance)' },
   LEVERAGE: { at: ['PORTFOLIO', 'LEVERAGE'], check: num(1, 25, { int: true }), label: 'Leverage' },
   DAILY_LOSS_LIMIT_PCT: { at: ['EXECUTION', 'DAILY_LOSS_LIMIT_PCT'], check: num(1, 100), label: 'Daily loss limit (% of balance)' },

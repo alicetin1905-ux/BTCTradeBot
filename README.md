@@ -109,7 +109,17 @@ account with the `testtrade` workflow (coin = ETH, NEAR).
   history. So the live score is exactly the one the backtest used.
 - **Entry:** a market order with the stop attached, on the run right after the
   4H close (within 3 h, `ENTRY_FRESH_MIN`, so late GitHub runs don't miss it). One attempt per signal candle.
-- **Initial stop:** 2 × ATR(14) from the entry (`STOP_ATR`).
+- **Position rules (`TRADE_MODE`, live: `fixed`):** every trade uses **500 USDT of
+  margin at 10x = 5,000 USDT of position**, a **stop-loss at −100 USDT** (2% away)
+  and a **take-profit at +200 USDT** (4% away), attached to the entry order as one
+  OCO pair on OKX. No trailing, no signal exit: whichever is hit first closes the
+  trade. A loss is 5% of a 2,000 balance, a win +10% (fees come on top, about
+  5.5 USDT per round trip). The entry signals are the same flip / ±80 as below.
+  Needs a win rate above about 35% to break even. Set `TRADE_MODE` to `atr` for
+  the earlier rules (2% risk, ATR stop that trails) described below. Settings:
+  `FIXED_MARGIN`, `FIXED_SL_USDT`, `FIXED_TP_USDT`. NEAR (spot, no leverage) was
+  taken out of `COINS` because 5,000 USDT of position doesn't fit a spot buy.
+- **Initial stop ('atr' mode):** 2 × ATR(14) from the entry (`STOP_ATR`).
 - **Trailing stop:** after every 4H close the stop moves to *best close since
   entry ∓ 3 × ATR* (`TRAIL_ATR`). It only ever tightens, and it sits on the
   exchange, so it works between runs.

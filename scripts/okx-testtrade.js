@@ -56,15 +56,17 @@ async function testSide(client, inst, S, bias, lev, holdSec) {
   // Stops 2% then 1.5% away on the losing side, on the tick, away from the price.
   const lvl = (pct) => { const x = mark * (1 - bias * pct) / inst.tickSize; return +((bias === 1 ? Math.floor(x) : Math.ceil(x)) * inst.tickSize).toFixed(4); };
   const stop1 = lvl(0.02), stop2 = lvl(0.015);
+  // Futures: a take-profit 4% away on the winning side goes with the stop, as in TRADE_MODE 'fixed' (stop 2%, target 4%).
+  const tp = client.spot ? null : (() => { const x = mark * (1 + bias * 0.04) / inst.tickSize; return +(Math.round(x) * inst.tickSize).toFixed(4); })();
   const startedAt = Date.now();
   let opened = false, ok = true;
   try {
     await client.setLeverage(S, lev);
     console.log(`✓ 1. leverage ${lev}x set`);
 
-    const ordId = await client.openMarket({ symbol: S, bias, qty, stopLoss: stop1 });
+    const ordId = await client.openMarket({ symbol: S, bias, qty, stopLoss: stop1, takeProfit: tp });
     opened = true;
-    console.log(`✓ 2. ${bias === 1 ? 'bought' : 'sold short'} ${qty} ${config.COIN} at market (order ${ordId}), stop attached at ${px(stop1)} (mark was ${px(mark)})`);
+    console.log(`✓ 2. ${bias === 1 ? 'bought' : 'sold short'} ${qty} ${config.COIN} at market (order ${ordId}), stop attached at ${px(stop1)}${tp ? ` and take-profit at ${px(tp)}` : ''} (mark was ${px(mark)})`);
 
     let live = null;
     for (let i = 0; i < 10 && !(live && live.stopLoss); i++) { live = (await client.getPositions())[S]; if (!(live && live.stopLoss)) await sleep(500); }
@@ -72,15 +74,20 @@ async function testSide(client, inst, S, bias, lev, holdSec) {
     const sideOk = live.bias === bias;
     console.log(`${live.stopLoss && sideOk ? '✓' : '✗'} 3. OKX shows: ${live.bias === 1 ? 'long' : 'short'} ${live.size} ${config.COIN} @ ${px(live.avgPrice)}, stop ${live.stopLoss ? px(live.stopLoss) : 'MISSING'}`);
     if (!live.stopLoss || !sideOk) ok = false;
+    if (tp) {
+      const tpOk = live.takeProfit && Math.abs(live.takeProfit - tp) < inst.tickSize;
+      console.log(`${tpOk ? '✓' : '✗'} 3b. take-profit on OKX: ${live.takeProfit ? px(live.takeProfit) : 'MISSING'} (sent ${px(tp)})`);
+      if (!tpOk) ok = false;
+    } else {
+      await client.setStopLoss(S, stop2);
+      await sleep(500);
+      const moved = (await client.getPositions())[S];
+      const movedOk = moved && Math.abs(moved.stopLoss - stop2) < inst.tickSize;
+      console.log(`${movedOk ? '✓' : '✗'} 4. stop moved ${px(stop1)} → ${moved ? px(moved.stopLoss) : '?'}`);
+      if (!movedOk) ok = false;
+    }
 
-    await client.setStopLoss(S, stop2);
-    await sleep(500);
-    const moved = (await client.getPositions())[S];
-    const movedOk = moved && Math.abs(moved.stopLoss - stop2) < inst.tickSize;
-    console.log(`${movedOk ? '✓' : '✗'} 4. stop moved ${px(stop1)} → ${moved ? px(moved.stopLoss) : '?'}`);
-    if (!movedOk) ok = false;
-
-    console.log(`   holding ${holdSec}s — open the OKX app: Positions should show the ${side} with its stop-loss…`);
+    console.log(`   holding ${holdSec}s — open the OKX app: Positions should show the ${side} with its stop-loss${tp ? ' and take-profit' : ''}…`);
     await sleep(holdSec * 1000);
   } catch (err) {
     ok = false;

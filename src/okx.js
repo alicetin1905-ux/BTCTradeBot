@@ -256,7 +256,7 @@ function createSwapClient(opts) {
       for (const symbol of Object.keys(out)) {
         if (symbol !== SYMBOL) continue;
         const sl = (await stopOrders(symbol))[0];
-        if (sl) out[symbol].stopLoss = num(sl.slTriggerPx);
+        if (sl) { out[symbol].stopLoss = num(sl.slTriggerPx); out[symbol].takeProfit = num(sl.tpTriggerPx) || null; }
       }
       return out;
     },
@@ -282,13 +282,17 @@ function createSwapClient(opts) {
       }
     },
 
-    // Market entry with the stop-loss attached to the same order, so the
-    // position never exists on OKX without a stop.
-    async openMarket({ symbol, bias, qty, stopLoss }) {
+    // Market entry with the stop-loss (and optionally a take-profit) attached
+    // to the same order, so the position never exists on OKX without a stop.
+    // With both, OKX holds them as one OCO pair: one triggering cancels the other.
+    async openMarket({ symbol, bias, qty, stopLoss, takeProfit }) {
       const r = await request('POST', '/api/v5/trade/order', {
         instId: idOf(symbol), tdMode: TDM, side: bias === 1 ? 'buy' : 'sell', ...(await posSide(bias)),
         ordType: 'market', sz: await contracts(symbol, qty),
-        attachAlgoOrds: [{ slTriggerPx: String(stopLoss), slOrdPx: '-1', slTriggerPxType: 'mark' }],
+        attachAlgoOrds: [{
+          slTriggerPx: String(stopLoss), slOrdPx: '-1', slTriggerPxType: 'mark',
+          ...(takeProfit ? { tpTriggerPx: String(takeProfit), tpOrdPx: '-1', tpTriggerPxType: 'mark' } : {}),
+        }],
       });
       return r[0].ordId;
     },

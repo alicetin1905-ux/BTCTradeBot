@@ -7,7 +7,7 @@ const config = module.exports = {
   // state/demo/<coin>/), all sharing one balance. COINS is the run order:
   // scripts/actions-run.sh runs `COIN=<coin> node src/run.js` for each, and
   // the last one also sends the combined daily / status pushes.
-  COINS: ['UNI', 'NEAR', 'ETH', 'BTC'],
+  COINS: ['UNI', 'ETH', 'BTC'],
   // Where each coin trades. BTC and ETH: the USD-settled futures (long + short,
   // 10x). NEAR: its futures are refused on the EEA site (OKX 51155, local
   // compliance), so it trades the SPOT pair NEAR-USDC: long only, no leverage,
@@ -91,7 +91,17 @@ const config = module.exports = {
   // hold up after fees.
   DIRECTION: 'both',
 
-  // Stops, in ATRs of the 4H candles. Both live on the exchange as the position's
+  // How a trade is sized and exited (the entry signals above are the same):
+  //   'fixed' — every trade uses FIXED.MARGIN USDT of margin at PORTFOLIO.LEVERAGE (500 x 10x = $5000
+  //             of position), a stop-loss at -FIXED.SL_USDT and a take-profit at +FIXED.TP_USDT of that
+  //             position (-$100 / +$200 = 2% / 4% away), both on the exchange as one OCO pair. No trailing,
+  //             no signal exit. A trade that loses = 5% of a 2000 balance, one that wins = +10%.
+  //   'atr'   — the earlier rules: RISK_PCT of the balance at a 2 x ATR stop that trails 3 x ATR.
+  // Spot coins (NEAR-USDC) can't be leveraged and keep the 'atr' rules.
+  TRADE_MODE: 'fixed',
+  FIXED: { MARGIN: 500, SL_USDT: 100, TP_USDT: 200 },
+
+  // Stops ('atr' mode), in ATRs of the 4H candles. Both live on the exchange as the position's
   // stop-loss, so they work while the machine running the bot is off.
   STOP_ATR: 2,         // initial stop: entry -/+ 2 x ATR
   TRAIL_ATR: 3,        // after each 4H close: best close since entry -/+ 3 x ATR (never loosens)

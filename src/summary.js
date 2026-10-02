@@ -33,7 +33,7 @@ function positionsFrom(trades) {
 
 function positionLine(p, coin = config.COIN) {
   const u = p.unrealisedPnl || 0;
-  return `${coin} ${p.bias === 1 ? 'long' : 'short'} ${p.qty} @ ${px(p.entry)} · ${money(u)} · stop ${px(p.stop)}${p.trailed ? ' (trailed)' : ''}`;
+  return `${coin} ${p.bias === 1 ? 'long' : 'short'} ${p.qty} @ ${px(p.entry)} · ${money(u)} · stop ${px(p.stop)}${p.trailed ? ' (trailed)' : ''}${p.takeProfit ? ` · TP ${px(p.takeProfit)}` : ''}`;
 }
 
 // Every coin's { coin, position, signal, trades }: this process's, then the peers'.

@@ -282,13 +282,14 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       '<dt>Entry</dt><dd>' + esc(px(p.entry)) + '</dd>' +
       '<dt>Price now</dt><dd>' + esc(px(mark)) + '</dd>' +
       '<dt>Stop ' + (p.trailed ? '(trailed)' : '(initial)') + '</dt><dd class="' + (locked >= 0 ? 'up' : 'dn') + '">' + esc(px(p.stop)) + '</dd>' +
+      (p.takeProfit ? '<dt>Take profit</dt><dd class="up">' + esc(px(p.takeProfit)) + '</dd><dt>Gain at the target</dt><dd class="up">' + esc(signed((p.takeProfit - p.entry) * p.bias * p.qty)) + '</dd>' : '') +
       '<dt>Distance to stop</dt><dd>' + (toStop == null ? '—' : esc(toStop.toFixed(2)) + '%') + '</dd>' +
       '<dt>At the stop</dt><dd class="' + cls(locked) + '">' + esc(signed(locked)) + (locked >= 0 ? ' locked in' : '') + '</dd>' +
       '<dt>Risk when opened</dt><dd>' + esc(usd(p.riskAmt)) + '</dd>' +
       (p.funding ? '<dt>Funding so far</dt><dd class="' + cls(p.funding) + '">' + esc(signed(p.funding)) + '</dd>' : '') +
       '</dl>' +
-      '<div class="note">The stop sits on ' + esc(EXCHANGE_NAME[S.account.exchange] || 'the exchange') + ' and trails after every 4H close' +
-      (S.signal && S.signal.upper == null && S.signal.score != null ? '; an opposite ATLAS swing closes the position (and reverses it).' : '; the bot also exits on a 4H close below the ' + esc(S.account.settings ? S.account.settings.EXIT_N : 20) + '-candle low.') + '</div>';
+      '<div class="note">The stop sits on ' + esc(EXCHANGE_NAME[S.account.exchange] || 'the exchange') + (p.fixed ? ': a fixed stop-loss and take-profit, no trailing; whichever is hit first closes the trade' : ' and trails after every 4H close') +
+      (p.fixed ? '.' : S.signal && S.signal.upper == null && S.signal.score != null ? '; an opposite ATLAS swing closes the position (and reverses it).' : '; the bot also exits on a 4H close below the ' + esc(S.account.settings ? S.account.settings.EXIT_N : 20) + '-candle low.') + '</div>';
   }
 
   function renderSignal() {
@@ -397,7 +398,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     var Hs = flipMode ? (W < 600 ? 90 : 110) : 0, gap = flipMode ? 14 : 0, Hh = Hp + gap + Hs + 26, m = { l: 4, r: 74, t: 12, b: 26 };
     var lo = Infinity, hi = -Infinity;
     rows.forEach(function (r) { lo = Math.min(lo, r.l, r.ex || Infinity); hi = Math.max(hi, r.h, r.up || -Infinity); });
-    if (p) { lo = Math.min(lo, p.stop, p.entry); hi = Math.max(hi, p.stop, p.entry); }
+    if (p) { lo = Math.min(lo, p.stop, p.entry, p.takeProfit || Infinity); hi = Math.max(hi, p.stop, p.entry, p.takeProfit || -Infinity); }
     var pad = (hi - lo) * 0.06; lo -= pad; hi += pad;
     var n = rows.length, cw = (W - m.l - m.r) / n;
     var X = function (i) { return m.l + cw * (i + 0.5); };
@@ -405,7 +406,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     var sTop = Hp + gap, YS = function (v) { return sTop + (100 - v) / 200 * Hs; };
     var svg = node('svg', { viewBox: '0 0 ' + W + ' ' + Hh, width: W, height: Hh, role: 'img', 'aria-label': flipMode ? S.coin + ' 4H candles with the ATLAS score below' : S.coin + ' 4H candles with the breakout and exit channel' }, box);
     // Level labels (right edge) are placed first so price ticks can make room for them.
-    var p0 = S.position, labelYs = (rows[rows.length - 1].up != null ? [Y(rows[rows.length - 1].up)] : []).concat(p0 ? [Y(p0.entry), Y(p0.stop)] : []);
+    var p0 = S.position, labelYs = (rows[rows.length - 1].up != null ? [Y(rows[rows.length - 1].up)] : []).concat(p0 ? [Y(p0.entry), Y(p0.stop)].concat(p0.takeProfit ? [Y(p0.takeProfit)] : []) : []);
     niceTicks(lo, hi, W < 600 ? 4 : 5).forEach(function (v) {
       node('line', { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: 'var(--line)', 'stroke-width': 1 }, svg);
       if (labelYs.some(function (y) { return Math.abs(y - Y(v)) < 14; })) return;
@@ -444,6 +445,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     if (p) {
       level(p.entry, 'var(--blue)', 'entry', '');
       level(p.stop, 'var(--dn)', 'stop', '6 4');
+      if (p.takeProfit) level(p.takeProfit, 'var(--up)', 'target', '6 4');
     }
     var last = rows[rows.length - 1];
     if (last.up != null) labels.push({ y: Y(last.up), text: 'breakout', color: 'var(--nt)' });
@@ -555,6 +557,10 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
 
   var LABELS = {
     RISK_PCT: ['Loss at the initial stop', function (v) { return v + '% of balance'; }],
+    TRADE_MODE: ['Position rules', function (v) { return v === 'fixed' ? 'fixed margin, stop-loss and take-profit' : 'risk % of balance, trailing stop'; }],
+    FIXED_MARGIN: ['Fixed: margin per trade', function (v) { return '$' + v; }],
+    FIXED_SL_USDT: ['Fixed: loss at the stop-loss', function (v) { return '$' + v; }],
+    FIXED_TP_USDT: ['Fixed: gain at the take-profit', function (v) { return '$' + v; }],
     COIN_RISK_PCT: ['Own risk per coin', function (v) { var k = Object.keys(v || {}); return k.length ? k.map(function (c) { return c + ' ' + v[c] + '%'; }).join(', ') : 'none'; }],
     MAX_POSITION_X: ['Max position value', function (v) { return v + '× balance'; }],
     LEVERAGE: ['Leverage', function (v) { return v + '×'; }],

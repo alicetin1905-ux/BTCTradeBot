@@ -14,6 +14,7 @@ const config = require('../config');
 config.STRATEGY = 'breakout';
 config.DIRECTION = 'long';
 config.PORTFOLIO.RISK_PCT = 2;
+config.TRADE_MODE = 'atr'; // these tests are about the ATR rules; fixed mode has its own tests at the end
 config.CHANNEL_N = 20;
 config.EXIT_N = 20;
 const signal = require('../src/signal');
@@ -48,10 +49,10 @@ function fakeBybit({ equity = 10000, mark = 100000 } = {}) {
     async getInstrument() { return INST; },
     async getMarkPrice(s) { return ex.marks[s]; },
     async setLeverage(s, l) { ex.calls.push(['setLeverage', s, l]); },
-    async openMarket({ symbol, bias, qty, stopLoss }) {
+    async openMarket({ symbol, bias, qty, stopLoss, takeProfit }) {
       ex.calls.push(['openMarket', symbol, bias, qty, stopLoss]);
       const m = ex.marks[symbol];
-      ex.positions[symbol] = { symbol, bias, size: qty, avgPrice: m, stopLoss, markPrice: m, unrealisedPnl: 0 };
+      ex.positions[symbol] = { symbol, bias, size: qty, avgPrice: m, stopLoss, takeProfit, markPrice: m, unrealisedPnl: 0 };
       return ex.id();
     },
     async setStopLoss(symbol, sl) {
@@ -532,6 +533,12 @@ test('OKX: sizes in BTC become contracts; the entry carries its stop-loss; long/
     attachAlgoOrds: [{ slTriggerPx: '98000', slOrdPx: '-1', slTriggerPxType: 'mark' }] });
   assert.deepEqual(f.S.calls.find(x => x.path === '/api/v5/account/set-leverage').body, { instId: 'BTC-USDT-SWAP', lever: '5', mgnMode: 'cross' });
 
+  // With a take-profit it rides on the same attached algo order (one OCO pair on OKX).
+  const h = fakeOkx();
+  await okxClient(h).openMarket({ symbol: 'BTCUSDT', bias: -1, qty: 0.05, stopLoss: 102000, takeProfit: 96000 });
+  assert.deepEqual(h.S.calls.find(x => x.path === '/api/v5/trade/order').body.attachAlgoOrds,
+    [{ slTriggerPx: '102000', slOrdPx: '-1', slTriggerPxType: 'mark', tpTriggerPx: '96000', tpOrdPx: '-1', tpTriggerPxType: 'mark' }]);
+
   const g = fakeOkx({ posMode: 'long_short_mode' });
   await okxClient(g).closeMarket({ symbol: 'BTCUSDT', bias: -1, qty: 0.03 });
   const close = g.S.calls.find(x => x.path === '/api/v5/trade/order').body;
@@ -548,7 +555,7 @@ test('OKX: positions keyed like Bybit, size in BTC, stop read from the stop-loss
     algos: [{ ordType: 'conditional', algoId: 'a1', instId: 'BTC-USDT-SWAP', slTriggerPx: '102000' }],
   });
   const p = await okxClient(f).getPositions();
-  assert.deepEqual(p.BTCUSDT, { symbol: 'BTCUSDT', bias: -1, size: 0.03, avgPrice: 100000, markPrice: 99000, unrealisedPnl: 30, stopLoss: 102000 });
+  assert.deepEqual(p.BTCUSDT, { symbol: 'BTCUSDT', bias: -1, size: 0.03, avgPrice: 100000, markPrice: 99000, unrealisedPnl: 30, stopLoss: 102000, takeProfit: null });
   assert.equal(p.SOLUSDT.bias, 1);
 });
 
@@ -734,7 +741,7 @@ test('OKX XPERP future: 1 BTC contracts, USDC margin, 10x, FUTURES endpoints, it
   assert.deepEqual(await c.getWallet(), { equity: 1999.94, available: 1999.94 });
   assert.deepEqual(await c.getInstrument('BTCUSDT'), { qtyStep: 0.0001, minOrderQty: 0.0001, minNotional: 0, tickSize: 0.1 });
   const p = await c.getPositions();
-  assert.deepEqual(p.BTCUSDT, { symbol: 'BTCUSDT', bias: 1, size: 0.0234, avgPrice: 100000, markPrice: 101000, unrealisedPnl: 23.4, stopLoss: 98000 });
+  assert.deepEqual(p.BTCUSDT, { symbol: 'BTCUSDT', bias: 1, size: 0.0234, avgPrice: 100000, markPrice: 101000, unrealisedPnl: 23.4, stopLoss: 98000, takeProfit: null });
   await c.setLeverage('BTCUSDT', 10);
   await c.openMarket({ symbol: 'BTCUSDT', bias: 1, qty: 0.0234, stopLoss: 98000 });
   assert.deepEqual(f.S.calls.find(x => x.path === '/api/v5/account/set-leverage').body, { instId: XP, lever: '10', mgnMode: 'cross' });
@@ -933,7 +940,7 @@ test('price text keeps the decimals a cheap coin needs (NEAR 4.807), BTC / ETH a
 
 test('settings: COIN_RISK_PCT gives single coins their own risk, validated', () => {
   const { apply, current } = require('../src/settings');
-  const cfg = JSON.parse(JSON.stringify({ PORTFOLIO: { RISK_PCT: 2, MAX_POSITION_X: 2, LEVERAGE: 10, STARTING_BALANCE: 2000 }, EXECUTION: { DAILY_LOSS_LIMIT_PCT: 10 }, NOTIFY: { STATUS_EVERY_H: 4 }, COIN_RISK_PCT: { NEAR: 1 }, STRATEGY: 'atlas-flip', FLIP_SCORE: 10, FLIP_WINDOW: 2, EXTREME_SCORE: 90, TREND_BAND_PCT: 10, DIRECTION: 'both', CHANNEL_N: 15, EXIT_N: 15, STOP_ATR: 2, TRAIL_ATR: 3, ENTRY_FRESH_MIN: 180, MARKET_DATA: null, SCORE_MODE: 'graded' }));
+  const cfg = JSON.parse(JSON.stringify({ PORTFOLIO: { RISK_PCT: 2, MAX_POSITION_X: 2, LEVERAGE: 10, STARTING_BALANCE: 2000 }, EXECUTION: { DAILY_LOSS_LIMIT_PCT: 10 }, NOTIFY: { STATUS_EVERY_H: 4 }, COIN_RISK_PCT: { NEAR: 1 }, TRADE_MODE: 'fixed', FIXED: { MARGIN: 500, SL_USDT: 100, TP_USDT: 200 }, STRATEGY: 'atlas-flip', FLIP_SCORE: 10, FLIP_WINDOW: 2, EXTREME_SCORE: 90, TREND_BAND_PCT: 10, DIRECTION: 'both', CHANNEL_N: 15, EXIT_N: 15, STOP_ATR: 2, TRAIL_ATR: 3, ENTRY_FRESH_MIN: 180, MARKET_DATA: null, SCORE_MODE: 'graded' }));
   assert.deepEqual(current(cfg).COIN_RISK_PCT, { NEAR: 1 });
   let r = apply(cfg, { COIN_RISK_PCT: { NEAR: 0.5, ETH: 3 } });
   assert.deepEqual(cfg.COIN_RISK_PCT, { NEAR: 0.5, ETH: 3 }); assert.equal(r.errors.length, 0);
@@ -942,4 +949,65 @@ test('settings: COIN_RISK_PCT gives single coins their own risk, validated', () 
   assert.deepEqual(cfg.COIN_RISK_PCT, { NEAR: 0.5, ETH: 3 }); // bad value: kept
   r = apply(cfg, { COIN_RISK_PCT: null });
   assert.deepEqual(cfg.COIN_RISK_PCT, {});
+});
+
+test('fixed mode: 500 margin x 10x = $5000, stop-loss -$100 (2%), take-profit +$200 (4%), no trailing, no signal exit', async () => {
+  config.TRADE_MODE = 'fixed';
+  const dir = config.DIRECTION; config.DIRECTION = 'both';
+  try {
+    for (const bias of [1, -1]) {
+      const { ex, client } = fakeBybit();
+      const st = freshState();
+      const flipSig = (t, close, score, flipFrom, enter) => ({ t, close, atr: 1000, score, flipFrom, enter, exitLong: enter === -1, exitShort: enter === 1, upper: null, lower: null, exitUpper: null, exitLower: null });
+      const events = [];
+      await exchange.runExchange({ client, st, sig: [flipSig(T0, 100000, 30 * bias, -40 * bias, bias)], events, now: after(T0) });
+      const p = st.position;
+      assert.equal(p.fixed, true);
+      assert.equal(p.bias, bias);
+      const mark = ex.marks.BTCUSDT;
+      assert.ok(Math.abs(p.qty * mark - 5000) < 5000 * 0.01, 'position value about $5000: ' + p.qty * mark);
+      assert.ok(Math.abs(p.qty * Math.abs(mark - p.stop) - 100) < 2, 'loss at the stop about $100: ' + p.qty * Math.abs(mark - p.stop));
+      assert.ok(Math.abs(p.qty * Math.abs(p.takeProfit - mark) - 200) < 4, 'gain at the take-profit about $200');
+      assert.equal(Math.sign(p.takeProfit - mark), bias);        // target on the winning side
+      assert.equal(ex.positions.BTCUSDT.takeProfit, p.takeProfit); // sent to the exchange with the order
+      const enter = events.find(e => e.type === 'enter');
+      assert.equal(enter.takeProfit, p.takeProfit);
+      assert.match(require('../src/notify').messagesFor(events, st)[0].message, /take profit .* \(fixed\)/);
+      // Next 4H close, an opposite swing and a trail-worthy move: a fixed position is left alone.
+      const t1 = T0 + TF;
+      ex.marks.BTCUSDT = mark * (1 + 0.01 * bias);
+      const before = ex.calls.length;
+      await exchange.runExchange({ client, st, sig: [flipSig(t1, mark * (1 + 0.01 * bias), -30 * bias, 40 * bias, -bias)], events: [], now: after(t1) });
+      assert.ok(st.position, 'still open');
+      assert.deepEqual(ex.calls.slice(before).filter(c => ['setStopLoss', 'closeMarket'].includes(c[0])), []);
+      // The exchange fires the take-profit: booked as "take profit".
+      ex.closedPnl.push({ symbol: 'BTCUSDT', orderId: ex.id(), qty: p.qty, exit: p.takeProfit, pnl: 200, at: Date.now() });
+      delete ex.positions.BTCUSDT;
+      await exchange.runExchange({ client, st, events: [], now: after(t1) });
+      assert.equal(st.position, null);
+      assert.equal(st.trades.at(-1).reason, 'take profit');
+    }
+  } finally { config.TRADE_MODE = 'atr'; config.DIRECTION = dir; }
+});
+
+test('fixed mode: a stop-loss hit is booked as "stop loss"; spot coins keep the ATR rules', async () => {
+  config.TRADE_MODE = 'fixed';
+  try {
+    const { ex, client } = fakeBybit();
+    const st = freshState();
+    const sig = { t: T0, close: 100000, atr: 1000, score: 30, flipFrom: -40, enter: 1, exitLong: false, exitShort: false, upper: null, lower: null, exitUpper: null, exitLower: null };
+    await exchange.runExchange({ client, st, sig: [sig], events: [], now: after(T0) });
+    const p = st.position;
+    ex.hitStop('BTCUSDT', Date.now());
+    await exchange.runExchange({ client, st, events: [], now: after(T0) });
+    assert.equal(st.trades.at(-1).reason, 'stop loss');
+    assert.ok(Math.abs(st.trades.at(-1).pnl + 100) < 2, 'lost about $100: ' + st.trades.at(-1).pnl);
+    // A spot client (no leverage) is not sized by the fixed rules.
+    const spot = fakeBybit();
+    spot.client.spot = true;
+    const st2 = freshState();
+    await exchange.runExchange({ client: spot.client, st: st2, sig: [{ ...sig, t: T0 + TF }], events: [], now: after(T0 + TF) });
+    assert.equal(st2.position.fixed, false);
+    assert.equal(st2.position.takeProfit, null);
+  } finally { config.TRADE_MODE = 'atr'; }
 });

@@ -53,8 +53,10 @@ function notionalFor(base, stopDist) {
   return Math.min((base * P.RISK_PCT / 100) / stopDist, base * P.MAX_POSITION_X);
 }
 
-function reasonFor(pos, orderId) {
+function reasonFor(pos, orderId, exit) {
   if (orderId && pos.orders && orderId === pos.orders.close) return pos.closeReason || 'closed at market';
+  // Fixed mode: the exit price says which of the two orders fired.
+  if (pos.fixed && pos.takeProfit && exit != null) return Math.abs(exit - pos.takeProfit) < Math.abs(exit - pos.stop) ? 'take profit' : 'stop loss';
   return pos.trailed ? 'trailing stop' : 'stop';
 }
 
@@ -71,7 +73,7 @@ async function recordFills(client, st, pos, events, { until = Infinity, skipIds 
     if (r.orderId !== (pos.orders && pos.orders.close) && (r.at < pos.openedAt - 60000 || r.at > until)) continue;
     seen.add(r.orderId);
     st.seenOrderIds.push(r.orderId);
-    const reason = reasonFor(pos, r.orderId);
+    const reason = reasonFor(pos, r.orderId, r.exit);
     st.trades.push({
       symbol: SYMBOL, bias: pos.bias, entry: pos.entry, exit: r.exit, qty: r.qty, pnl: r.pnl,
       reason, openedAt: pos.openedAt, closedAt: r.at, initialStop: pos.initialStop,
@@ -135,6 +137,8 @@ async function closeAtMarket(client, st, pos, live, reason, events, now) {
 async function manage({ client, st, live, sig, events, now }) {
   const pos = st.position;
   if (!pos || !live) return false;
+  // Fixed mode (TRADE_MODE 'fixed'): the stop-loss and take-profit sit on the exchange; nothing to trail, no signal exit.
+  if (pos.fixed) return false;
   const fromT = pos.entryCandleT + TF_MS; // candles closed after the entry candle
   // Exit signal on any 4H close since the last check (a missed run still exits).
   const exitOn = sig.filter(s => s && s.t >= fromT && s.t > (pos.lastExitCheckT || 0))
@@ -207,8 +211,14 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
   }
   const bias = s.enter;
   const base = sizingBase(st, wallet);
-  const stopDist = (config.STOP_ATR * s.atr) / s.close;
-  let notional = notionalFor(base, stopDist);
+  // Fixed mode: always FIXED.MARGIN x leverage of position value, stop-loss at -FIXED.SL_USDT and
+  // take-profit at +FIXED.TP_USDT of that size (so 500 x 10x = $5000: stop 2% away, target 4%).
+  // Spot coins keep the ATR rules (no leverage there).
+  const fixed = config.TRADE_MODE === 'fixed' && !client.spot;
+  const F = config.FIXED;
+  const stopDist = fixed ? F.SL_USDT / (F.MARGIN * P.LEVERAGE) : (config.STOP_ATR * s.atr) / s.close;
+  const tpDist = fixed ? F.TP_USDT / (F.MARGIN * P.LEVERAGE) : null;
+  let notional = fixed ? F.MARGIN * P.LEVERAGE : notionalFor(base, stopDist);
   const maxByMargin = wallet.available * 0.95 * P.LEVERAGE;
   if (notional > maxByMargin) {
     events.push({ type: 'info', reason: `size cut to what ${client.label || 'the exchange'}'s free margin allows ($${maxByMargin.toFixed(0)} of $${notional.toFixed(0)})` });
@@ -222,10 +232,11 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
     return;
   }
   const stopLoss = stopRound(mark * (1 - bias * stopDist), inst.tickSize, bias);
+  const takeProfit = fixed ? +(Math.round(mark * (1 + bias * tpDist) / inst.tickSize) * inst.tickSize).toFixed(dp(inst.tickSize)) : null;
   st.meta = { ...st.meta, lastEntryCandle: s.t }; // one attempt per signal candle, even if the order fails
 
   await client.setLeverage(SYMBOL, P.LEVERAGE);
-  const entryId = await client.openMarket({ symbol: SYMBOL, bias, qty, stopLoss });
+  const entryId = await client.openMarket({ symbol: SYMBOL, bias, qty, stopLoss, takeProfit });
   // The exchange's position list can lag the fill by a moment: without this
   // retry the bot would lose track of its own trade (stop on the exchange,
   // but no trailing or exit).
@@ -239,14 +250,14 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
   const entry = pos.avgPrice;
   st.position = {
     symbol: SYMBOL, exchange: config.MARKET_ID || config.EXCHANGE, bias, entry, qty: pos.size, qtyTotal: pos.size,
-    stop: stopLoss, initialStop: stopLoss, ext: s.close, trailed: false,
+    stop: stopLoss, initialStop: stopLoss, takeProfit, fixed, ext: s.close, trailed: false,
     entryCandleT: s.t, lastExitCheckT: s.t, openedAt: now, orders: { entry: entryId }, tickSize: inst.tickSize,
     notional: pos.size * entry, margin: (pos.size * entry) / P.LEVERAGE, riskAmt: pos.size * Math.abs(entry - stopLoss),
     atrAtEntry: s.atr, breakout: bias === 1 ? s.upper : s.lower, score: s.score ?? null, flipFrom: s.flipFrom ?? null,
     markPrice: pos.markPrice || entry, unrealisedPnl: pos.unrealisedPnl || 0, exchangeStop: pos.stopLoss || stopLoss,
   };
   events.push({
-    type: 'enter', bias, entry, stop: stopLoss, qty: pos.size, notional: pos.size * entry,
+    type: 'enter', bias, entry, stop: stopLoss, takeProfit, fixed, qty: pos.size, notional: pos.size * entry,
     riskAmt: st.position.riskAmt, breakout: st.position.breakout, score: s.score ?? null, flipFrom: s.flipFrom ?? null, close: s.close,
   });
 }
