@@ -22,10 +22,22 @@ async function main() {
   // "CLOSE:<instrument>" only flattens that instrument (and cancels its stops) instead of probing it.
   for (const raw of INSTS.filter(x => x.startsWith('CLOSE:'))) {
     const id = raw.slice(6);
+    // Pending (close) orders and stops first, then a reduce-only market order the other way.
+    for (const o of await t.request('GET', '/api/v5/trade/orders-pending', { instType: 'FUTURES', instId: id }).catch(() => [])) {
+      await t.request('POST', '/api/v5/trade/cancel-order', { instId: id, ordId: o.ordId }).catch(e => console.log(`  cancel order: ${e.message}`));
+      console.log(`cancelled pending order ${o.ordId} (${o.side} ${o.sz} ${o.ordType})`);
+    }
+    for (const ordType of ['conditional', 'oco']) {
+      for (const o of await t.request('GET', '/api/v5/trade/orders-algo-pending', { ordType, instType: 'FUTURES', instId: id }).catch(() => [])) {
+        await t.request('POST', '/api/v5/trade/cancel-algos', [{ algoId: o.algoId, instId: id }]).catch(() => {});
+      }
+    }
     for (const p of (await t.request('GET', '/api/v5/account/positions', { instType: 'FUTURES', instId: id })).filter(q => +q.pos)) {
-      await t.request('POST', '/api/v5/trade/close-position', { instId: id, mgnMode: p.mgnMode, ...(p.mgnMode === 'cross' ? { ccy: 'USDC' } : {}) });
+      const n = +p.pos;
+      await t.request('POST', '/api/v5/trade/order', { instId: id, tdMode: p.mgnMode, side: n > 0 ? 'sell' : 'buy', ordType: 'market', sz: String(Math.abs(n)), reduceOnly: true, ...(p.mgnMode === 'cross' ? { ccy: 'USDC' } : {}) });
       console.log(`closed ${p.pos} contracts on ${id}`);
     }
+    await sleep(2000);
     const left = (await t.request('GET', '/api/v5/account/positions', { instType: 'FUTURES', instId: id })).filter(q => +q.pos);
     console.log(left.length ? `✗ still open on ${id}` : `✓ nothing open on ${id}`);
   }
