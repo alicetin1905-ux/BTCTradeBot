@@ -18,6 +18,7 @@ async function main() {
   const t = transport({
     apiKey: process.env.OKX_API_KEY, apiSecret: process.env.OKX_API_SECRET, passphrase: process.env.OKX_API_PASSPHRASE, base: process.env.OKX_API_BASE,
   });
+  const publicGet = t.publicGet;
   let ok = 0;
   // "CLOSE:<instrument>" only flattens that instrument (and cancels its stops) instead of probing it.
   for (const raw of INSTS.filter(x => x.startsWith('CLOSE:'))) {
@@ -34,7 +35,9 @@ async function main() {
     }
     for (const p of (await t.request('GET', '/api/v5/account/positions', { instType: 'FUTURES', instId: id })).filter(q => +q.pos)) {
       const n = +p.pos;
-      await t.request('POST', '/api/v5/trade/order', { instId: id, tdMode: p.mgnMode, side: n > 0 ? 'sell' : 'buy', ordType: 'market', sz: String(Math.abs(n)), reduceOnly: true, ...(p.mgnMode === 'cross' ? { ccy: 'USDC' } : {}) });
+      // A thin demo book can leave a market order pending: cross the spread with a limit price 30% through the mark instead.
+      const mk = +(await publicGet('/api/v5/public/mark-price', { instType: 'FUTURES', instId: id }))[0].markPx;
+      await t.request('POST', '/api/v5/trade/order', { instId: id, tdMode: p.mgnMode, side: n > 0 ? 'sell' : 'buy', ordType: 'ioc', px: String(+(mk * (n > 0 ? 0.7 : 1.3)).toPrecision(6)), sz: String(Math.abs(n)), reduceOnly: true, ...(p.mgnMode === 'cross' ? { ccy: 'USDC' } : {}) });
       console.log(`closed ${p.pos} contracts on ${id}`);
     }
     await sleep(2000);
