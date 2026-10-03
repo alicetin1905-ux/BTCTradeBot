@@ -37,12 +37,12 @@ const config = module.exports = {
   // Signal timeframe: closed 4H candles (UTC-aligned: 00/04/08/12/16/20).
   // backtest/RESEARCH.md: 1D breakouts were much weaker on BTC.
   ENTRY_TF: '240',
-  // New entries only within this many minutes of the 4H close. GitHub's cron
-  // often delays or drops runs, so this leaves room for a few late ones; a
-  // signal older than that isn't chased. Backtest: entering 1-4h after the
-  // close costs nothing measurable (PF 1.43-1.46 vs 1.44 at the close).
-  // Stops and exits still update on any run.
-  ENTRY_FRESH_MIN: 180,
+  // New entries only within this many minutes of the 4H close; an older
+  // signal isn't chased. The Mac runs at :02 and :32, so both runs after a
+  // close fit. (180 while GitHub's cron ran the bot and delayed runs by hours:
+  // BTC 2026-10-02 then entered 2h47 late, ~360 points worse.) Stops and exits
+  // still update on any run.
+  ENTRY_FRESH_MIN: 45,
 
   // Where the candles come from: null = the exchange it trades on (the
   // other one as a fallback), or 'bybit' / 'okx'.
@@ -99,21 +99,22 @@ const config = module.exports = {
   DIRECTION: 'both',
 
   // How a trade is sized and exited (the entry signals above are the same):
-  //   'fixed' — every trade uses FIXED.MARGIN USDT of margin at PORTFOLIO.LEVERAGE (750 x 10x = $7500
+  //   'fixed' — every trade uses FIXED.MARGIN USDT of margin at PORTFOLIO.LEVERAGE (550 x 10x = $5500
   //             of position), a stop-loss at -FIXED.SL_USDT and a take-profit at +FIXED.TP_USDT of that
-  //             position (-$100 / +$200 = 1.33% / 2.67% away), both on the exchange as one OCO pair. No
+  //             position (-$100 / +$200 = 1.8% / 3.6% away), both on the exchange as one OCO pair. No
   //             trailing, no signal exit. A trade that loses = 5% of a 2000 balance, one that wins = +10%.
   //             Chosen (2026-10-02) for a sideways BTC: bounces of about 2-2.7%, 4H candles about 1%.
   //             With 2000 USDC of margin, two such trades fit at once; a third is cut to the free margin.
   //   'atr'   — the earlier rules: RISK_PCT of the balance at a 2 x ATR stop that trails 3 x ATR.
   // Spot coins (NEAR-USDC) can't be leveraged and keep the 'atr' rules.
   TRADE_MODE: 'fixed',
-  FIXED: { MARGIN: 750, SL_USDT: 100, TP_USDT: 200 },
-  // A coin's own fixed-mode numbers (merged over FIXED for that coin). ETH: 667 margin = a 6,667 USDT position, so
-  // the same -$100 / +$200 sit 1.5% / 3% away from the entry (BTC: 750 margin, 1.33% / 2.67%). UNI (4H candles ~3%)
-  // uses FIXED until it gets its own.
-  // HYPE (4H candles ~2%, 7-day range ~11%): 400 margin = a 4,000 position, so -$100 / +$200 sit 2.5% / 5% away.
-  COIN_FIXED: { ETH: { MARGIN: 667 }, HYPE: { MARGIN: 400 } },
+  // 2026-10-03: margins lowered so the stop sits about 2 average 4H moves (ATR) from the entry; at 750 / 667 / 400
+  // it was only 1.2-1.5 ATR and an ordinary candle could hit it (both first trades stopped out within hours).
+  FIXED: { MARGIN: 550, SL_USDT: 100, TP_USDT: 200 },
+  // A coin's own fixed-mode numbers (merged over FIXED for that coin). BTC (4H ~0.9%): 550 -> 1.8% / 3.6%.
+  // ETH (4H ~1.1%): 450 margin = a 4,500 position, -$100 / +$200 at 2.2% / 4.4%.
+  // HYPE (4H ~2.2%): 230 margin = a 2,300 position, -$100 / +$200 at 4.3% / 8.7%.
+  COIN_FIXED: { ETH: { MARGIN: 450 }, HYPE: { MARGIN: 230 } },
 
   // Stops ('atr' mode), in ATRs of the 4H candles. Both live on the exchange as the position's
   // stop-loss, so they work while the machine running the bot is off.
@@ -146,6 +147,10 @@ const config = module.exports = {
     // Daily summary: sent by the first hourly run at/after this hour, in the
     // running Mac's local time.
     DAILY_SUMMARY_HOUR: 8,
+    // Weekly report (trades, wins / losses and P&L per coin over the last 7 days, the balance):
+    // sent by the first full run on this weekday (0 = Sunday) at/after this hour, Mac local time.
+    WEEKLY_REPORT_DAY: 0,
+    WEEKLY_REPORT_HOUR: 20,
     // Status push (position with live P&L, stop, equity), low priority.
     HOURLY_STATUS: true,
     // ...only on the run right after every Nth UTC hour — 4 = after each 4H close.

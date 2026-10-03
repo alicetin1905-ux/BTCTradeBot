@@ -956,6 +956,28 @@ test('ATLAS flip jump entry: +/-JUMP_SCORE in one 4H candle enters when it ends 
   } finally { atlas.analyse = real; }
 });
 
+test('weekly report: per coin, last 7 days only, once per Sunday evening', () => {
+  const summary = require('../src/summary');
+  const sun = new Date(2026, 9, 4, 20, 5).getTime(), H = 3600000;   // Sunday 4 Oct 2026 20:05 local
+  const st = {
+    account: { balance: 1891.6, startingBalance: 2000 }, meta: {},
+    trades: [{ bias: 1, entry: 1, exit: 1, pnl: -103.9, openedAt: sun - 50 * H, closedAt: sun - 48 * H }],
+    position: null, signal: null,
+    peers: { HYPE: { trades: [{ bias: -1, entry: 1, exit: 1, pnl: -104.5, openedAt: sun - 45 * H, closedAt: sun - 44 * H },
+                              { bias: 1, entry: 1, exit: 1, pnl: 200, openedAt: sun - 9 * 24 * H, closedAt: sun - 8 * 24 * H }] },
+             ETH: { trades: [] } },
+  };
+  assert.equal(summary.weeklyDue(st, sun - 2 * H), null);             // Sunday 18:05: too early
+  assert.equal(summary.weeklyDue(st, sun - 24 * H), null);            // Saturday
+  const m = summary.weeklyDue(st, sun);
+  assert.match(m.message, /This week: 2 trades · 0W \/ 2L \(0% win\) · -\$208\.40/);
+  assert.match(m.message, /BTC: 1 trade · 0W \/ 1L · -\$103\.90/);
+  assert.match(m.message, /ETH: no trades/);
+  assert.match(m.message, /HYPE: 1 trade · 0W \/ 1L/);              // the win 8 days ago is not this week's
+  assert.match(m.message, /Since the start: 3 trades · 1W \/ 2L/);
+  assert.equal(summary.weeklyDue(st, sun + H), null);                 // sent once
+});
+
 test('price text keeps the decimals a cheap coin needs (NEAR 4.807), BTC / ETH as before', () => {
   const { price } = require('../src/format');
   assert.equal(price(84625.55, 1), '84,625.6');
@@ -1098,8 +1120,8 @@ test('fixed mode follows the configured margin: 750 x 10x = $7500, stop-loss -$1
   } finally { config.TRADE_MODE = 'atr'; config.FIXED = { MARGIN: 500, SL_USDT: 100, TP_USDT: 200 }; }
 });
 
-test('the shipped fixed-mode defaults are 750 margin, -100 stop, +200 target', () => {
-  assert.deepEqual(FIXED_DEFAULTS, { MARGIN: 750, SL_USDT: 100, TP_USDT: 200 });
+test('the shipped fixed-mode defaults are 550 margin, -100 stop, +200 target', () => {
+  assert.deepEqual(FIXED_DEFAULTS, { MARGIN: 550, SL_USDT: 100, TP_USDT: 200 });
 });
 
 test('settings: COIN_FIXED is validated; ETH 667 margin puts -$100 / +$200 at 1.5% / 3% of the entry', async () => {

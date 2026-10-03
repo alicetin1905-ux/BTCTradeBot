@@ -4,6 +4,7 @@
 //   daily  — balance and change since the last summary, realized P&L of the
 //            last 24h, win rate, the open positions. Sent once a day by the
 //            first full run at/after config.NOTIFY.DAILY_SUMMARY_HOUR (local time).
+//   weekly — the last 7 days per coin, once a week (NOTIFY.WEEKLY_REPORT_DAY / _HOUR).
 //   status — equity, each coin's open position (live P&L, stop) or its ATLAS
 //            score. Quiet (low priority).
 'use strict';
@@ -71,6 +72,43 @@ function due(st, now = Date.now()) {
   return msg;
 }
 
+// The weekly report: the last 7 days per coin (positions, wins / losses, P&L), the balance, all trades since start.
+function weekly(st, now) {
+  const a = st.account;
+  const coins = coinsOf(st);
+  const from = now - 7 * DAY_MS;
+  const wl = (pos) => {
+    const w = pos.filter(p => p.pnl > 0.005).length, l = pos.filter(p => p.pnl < -0.005).length;
+    return { n: pos.length, w, l, pnl: pos.reduce((s, p) => s + p.pnl, 0) };
+  };
+  const lines = [];
+  let week = [];
+  for (const c of coins) {
+    const pos = positionsFrom(c.trades).filter(p => p.closedAt >= from);
+    week = week.concat(pos);
+    const r = wl(pos);
+    lines.push(r.n ? `${c.coin}: ${r.n} trade${r.n > 1 ? 's' : ''} · ${r.w}W / ${r.l}L · ${money(r.pnl)}` : `${c.coin}: no trades`);
+  }
+  const t = wl(week);
+  const all = wl([].concat(...coins.map(c => positionsFrom(c.trades))));
+  lines.unshift(t.n ? `This week: ${t.n} trade${t.n > 1 ? 's' : ''} · ${t.w}W / ${t.l}L (${Math.round((t.w / t.n) * 100)}% win) · ${money(t.pnl)}` : 'This week: no closed trades');
+  lines.push(`Balance $${a.balance.toFixed(2)} (${money(a.balance - a.startingBalance)} since the start, $${a.startingBalance.toFixed(0)})`);
+  lines.push(all.n ? `Since the start: ${all.n} trades · ${all.w}W / ${all.l}L (${Math.round((all.w / all.n) * 100)}% win)` : 'Since the start: no closed trades');
+  for (const c of coins) if (c.position) lines.push(positionLine(c.position, c.coin));
+  return { title: `Bot weekly · ${money(t.pnl)}`, message: lines.join('\n'), tags: ['calendar'] };
+}
+
+// Returns the weekly report if it is due (and marks it sent in st.meta.weekly), else null.
+function weeklyDue(st, now = Date.now()) {
+  const d = new Date(now), N = config.NOTIFY;
+  if (N.WEEKLY_REPORT_DAY == null || d.getDay() !== N.WEEKLY_REPORT_DAY || d.getHours() < (N.WEEKLY_REPORT_HOUR || 0)) return null;
+  const key = localDate(now);
+  if (st.meta && st.meta.weekly === key) return null;
+  const msg = weekly(st, now);
+  st.meta = { ...(st.meta || {}), weekly: key };
+  return msg;
+}
+
 // True on the runs that send the status push: the first run in every
 // NOTIFY.STATUS_EVERY_H-th UTC hour (runs are at :01, right after a candle close).
 function statusDue(now = Date.now()) {
@@ -99,4 +137,4 @@ function status(st) {
   return { title: `Bot $${equity.toFixed(2)} (${pct >= 0 ? '+' : ''}${pct}%)`, message: lines.join('\n'), tags: ['clock3'], priority: 2 };
 }
 
-module.exports = { due, build, status, statusDue, positionsFrom };
+module.exports = { due, build, status, statusDue, positionsFrom, weekly, weeklyDue };

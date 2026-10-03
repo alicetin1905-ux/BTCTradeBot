@@ -333,6 +333,7 @@ async function run() {
   };
   // Combined daily / status pushes come from the lead coin only (it runs last, so the others' state is fresh).
   const daily = LEAD ? summary.due(st) : null;
+  const weekly = LEAD ? summary.weeklyDue(st, now) : null;
   // Status push once per due hour, however many runs that hour has.
   const hour = Math.floor(now / 3600000);
   const status = LEAD && !daily && config.NOTIFY.HOURLY_STATUS && summary.statusDue(now) && st.meta.lastStatusHour !== hour;
@@ -342,6 +343,7 @@ async function run() {
   await notify.send(events, st);
   if (daily) await notify.push([daily]);
   else if (status) await notify.push([summary.status(st)]);
+  if (weekly) await notify.push([weekly]);
 }
 
 // Quick reconcile between hourly runs: books fills and notices a stop-out.

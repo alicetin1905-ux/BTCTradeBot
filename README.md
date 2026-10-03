@@ -108,18 +108,19 @@ account with the `testtrade` workflow (coin = ETH, NEAR).
   funding / open interest / order book / taker-flow inputs, which have no
   history. So the live score is exactly the one the backtest used.
 - **Entry:** a market order with the stop attached, on the run right after the
-  4H close (within 3 h, `ENTRY_FRESH_MIN`, so late GitHub runs don't miss it). One attempt per signal candle.
-- **Position rules (`TRADE_MODE`, live: `fixed`):** every trade uses **750 USDT of
-  margin at 10x = 7,500 USDT of position**, a **stop-loss at −100 USDT** (1.33% away)
-  and a **take-profit at +200 USDT** (2.67% away), attached to the entry order as one
+  4H close (within 45 min, `ENTRY_FRESH_MIN`; the Mac runs at :02 and :32). One attempt per signal candle.
+- **Position rules (`TRADE_MODE`, live: `fixed`):** every trade uses **550 USDT of
+  margin at 10x = 5,500 USDT of position**, a **stop-loss at −100 USDT** (1.8% away)
+  and a **take-profit at +200 USDT** (3.6% away), attached to the entry order as one
   OCO pair on OKX. No trailing, no signal exit: whichever is hit first closes the
   trade. A loss is 5% of a 2,000 balance, a win +10% (fees come on top, about
-  5.5 USDT per round trip). The entry signals are the same flip / ±80 as below.
+  4 USDT per round trip). The entry signals are the same flip / ±80 as below.
   Needs a win rate above about 35% to break even. Set `TRADE_MODE` to `atr` for
   the earlier rules (2% risk, ATR stop that trails) described below. Settings:
   `FIXED_MARGIN`, `FIXED_SL_USDT`, `FIXED_TP_USDT`; `COIN_FIXED` gives one coin its own
-  numbers (live: **ETH 667 margin** = a 6,667 position, so −100 / +200 are 1.5% / 3% away;
-  **HYPE 400 margin** = 4,000, so 2.5% / 5% away; BTC 750 margin, 1.33% / 2.67%). HYPE: `HYPE-USD_UM_XPERP-310801`. NEAR (spot, no leverage) was
+  numbers (live: **ETH 450 margin** = a 4,500 position, so −100 / +200 are 2.2% / 4.4% away;
+  **HYPE 230 margin** = 2,300, so 4.3% / 8.7% away; BTC 550 margin, 1.8% / 3.6%; each stop
+  about 2 average 4H moves from the entry). HYPE: `HYPE-USD_UM_XPERP-310801`. NEAR (spot, no leverage) was
   taken out of `COINS` because 5,000 USDT of position doesn't fit a spot buy.
 - **Initial stop ('atr' mode):** 2 × ATR(14) from the entry (`STOP_ATR`).
 - **Trailing stop:** after every 4H close the stop moves to *best close since
