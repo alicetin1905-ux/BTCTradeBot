@@ -17,13 +17,13 @@
     "TRADE_MODE": "fixed",
     "COIN_FIXED": {
       "ETH": {
-        "MARGIN": 667
+        "MARGIN": 450
       },
       "HYPE": {
-        "MARGIN": 400
+        "MARGIN": 230
       }
     },
-    "FIXED_MARGIN": 750,
+    "FIXED_MARGIN": 550,
     "FIXED_SL_USDT": 100,
     "FIXED_TP_USDT": 200,
     "MAX_POSITION_X": 2,
@@ -42,7 +42,7 @@
     "EXIT_N": 15,
     "STOP_ATR": 2,
     "TRAIL_ATR": 3,
-    "ENTRY_FRESH_MIN": 180,
+    "ENTRY_FRESH_MIN": 45,
     "MARKET_DATA": null,
     "STATUS_EVERY_H": 4
   },
@@ -55,13 +55,13 @@
     "TRADE_MODE": "fixed",
     "COIN_FIXED": {
       "ETH": {
-        "MARGIN": 667
+        "MARGIN": 450
       },
       "HYPE": {
-        "MARGIN": 400
+        "MARGIN": 230
       }
     },
-    "FIXED_MARGIN": 750,
+    "FIXED_MARGIN": 550,
     "FIXED_SL_USDT": 100,
     "FIXED_TP_USDT": 200,
     "MAX_POSITION_X": 2,
@@ -80,7 +80,7 @@
     "EXIT_N": 15,
     "STOP_ATR": 2,
     "TRAIL_ATR": 3,
-    "ENTRY_FRESH_MIN": 180,
+    "ENTRY_FRESH_MIN": 45,
     "MARKET_DATA": null,
     "STATUS_EVERY_H": 4
   },
@@ -88,7 +88,7 @@
   "mode": "demo",
   "exchange": "okx",
   "instrument": "BTC-USD_UM_XPERP-310328",
-  "updatedAt": 1791065703450,
+  "updatedAt": 1791066004171,
   "lastRunAt": 1791064927186,
   "instruments": {
     "ETH": "ETH-USD_UM_XPERP-310328",
