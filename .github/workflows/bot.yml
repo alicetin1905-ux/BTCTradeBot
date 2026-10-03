@@ -13,12 +13,14 @@ name: BTC bot
 # only check the connection to OKX. "Run workflow" with action = check tests
 # the keys without trading.
 #
-# Use this OR the Mac's cron (scripts/setup-mac.sh), not both.
+# Use this OR the Mac's cron (scripts/setup-mac.sh), not both. Right now the Mac runs the bot; this workflow is manual only.
 
 on:
-  schedule:
-    - cron: '3,33 * * * *'
-    - cron: '18,48 * * * *'
+  # Scheduled runs are OFF since 2026-10-03: the bot runs from the Mac's cron (scripts/setup-mac.sh) because
+  # GitHub skipped scheduled runs for hours. To go back to GitHub, restore these two lines and stop the Mac:
+  #   schedule:
+  #     - cron: '3,33 * * * *'    full run
+  #     - cron: '18,48 * * * *'   sync
   workflow_dispatch:
     inputs:
       action:
