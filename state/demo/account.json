@@ -88,7 +88,7 @@
   "mode": "demo",
   "exchange": "okx",
   "instrument": "BTC-USD_UM_XPERP-310328",
-  "updatedAt": 1791070327313,
+  "updatedAt": 1791070503287,
   "lastRunAt": 1791070327313,
   "instruments": {
     "ETH": "ETH-USD_UM_XPERP-310328",
