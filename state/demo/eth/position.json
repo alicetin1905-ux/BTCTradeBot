@@ -1,1 +1,32 @@
-null
+{
+  "symbol": "ETHUSDT",
+  "exchange": "okx:ETH-USD_UM_XPERP-310328",
+  "bias": 1,
+  "entry": 2722.039540229885,
+  "qty": 1.653,
+  "qtyTotal": 1.653,
+  "stop": 2661.4,
+  "initialStop": 2661.4,
+  "takeProfit": 2842.86,
+  "fixed": true,
+  "ext": 2725.97,
+  "trailed": false,
+  "entryCandleT": 1791144000000,
+  "lastExitCheckT": 1791144000000,
+  "openedAt": 1791158524526,
+  "orders": {
+    "entry": "3981438934697230336"
+  },
+  "tickSize": 0.01,
+  "notional": 4499.53136,
+  "margin": 449.953136,
+  "riskAmt": 100.23715999999976,
+  "atrAtEntry": 24.772029082019262,
+  "breakout": null,
+  "score": 53,
+  "flipFrom": 10,
+  "jump": true,
+  "markPrice": 2722.01,
+  "unrealisedPnl": -0.0488299999995538,
+  "exchangeStop": 2661.4
+}
