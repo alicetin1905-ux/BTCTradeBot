@@ -135,7 +135,7 @@ const config = module.exports = {
     // No new entries for the rest of the UTC day once today's realized loss
     // reaches this % of the day's starting balance. Open positions keep
     // their exchange-side stop either way.
-    DAILY_LOSS_LIMIT_PCT: 10,
+    DAILY_LOSS_LIMIT_PCT: 20,
   },
 
   // Phone alerts through the ntfy app (src/notify.js). Subscribe to this

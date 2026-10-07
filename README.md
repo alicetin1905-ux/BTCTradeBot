@@ -135,7 +135,7 @@ account with the `testtrade` workflow (coin = ETH, NEAR).
   P&L and funding payments. A bigger demo wallet still trades like 2000.
 - **Safety:**
   - `TRADEBOT_HALT=1` stops new entries (an open position keeps its trailing stop).
-  - The daily loss limit (10%) stops entries until 00:00 UTC.
+  - The daily loss limit (20%) stops entries until 00:00 UTC.
   - `close-all` and `reset` are available as remote commands.
   - There is **no real-money mode**. The OKX client sends
     `x-simulated-trading: 1` on every request, so OKX refuses real-account

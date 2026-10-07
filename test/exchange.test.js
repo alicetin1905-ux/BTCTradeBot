@@ -195,11 +195,11 @@ test('positions on other coins (e.g. TradeBot\'s) are ignored', async () => {
   assert.equal(ex.calls.filter(c => c[1] === 'SOLUSDT').length, 0);
 });
 
-test('daily loss limit (10%) blocks new entries for the rest of the UTC day', async () => {
+test('daily loss limit (20%) blocks new entries for the rest of the UTC day', async () => {
   const { ex, client } = fakeBybit();
   const st = freshState();
   st.account.balance = 1790;
-  st.trades.push({ pnl: -210, closedAt: after(T0) - 60000, openedAt: T0 - TF });
+  st.trades.push({ pnl: -460, closedAt: after(T0) - 60000, openedAt: T0 - TF });   // 20.4% of the day's 2250
   const events = await enterLong(client, st);
   assert.equal(ex.calls.filter(c => c[0] === 'openMarket').length, 0);
   assert.match(events.find(e => e.type === 'hold').reason, /daily loss limit/);
@@ -902,9 +902,11 @@ test('daily loss limit counts the other coins\' trades too', () => {
   const st = freshState();
   st.account.balance = 2000;
   assert.equal(exchange.entryBlock(st, sig, now), null);
-  // ETH lost 12% of the balance today: no BTC entry either.
-  st.peers = { ETH: { trades: [{ closedAt: now - 3600000, pnl: -240 }] } };
+  // ETH lost 21% of the day's balance today: no BTC entry either.
+  st.peers = { ETH: { trades: [{ closedAt: now - 3600000, pnl: -540 }] } };
   assert.match(exchange.entryBlock(st, sig, now), /daily loss limit/);
+  st.peers = { ETH: { trades: [{ closedAt: now - 3600000, pnl: -240 }] } };   // 10.7%: under the 20% limit
+  assert.equal(exchange.entryBlock(st, sig, now), null);
   st.peers = { ETH: { trades: [{ closedAt: now - 3600000, pnl: -100 }] } };
   assert.equal(exchange.entryBlock(st, sig, now), null);
 });
