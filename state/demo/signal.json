@@ -17,8 +17,8 @@
   "exitLower": null,
   "closeT": 1791345600000,
   "source": "okx",
-  "at": 1791356526480,
-  "wait": "signal candle closed 210 min ago — entries only within 45 min of a 4H close",
+  "at": 1791358325869,
+  "wait": "signal candle closed 212 min ago — entries only within 45 min of a 4H close",
   "strategy": "atlas-flip",
   "chart": [
     [
