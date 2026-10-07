@@ -1,13 +1,13 @@
 {
-  "t": 1791360000000,
-  "close": 83700,
-  "score": -51,
-  "atr": 788.7505255967274,
+  "t": 1791374400000,
+  "close": 83417.2,
+  "score": -54,
+  "atr": 805.739773768396,
   "flipFrom": null,
   "enter": 0,
   "exitLong": false,
   "exitShort": false,
-  "ma": 81489.44050000003,
+  "ma": 81503.36750000002,
   "blocked": false,
   "extreme": false,
   "jump": false,
@@ -15,22 +15,12 @@
   "lower": null,
   "exitUpper": null,
   "exitLower": null,
-  "closeT": 1791374400000,
+  "closeT": 1791388800000,
   "source": "okx",
-  "at": 1791387125718,
+  "at": 1791388925822,
   "wait": "no ATLAS flip on the last 4H close",
   "strategy": "atlas-flip",
   "chart": [
-    [
-      1790510400000,
-      84857.1,
-      85137.5,
-      84270.3,
-      84424.9,
-      null,
-      null,
-      19
-    ],
     [
       1790524800000,
       84424.8,
@@ -620,6 +610,16 @@
       null,
       null,
       -51
+    ],
+    [
+      1791374400000,
+      83700,
+      83726.6,
+      82700,
+      83417.2,
+      null,
+      null,
+      -54
     ]
   ]
 }
