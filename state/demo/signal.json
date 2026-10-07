@@ -17,7 +17,7 @@
   "exitLower": null,
   "closeT": 1791345600000,
   "source": "okx",
-  "at": 1791345726193,
+  "at": 1791347526440,
   "wait": "daily loss limit (10%) reached — no new entries until 00:00 UTC",
   "strategy": "atlas-flip",
   "chart": [
