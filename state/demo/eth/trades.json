@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "symbol": "ETHUSDT",
+    "bias": 1,
+    "entry": 2722.039540229885,
+    "exit": 2661.34,
+    "qty": 1.653,
+    "pnl": -104.78570319,
+    "reason": "stop loss",
+    "openedAt": 1791158524526,
+    "closedAt": 1791338391316,
+    "initialStop": 2661.4
+  }
+]
