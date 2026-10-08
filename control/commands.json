@@ -15,5 +15,11 @@
     "id": "2026-10-02-btc-scale-750",
     "action": "scale-to-fixed",
     "coin": "BTC"
+  },
+  {
+    "id": "2026-10-08-btc-adopt",
+    "action": "adopt",
+    "coin": "BTC",
+    "openedAt": "2026-10-07T08:01:00Z"
   }
 ]

@@ -92,6 +92,34 @@ function markClosed(st, pos, now) {
   st.position = null;
 }
 
+// An entry whose position showed up after openEntry() gave up waiting (st.meta.pendingEntry): becomes the
+// tracked position, with the exchange's own entry price and stop / take-profit, so its exit is booked and shown.
+// Not on the exchange (never filled, or filled and already closed): its window goes to st.closing, where any
+// closing fill is still booked; then it's forgotten.
+const PENDING_GRACE_MS = 10 * 60000;
+function adoptPending(st, live, events, now) {
+  const p = st.meta && st.meta.pendingEntry;
+  if (!p || st.position) return;
+  if (!live) {
+    if (now - p.at < PENDING_GRACE_MS) return;
+    st.closing.push({ symbol: SYMBOL, bias: p.bias, entry: 0, openedAt: p.at, orders: { entry: p.orderId }, initialStop: p.stopLoss, takeProfit: p.takeProfit, fixed: p.fixed, closedDetectedAt: now });
+    delete st.meta.pendingEntry;
+    return;
+  }
+  if (live.bias !== p.bias) return;
+  const entry = live.avgPrice, stop = live.stopLoss || p.stopLoss, tp = live.takeProfit || p.takeProfit;
+  st.position = {
+    symbol: SYMBOL, exchange: config.MARKET_ID || config.EXCHANGE, bias: p.bias, entry, qty: live.size, qtyTotal: live.size,
+    stop, initialStop: stop, takeProfit: tp, fixed: !!p.fixed, ext: p.close || entry, trailed: false,
+    entryCandleT: p.candleT, lastExitCheckT: p.candleT, openedAt: p.at, orders: { entry: p.orderId }, tickSize: p.tickSize,
+    notional: live.size * entry, margin: (live.size * entry) / P.LEVERAGE, riskAmt: live.size * Math.abs(entry - stop),
+    atrAtEntry: p.atr, breakout: null, score: p.score ?? null, flipFrom: p.flipFrom ?? null, jump: !!p.jump,
+    markPrice: live.markPrice || entry, unrealisedPnl: live.unrealisedPnl || 0, exchangeStop: live.stopLoss || stop, adopted: true,
+  };
+  delete st.meta.pendingEntry;
+  events.push({ type: 'info', reason: `${config.COIN} ${p.bias === 1 ? 'long' : 'short'} ${live.size} @ ${px(entry)} found on the exchange and taken over (stop ${px(stop)}${tp ? `, take-profit ${px(tp)}` : ''})` });
+}
+
 async function reconcile({ client, st, live, events, now }) {
   // Positions closed earlier whose final closed-pnl record may land late.
   // A record is stamped with its fill time, which is before the bot noticed
@@ -245,7 +273,16 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
     pos = (await client.getPositions())[SYMBOL];
     if (!pos && i < 9) await new Promise(r => setTimeout(r, ENTRY_READBACK_MS));
   }
-  if (!pos) { events.push({ type: 'error', reason: `entry order ${entryId} sent but no position showed up after 5 s — check the exchange` }); return; }
+  if (!pos) {
+    // OKX can show the position later than the readback (BTC 2026-10-07: filled, but missing for 5 s, then never tracked).
+    // Remembered here; adoptPending() takes it over on a later run, or books its P&L if it already closed.
+    st.meta.pendingEntry = {
+      orderId: entryId, bias, stopLoss, takeProfit, fixed, at: now, candleT: s.t, close: s.close, atr: s.atr,
+      tickSize: inst.tickSize, score: s.score ?? null, flipFrom: s.flipFrom ?? null, jump: !!s.jump,
+    };
+    events.push({ type: 'error', reason: `entry order ${entryId} sent but no position showed up after 5 s — taken over on a later run if it fills` });
+    return;
+  }
 
   const entry = pos.avgPrice;
   st.position = {
@@ -293,6 +330,7 @@ async function recordFunding(client, st, events, now) {
 async function runExchange({ client, st, sig = null, events, halt = false, now = Date.now() }) {
   let wallet = await client.getWallet();
   let live = (await client.getPositions())[SYMBOL] || null;
+  adoptPending(st, live, events, now);
   await reconcile({ client, st, live, events, now });
   await recordFunding(client, st, events, now);
   if (sig) {

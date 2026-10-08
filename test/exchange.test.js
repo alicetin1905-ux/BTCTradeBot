@@ -806,6 +806,53 @@ test('entry read-back: a position that shows up a moment late is still tracked',
   exchange.setReadbackMs(500);
 });
 
+test('entry read-back: a position that shows up only after the bot gave up is taken over on the next run, and its stop-out booked', async () => {
+  exchange.setReadbackMs(0);
+  const { ex, client } = fakeBybit();
+  let hide = true;
+  const getPositions = client.getPositions;
+  client.getPositions = async () => (hide ? {} : getPositions());
+  const st = freshState();
+  let events = await enterLong(client, st);
+  assert.equal(st.position, null);
+  assert.ok(events.some(e => e.type === 'error' && /taken over on a later run/.test(e.reason)));
+  assert.equal(st.meta.pendingEntry.bias, 1);
+  // Next sync: the position is there now.
+  hide = false;
+  events = [];
+  await exchange.runExchange({ client, st, events, now: after(T0) + 300000 });
+  assert.ok(st.position && st.position.adopted, JSON.stringify(events));
+  assert.equal(st.position.entry, 100000);
+  assert.equal(st.position.qty, ex.positions.BTCUSDT.size);
+  assert.equal(st.position.stop, ex.positions.BTCUSDT.stopLoss);
+  assert.equal(st.meta.pendingEntry, undefined);
+  assert.ok(events.some(e => /taken over/.test(e.reason)));
+  // Its stop-out is booked like any trade.
+  ex.hitStop('BTCUSDT', after(T0) + 600000);
+  events = [];
+  await exchange.runExchange({ client, st, events, now: after(T0) + 900000 });
+  assert.equal(st.position, null);
+  assert.equal(st.trades.length, 1);
+  assert.ok(st.trades[0].pnl < 0);
+  exchange.setReadbackMs(500);
+});
+
+test('entry read-back: an entry that never showed up is dropped after the grace time (no phantom position)', async () => {
+  exchange.setReadbackMs(0);
+  const { ex, client } = fakeBybit();
+  client.openMarket = async () => 'o-never';       // the order never fills
+  const st = freshState();
+  await enterLong(client, st);
+  assert.ok(st.meta.pendingEntry);
+  await exchange.runExchange({ client, st, events: [], now: after(T0) + 60000 });    // within the grace time: kept
+  assert.ok(st.meta.pendingEntry);
+  await exchange.runExchange({ client, st, events: [], now: after(T0) + 20 * 60000 });
+  assert.equal(st.meta.pendingEntry, undefined);
+  assert.equal(st.position, null);
+  assert.equal(st.trades.length, 0);
+  exchange.setReadbackMs(500);
+});
+
 /* ---------------- ATLAS flip strategy ---------------- */
 
 test('ATLAS flip rule: -25 or lower then +25 or higher within the window -> long; mirror -> short', () => {

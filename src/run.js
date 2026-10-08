@@ -256,6 +256,38 @@ async function runCommands(client, st, events) {
       ran = true;
       continue;
     }
+    if (c.action === 'adopt') {
+      // { "id": "...", "action": "adopt", "coin": "BTC", "openedAt": "2026-10-07T08:02:00Z" }: the coin's position on the
+      // exchange that the bot doesn't track (its entry fill showed up too late) becomes the tracked position, with its own
+      // entry price, stop and take-profit; its close is then booked. openedAt: just before the entry fill (UTC).
+      if (c.coin && String(c.coin).toUpperCase() !== COIN) continue;
+      const S = SYMBOL_OF(COIN);
+      if (st.position) {
+        events.push({ type: 'info', reason: `adopt ${c.id}: the bot already tracks a ${COIN} position — nothing to do` });
+      } else {
+        try {
+          const live = (await client.getPositions())[S];
+          if (!live) {
+            events.push({ type: 'info', reason: `adopt ${c.id}: no ${COIN} position on the exchange — nothing to do` });
+          } else {
+            const inst = await client.getInstrument(S);
+            st.meta = st.meta || {};
+            st.meta.pendingEntry = {
+              orderId: c.orderId || null, bias: live.bias, stopLoss: live.stopLoss, takeProfit: live.takeProfit || null,
+              fixed: config.TRADE_MODE === 'fixed', at: Date.parse(c.openedAt) || Date.now(), candleT: st.meta.lastEntryCandle || null,
+              close: live.avgPrice, atr: null, tickSize: inst.tickSize, score: null, flipFrom: null, jump: false,
+            };
+            // runExchange (right after the commands) takes it over and reports it.
+          }
+        } catch (err) {
+          events.push({ type: 'error', reason: `adopt ${c.id}: ${err.message} — retrying next run` });
+          continue;
+        }
+      }
+      st.commandsDone.push(c.id);
+      ran = true;
+      continue;
+    }
     if (c.action === 'close-all' || c.action === 'reset') {
       const evs = [];
       await exchange.closeAll({ client, st, events: evs });
