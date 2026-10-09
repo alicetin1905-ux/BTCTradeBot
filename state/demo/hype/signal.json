@@ -17,7 +17,7 @@
   "exitLower": null,
   "closeT": 1791561600000,
   "source": "okx",
-  "at": 1791561722069,
+  "at": 1791563522200,
   "wait": "no ATLAS flip on the last 4H close",
   "strategy": "atlas-flip",
   "chart": [
