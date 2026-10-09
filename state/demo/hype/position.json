@@ -1,1 +1,32 @@
-null
+{
+  "symbol": "HYPEUSDT",
+  "exchange": "okx:HYPE-USD_UM_XPERP-310801",
+  "bias": -1,
+  "entry": 83.611,
+  "qty": 27.5,
+  "qtyTotal": 27.5,
+  "stop": 87.2402,
+  "initialStop": 87.2402,
+  "takeProfit": 76.3351,
+  "fixed": true,
+  "ext": 83.45,
+  "trailed": false,
+  "entryCandleT": 1791561600000,
+  "lastExitCheckT": 1791561600000,
+  "openedAt": 1791576121882,
+  "orders": {
+    "entry": "3995451178292473857"
+  },
+  "tickSize": 0.0001,
+  "notional": 2299.3025000000002,
+  "margin": 229.93025000000003,
+  "riskAmt": 99.80299999999993,
+  "atrAtEntry": 1.6360853498481094,
+  "breakout": null,
+  "score": -61,
+  "flipFrom": -38,
+  "jump": true,
+  "markPrice": 83.6056,
+  "unrealisedPnl": 0.1485000000002401,
+  "exchangeStop": 87.2402
+}
