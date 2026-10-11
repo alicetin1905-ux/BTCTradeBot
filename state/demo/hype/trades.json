@@ -22,5 +22,17 @@
     "openedAt": 1791158521510,
     "closedAt": 1791456520652,
     "initialStop": 86.4221
+  },
+  {
+    "symbol": "HYPEUSDT",
+    "bias": -1,
+    "entry": 83.611,
+    "exit": 87.2,
+    "qty": 27.5,
+    "pnl": -101.04615125000001,
+    "reason": "stop loss",
+    "openedAt": 1791576121882,
+    "closedAt": 1791736944335,
+    "initialStop": 87.2402
   }
 ]
