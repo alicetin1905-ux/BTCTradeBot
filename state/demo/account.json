@@ -7,7 +7,7 @@
   },
   "startedAt": 1790814227992,
   "fundingError": null,
-  "exchangeEquity": 1421.9034766676746,
+  "exchangeEquity": 1429.8455166676747,
   "settings": {
     "RISK_PCT": 2,
     "COIN_RISK_PCT": {
@@ -88,7 +88,7 @@
   "mode": "demo",
   "exchange": "okx",
   "instrument": "BTC-USD_UM_XPERP-310328",
-  "updatedAt": 1791755404505,
+  "updatedAt": 1791755704515,
   "lastRunAt": 1791754327592,
   "instruments": {
     "ETH": "ETH-USD_UM_XPERP-310328",
