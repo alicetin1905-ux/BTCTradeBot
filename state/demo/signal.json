@@ -18,7 +18,7 @@
   "closeT": 1792065600000,
   "source": "okx",
   "at": 1792076526650,
-  "wait": "a position is open",
+  "wait": "no ATLAS flip on the last 4H close",
   "strategy": "atlas-flip",
   "chart": [
     [
