@@ -89,13 +89,15 @@
   "exchange": "okx",
   "instrument": "BTC-USD_UM_XPERP-310328",
   "instruments": {
-    "BTC": "BTC-USD_UM_XPERP-310328"
+    "BTC": "BTC-USD_UM_XPERP-310328",
+    "HYPE": "HYPE-USD_UM_XPERP-310801",
+    "ETH": "ETH-USD_UM_XPERP-310328"
   },
   "coins": [
     "HYPE",
     "ETH",
     "BTC"
   ],
-  "updatedAt": 1792242128654,
+  "updatedAt": 1792242303733,
   "lastRunAt": 1792242128654
 }
