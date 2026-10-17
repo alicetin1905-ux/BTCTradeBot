@@ -1,13 +1,13 @@
 {
-  "balance": 669.8741974849997,
+  "balance": 2000,
   "startingBalance": 2000,
-  "fundingSince": 1790814227992,
+  "fundingSince": 1792239005495,
   "funding": {
     "total": 0
   },
-  "startedAt": 1790814227992,
+  "startedAt": 1792239005495,
   "fundingError": null,
-  "exchangeEquity": 579.3894845206626,
+  "exchangeEquity": 581.8862677206622,
   "settings": {
     "RISK_PCT": 2,
     "COIN_RISK_PCT": {
@@ -88,18 +88,13 @@
   "mode": "demo",
   "exchange": "okx",
   "instrument": "BTC-USD_UM_XPERP-310328",
-  "updatedAt": 1792238703403,
-  "lastRunAt": 1792238527421,
   "instruments": {
-    "ETH": "ETH-USD_UM_XPERP-310328",
-    "BTC": "BTC-USD_UM_XPERP-310328",
-    "NEAR": "NEAR-USDC",
-    "UNI": "UNI-USD_UM_XPERP-310718",
-    "HYPE": "HYPE-USD_UM_XPERP-310801"
+    "BTC": "BTC-USD_UM_XPERP-310328"
   },
   "coins": [
     "HYPE",
     "ETH",
     "BTC"
-  ]
+  ],
+  "updatedAt": 1792239006018
 }
