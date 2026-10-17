@@ -21,5 +21,10 @@
     "action": "adopt",
     "coin": "BTC",
     "openedAt": "2026-10-07T08:01:00Z"
+  },
+  {
+    "id": "2026-10-17-reset",
+    "action": "reset",
+    "clearHistory": true
   }
 ]
