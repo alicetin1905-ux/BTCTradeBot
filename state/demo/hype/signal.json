@@ -17,8 +17,8 @@
   "exitLower": null,
   "closeT": 1792238400000,
   "source": "okx",
-  "at": 1792238521706,
-  "wait": null,
+  "at": 1792240321940,
+  "wait": "a position is open",
   "strategy": "atlas-flip",
   "chart": [
     [
