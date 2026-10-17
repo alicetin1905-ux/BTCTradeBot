@@ -1,1 +1,14 @@
-[]
+[
+  {
+    "symbol": "HYPEUSDT",
+    "bias": -1,
+    "entry": 78.894,
+    "exit": 78.789,
+    "qty": 29.1,
+    "pnl": 0.7612123499999999,
+    "reason": "stop loss",
+    "openedAt": 1792240321940,
+    "closedAt": 1792241770010,
+    "initialStop": 82.3264
+  }
+]
