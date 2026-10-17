@@ -1,11 +1,11 @@
 {
-  "balance": 2000.76121235,
+  "balance": 2000,
   "startingBalance": 2000,
-  "fundingSince": 1792239005495,
+  "fundingSince": 1792242126819,
   "funding": {
     "total": 0
   },
-  "startedAt": 1792239005495,
+  "startedAt": 1792242126819,
   "fundingError": null,
   "exchangeEquity": 1999.1982879540021,
   "settings": {
@@ -89,15 +89,13 @@
   "exchange": "okx",
   "instrument": "BTC-USD_UM_XPERP-310328",
   "instruments": {
-    "BTC": "BTC-USD_UM_XPERP-310328",
-    "HYPE": "HYPE-USD_UM_XPERP-310801",
-    "ETH": "ETH-USD_UM_XPERP-310328"
+    "BTC": "BTC-USD_UM_XPERP-310328"
   },
   "coins": [
     "HYPE",
     "ETH",
     "BTC"
   ],
-  "updatedAt": 1792242004114,
-  "lastRunAt": 1792240328255
+  "updatedAt": 1792242128654,
+  "lastRunAt": 1792242128654
 }
