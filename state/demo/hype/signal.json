@@ -17,7 +17,7 @@
   "exitLower": null,
   "closeT": 1792353600000,
   "source": "okx",
-  "at": 1792355521614,
+  "at": 1792357321173,
   "wait": "ATLAS flip, but the 4H close is more than 10% from its 200-candle average — skipped",
   "strategy": "atlas-flip",
   "chart": [
