@@ -7,14 +7,14 @@
   },
   "startedAt": 1792242126819,
   "fundingError": null,
-  "exchangeEquity": 1760.5587002776967,
+  "exchangeEquity": 1754.0052602776962,
   "settings": {
     "RISK_PCT": 2,
     "COIN_RISK_PCT": {
       "NEAR": 1,
       "UNI": 1
     },
-    "TRADE_MODE": "fixed",
+    "TRADE_MODE": "atr",
     "COIN_FIXED": {
       "ETH": {
         "MARGIN": 450
@@ -29,7 +29,7 @@
     "MAX_POSITION_X": 2,
     "LEVERAGE": 10,
     "DAILY_LOSS_LIMIT_PCT": 20,
-    "STRATEGY": "atlas-flip",
+    "STRATEGY": "trend-pullback",
     "SCORE_MODE": "graded",
     "FLIP_SCORE": 10,
     "FLIP_WINDOW": 2,
@@ -40,8 +40,9 @@
     "DIRECTION": "both",
     "CHANNEL_N": 15,
     "EXIT_N": 15,
+    "MAX_OPEN_POSITIONS": 2,
     "STOP_ATR": 2,
-    "TRAIL_ATR": 3,
+    "TRAIL_ATR": 4,
     "ENTRY_FRESH_MIN": 45,
     "MARKET_DATA": null,
     "STATUS_EVERY_H": 4
@@ -52,7 +53,7 @@
       "NEAR": 1,
       "UNI": 1
     },
-    "TRADE_MODE": "fixed",
+    "TRADE_MODE": "atr",
     "COIN_FIXED": {
       "ETH": {
         "MARGIN": 450
@@ -67,7 +68,7 @@
     "MAX_POSITION_X": 2,
     "LEVERAGE": 10,
     "DAILY_LOSS_LIMIT_PCT": 20,
-    "STRATEGY": "atlas-flip",
+    "STRATEGY": "trend-pullback",
     "SCORE_MODE": "graded",
     "FLIP_SCORE": 10,
     "FLIP_WINDOW": 2,
@@ -78,8 +79,9 @@
     "DIRECTION": "both",
     "CHANNEL_N": 15,
     "EXIT_N": 15,
+    "MAX_OPEN_POSITIONS": 2,
     "STOP_ATR": 2,
-    "TRAIL_ATR": 3,
+    "TRAIL_ATR": 4,
     "ENTRY_FRESH_MIN": 45,
     "MARKET_DATA": null,
     "STATUS_EVERY_H": 4
@@ -98,6 +100,6 @@
     "ETH",
     "BTC"
   ],
-  "updatedAt": 1792433403685,
+  "updatedAt": 1792433704591,
   "lastRunAt": 1792432926728
 }
