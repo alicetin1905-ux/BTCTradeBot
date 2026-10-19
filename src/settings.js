@@ -63,7 +63,7 @@ const FIELDS = {
   LEVERAGE: { at: ['PORTFOLIO', 'LEVERAGE'], check: num(1, 25, { int: true }), label: 'Leverage' },
   DAILY_LOSS_LIMIT_PCT: { at: ['EXECUTION', 'DAILY_LOSS_LIMIT_PCT'], check: num(1, 100), label: 'Daily loss limit (% of balance)' },
   // Signal
-  STRATEGY: { at: ['STRATEGY'], check: oneOf('atlas-flip', 'breakout'), label: 'Signal ("atlas-flip" = ATLAS score fast swing, "breakout" = 4H channel breakout)' },
+  STRATEGY: { at: ['STRATEGY'], check: oneOf('atlas-flip', 'breakout', 'trend-pullback'), label: 'Signal ("trend-pullback" = with the 4H trend, entry on a dip to EMA20; "atlas-flip" = ATLAS score fast swing; "breakout" = 4H channel breakout)' },
   SCORE_MODE: { at: ['SCORE_MODE'], check: oneOf('graded', 'classic'), label: 'ATLAS score method ("graded" = by strength, groups blended; "classic" = flat votes)' },
   FLIP_SCORE: { at: ['FLIP_SCORE'], check: num(10, 90, { int: true }), label: 'ATLAS flip: score level (swing from -X to +X)' },
   FLIP_WINDOW: { at: ['FLIP_WINDOW'], check: num(1, 12, { int: true }), label: 'ATLAS flip: within this many 4H candles' },
@@ -74,6 +74,7 @@ const FIELDS = {
   DIRECTION: { at: ['DIRECTION'], check: oneOf('long', 'both'), label: 'Trade direction ("long" = long-only, "both" = longs and shorts)' },
   CHANNEL_N: { at: ['CHANNEL_N'], check: num(5, 100, { int: true }), label: 'Breakout channel (4H candles)' },
   EXIT_N: { at: ['EXIT_N'], check: num(5, 100, { int: true }), label: 'Exit channel (4H candles)' },
+  MAX_OPEN_POSITIONS: { at: ['MAX_OPEN_POSITIONS'], check: num(1, 10, { int: true, nullable: true }), label: 'At most this many positions open at once across the coins (null = no limit)' },
   STOP_ATR: { at: ['STOP_ATR'], check: num(0.5, 6), label: 'Initial stop (x ATR)' },
   TRAIL_ATR: { at: ['TRAIL_ATR'], check: num(0.5, 8), label: 'Trailing stop (x ATR from the best close)' },
   ENTRY_FRESH_MIN: { at: ['ENTRY_FRESH_MIN'], check: num(5, 240, { int: true, nullable: true }), label: 'Enter only within this many minutes of a 4H close (null = any time)' },

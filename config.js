@@ -52,10 +52,15 @@ const config = module.exports = {
   //   'atlas-flip'  the ATLAS score swings from <= -FLIP_SCORE to >= +FLIP_SCORE
   //                 (or back) within FLIP_WINDOW candles (src/flip.js) — live
   //   'breakout'    Donchian channel breakout (src/signal.js) — the first setup
+  //   'trend-pullback'  trade with the 4H trend (EMA50 vs EMA200), enter when a candle dips to EMA20 and
+  //                 closes back on the trend side (src/pullback.js) — live since 2026-10-19. Backtest
+  //                 BTC+ETH+HYPE, max 2 open, $40 risk: 2024-26 PF 1.56, +$2,300; 5 of 6 years positive
+  //                 (2022 -$770). The ATLAS flip lost 66% in its first two forward weeks
+  //                 (backtest/TREND_PULLBACK.md).
   // backtest/REPORT.md (+ research in ATLAS_FLIP.md): ±10 within 2 candles (8h) with the trend band, long and
   // short: ~97 trades a year, +644% 2021-26, worst drop 29%, PF 1.37 (±25 / 16h: ~60 a year,
   // +834%, 25%, PF 1.56 - fewer, better trades; breakout: 74, +374%, 32%).
-  STRATEGY: 'atlas-flip',
+  STRATEGY: 'trend-pullback',
   // How the ATLAS score is computed (src/atlasScore.js): 'graded' — the ATLAS
   // page's method: each indicator counts by its strength (RSI 85 more than
   // RSI 56), each group is averaged on its own and the groups are blended
@@ -107,7 +112,8 @@ const config = module.exports = {
   //             With 2000 USDC of margin, two such trades fit at once; a third is cut to the free margin.
   //   'atr'   — the earlier rules: RISK_PCT of the balance at a 2 x ATR stop that trails 3 x ATR.
   // Spot coins (NEAR-USDC) can't be leveraged and keep the 'atr' rules.
-  TRADE_MODE: 'fixed',
+  // 2026-10-19: 'atr' with the trend pullback (risk 2%, stop 2 ATR, trailing 4 ATR, no take-profit).
+  TRADE_MODE: 'atr',
   // 2026-10-03: margins lowered so the stop sits about 2 average 4H moves (ATR) from the entry; at 750 / 667 / 400
   // it was only 1.2-1.5 ATR and an ordinary candle could hit it (both first trades stopped out within hours).
   FIXED: { MARGIN: 550, SL_USDT: 100, TP_USDT: 200 },
@@ -119,7 +125,9 @@ const config = module.exports = {
   // Stops ('atr' mode), in ATRs of the 4H candles. Both live on the exchange as the position's
   // stop-loss, so they work while the machine running the bot is off.
   STOP_ATR: 2,         // initial stop: entry -/+ 2 x ATR
-  TRAIL_ATR: 3,        // after each 4H close: best close since entry -/+ 3 x ATR (never loosens)
+  TRAIL_ATR: 4,        // after each 4H close: best close since entry -/+ 4 x ATR (never loosens); trend pullback backtest: 3 -> PF 1.34, 4 -> 1.56
+  // At most this many positions open at once across all coins (null = no limit). BTC, ETH and HYPE move together.
+  MAX_OPEN_POSITIONS: 2,
 
   // Money rules.
   PORTFOLIO: {

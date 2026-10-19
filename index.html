@@ -144,8 +144,8 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
 
 <footer>
   Demo funds on a demo trading account (OKX or Bybit) — a rehearsal of the strategy, not investment advice.
-  Signal (BTC, ETH and NEAR, each with its own position and stop, sharing one balance): the ATLAS score swinging from −10 to +10 within 8h (long) or back (short), on 4H closes, ignored when price is over 10% from its 200-candle 4H average; initial stop 2×ATR, trailed 3×ATR behind the best close after every 4H close; an opposite swing closes and reverses.
-  Backtest: <a href="https://github.com/alicetin1905-ux/BTCTradeBot/blob/main/backtest/REPORT.md" target="_blank" rel="noopener">backtest/REPORT.md</a>.
+  Signal (BTC, ETH and HYPE, each with its own position and stop, sharing one balance, at most 2 open at once): trend pullback on 4H closes — with the trend (EMA50 vs EMA200), enter when a candle dips to EMA20 and closes back on the trend side; 2% risk, initial stop 2×ATR, trailed 4×ATR behind the best close after every 4H close, no take-profit.
+  Backtest: <a href="https://github.com/alicetin1905-ux/BTCTradeBot/blob/main/backtest/TREND_PULLBACK.md" target="_blank" rel="noopener">backtest/TREND_PULLBACK.md</a>.
   State refreshes every minute from the repo; the live price every 10 s.
 </footer>
 
@@ -289,7 +289,25 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       (p.funding ? '<dt>Funding so far</dt><dd class="' + cls(p.funding) + '">' + esc(signed(p.funding)) + '</dd>' : '') +
       '</dl>' +
       '<div class="note">The stop sits on ' + esc(EXCHANGE_NAME[S.account.exchange] || 'the exchange') + (p.fixed ? ': a fixed stop-loss and take-profit, no trailing; whichever is hit first closes the trade' : ' and trails after every 4H close') +
-      (p.fixed ? '.' : S.signal && S.signal.upper == null && S.signal.score != null ? '; an opposite ATLAS swing closes the position (and reverses it).' : '; the bot also exits on a 4H close below the ' + esc(S.account.settings ? S.account.settings.EXIT_N : 20) + '-candle low.') + '</div>';
+      (p.fixed ? '.' : S.signal && S.signal.pullback ? '; no take-profit — the trailing stop closes the trade.' : S.signal && S.signal.upper == null && S.signal.score != null ? '; an opposite ATLAS swing closes the position (and reverses it).' : '; the bot also exits on a 4H close below the ' + esc(S.account.settings ? S.account.settings.EXIT_N : 20) + '-candle low.') + '</div>';
+  }
+
+  // Trend pullback: the trend now, the EMAs, and what the next 4H close needs for an entry.
+  function pullbackSignalHtml(s, set) {
+    var tr = s.trend === 1 ? '<span class="up" style="font-weight:700">UPTREND</span>' : s.trend === -1 ? '<span class="dn" style="font-weight:700">DOWNTREND</span>' : '<span class="faint" style="font-weight:700">NO TREND</span>';
+    var html = '<dl class="kv">' +
+      '<dt>Last 4H close</dt><dd>' + esc(px(s.close)) + ' <span class="faint">' + esc(when(s.closeT)) + '</span></dd>' +
+      '<dt>Trend</dt><dd>' + tr + '</dd>' +
+      '<dt>EMA20 (pullback level)</dt><dd class="nt">' + esc(px(s.ema20)) + '</dd>' +
+      '<dt>EMA50 / EMA200</dt><dd>' + esc(px(s.ema50)) + ' / ' + esc(px(s.ema200)) + '</dd>' +
+      '<dt>ATR (14 × 4H)</dt><dd>' + esc(px(s.atr)) + ' · ' + esc((s.atr / s.close * 100).toFixed(2)) + '%</dd>' +
+      '</dl>' +
+      '<div class="note">' + (s.trend === 1 ? 'Long when a 4H candle dips to EMA20 and closes back above it.'
+        : s.trend === -1 ? 'Short when a 4H candle rises to EMA20 and closes back below it.'
+        : 'No trade until EMA50 and the price are on the same side of EMA200.') +
+      ' Stop ' + esc(set.STOP_ATR || 2) + '×ATR, trailing ' + esc(set.TRAIL_ATR || 4) + '×ATR; no take-profit.</div>';
+    if (s.wait && !S.position) html += '<div class="note">Waiting: ' + esc(s.wait) + '</div>';
+    return html;
   }
 
   function renderSignal() {
@@ -299,6 +317,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     var nextClose = Math.floor(Date.now() / TF) * TF + TF;
     var mins = Math.max(0, Math.round((nextClose - Date.now()) / 60000));
     $('sigTag').textContent = 'next 4H close in ' + Math.floor(mins / 60) + 'h ' + (mins % 60) + 'm';
+    if (s.pullback) { el.innerHTML = pullbackSignalHtml(s, set); return; }
     if (s.upper == null && s.score != null) { el.innerHTML = flipSignalHtml(s, set); return; }
     var ref = S.live && S.live.px ? S.live.px : s.close;
     var away = (s.upper / ref - 1) * 100;
@@ -486,7 +505,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       hair.setAttribute('x1', X(i)); hair.setAttribute('x2', X(i)); hair.setAttribute('opacity', 1);
       tipAt(box, tip, X(i) / sx, (ev.clientY - r.top), '<div class="faint" style="margin-bottom:3px">' + esc(when(c.t)) + ' – ' + esc(new Date(c.t + TF).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })) + '</div>' +
         row('close', px(c.c)) + row('high / low', px(c.h, 0) + ' / ' + px(c.l, 0)) +
-        (c.up != null ? row('breakout', px(c.up), '#ffc857') : '') + (c.ex != null ? row('exit', px(c.ex), '#9aaca4', true) : '') +
+        (c.up != null ? row(S.signal && S.signal.pullback ? 'EMA20' : 'breakout', px(c.up), '#ffc857') : '') + (c.ex != null ? row(S.signal && S.signal.pullback ? 'EMA200' : 'exit', px(c.ex), '#9aaca4', true) : '') +
         (c.sc != null ? row('ATLAS score', sgn(c.sc), '#b98bff') : ''));
     }
     function leave() { hair.setAttribute('opacity', 0); tip.style.opacity = 0; }
@@ -494,7 +513,9 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     hit.addEventListener('pointerdown', move);
     hit.addEventListener('pointerleave', leave);
     $('chartTag').textContent = 'UTC';
-    $('pxLegend').innerHTML = (flipMode
+    $('pxLegend').innerHTML = (S.signal && S.signal.pullback
+      ? '<span><i style="background:var(--nt)"></i>EMA20 (pullback level)</span><span><i style="background:var(--dim);opacity:.8"></i>EMA200 (trend)</span>'
+      : flipMode
       ? '<span><i style="background:var(--violet)"></i>ATLAS score (lower panel)</span><span><i style="background:var(--nt)"></i>±' + esc(FX) + ' trigger levels</span>'
       : '<span><i style="background:var(--nt)"></i>breakout level (' + esc(fset.CHANNEL_N || 20) + '-candle high)</span>' +
         '<span><i style="background:var(--dim);opacity:.8"></i>exit level (' + esc(fset.EXIT_N || 20) + '-candle low)</span>') +
@@ -566,7 +587,8 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     MAX_POSITION_X: ['Max position value', function (v) { return v + '× balance'; }],
     LEVERAGE: ['Leverage', function (v) { return v + '×'; }],
     DAILY_LOSS_LIMIT_PCT: ['Daily loss limit', function (v) { return v + '%'; }],
-    STRATEGY: ['Signal', function (v) { return v === 'atlas-flip' ? 'ATLAS score fast flip' : 'channel breakout'; }],
+    STRATEGY: ['Signal', function (v) { return v === 'trend-pullback' ? 'trend pullback (EMA20 dip with the trend)' : v === 'atlas-flip' ? 'ATLAS score fast flip' : 'channel breakout'; }],
+    MAX_OPEN_POSITIONS: ['Max open positions', function (v) { return v == null ? 'no limit' : v + ' at a time'; }],
     FLIP_SCORE: ['Flip score level', function (v) { return '±' + v; }],
     FLIP_WINDOW: ['Flip window', function (v) { return v + ' × 4H (' + v * 4 + 'h)'; }],
     JUMP_SCORE: ['Jump entry', function (v) { return v == null ? 'off' : '±' + v + ' in one 4H candle'; }],

@@ -22,7 +22,9 @@ function messagesFor(events, st) {
       const dir = ev.bias === 1 ? 'LONG' : 'SHORT';
       out.push({
         title: `${config.COIN} ${dir} opened @ ${px(ev.entry)}`,
-        message: (ev.breakout != null
+        message: (ev.pullback
+          ? `Trend pullback: ${ev.bias === 1 ? 'uptrend' : 'downtrend'} (EMA50 ${ev.bias === 1 ? 'above' : 'below'} EMA200), the 4H candle touched EMA20 and closed back ${ev.bias === 1 ? 'above' : 'below'} it (4H close ${px(ev.close)})\n`
+          : ev.breakout != null
           ? `4H close ${px(ev.close)} broke the ${config.CHANNEL_N}-candle ${ev.bias === 1 ? 'high' : 'low'} ${px(ev.breakout)}\n`
           : ev.flipFrom == null
             ? `ATLAS score reached ${ev.score > 0 ? '+' : ''}${ev.score} (extreme level ±${config.EXTREME_SCORE}, 4H close ${px(ev.close)})\n`

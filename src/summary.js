@@ -125,12 +125,15 @@ function status(st) {
   const lines = [];
   for (const { coin, position: p, signal: s } of coins) {
     if (p) lines.push(positionLine(p, coin));
+    else if (s && s.pullback) lines.push(`${coin} flat · 4H close ${px(s.close)} · ${s.trend === 1 ? 'uptrend' : s.trend === -1 ? 'downtrend' : 'no trend'}`);
     else if (s && s.upper == null) lines.push(`${coin} flat · 4H close ${px(s.close)} · ATLAS ${s.score > 0 ? '+' : ''}${s.score}`);
     else if (s) lines.push(`${coin} flat · 4H close ${px(s.close)} · long above ${px(s.upper)}`);
     else lines.push(`${coin} flat`);
   }
   const X = config.FLIP_SCORE, h = config.FLIP_WINDOW * 4;
-  if (coins.some(c => c.signal && c.signal.upper == null)) {
+  if (config.STRATEGY === 'trend-pullback') {
+    lines.push('Enters with the 4H trend when a candle dips to EMA20 and closes back; stop 2 ATR, trailing ' + config.TRAIL_ATR + ' ATR');
+  } else if (coins.some(c => c.signal && c.signal.upper == null)) {
     lines.push(`Long on a swing from −${X} to +${X} within ${h}h` + (config.EXTREME_SCORE ? ` or a score of +${config.EXTREME_SCORE}` : '') + (config.JUMP_SCORE ? ` or a +${config.JUMP_SCORE} jump in one 4H candle` : '') + (config.DIRECTION === 'both' ? ', short on the mirror' : ''));
   }
   lines.push(`Balance $${a.balance.toFixed(2)}`);

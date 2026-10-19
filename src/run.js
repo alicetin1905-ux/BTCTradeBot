@@ -329,6 +329,7 @@ const sigParams = () => ({ channelN: config.CHANNEL_N, exitN: config.EXIT_N, atr
 // last 60 candles — the exit / trailing checks and the dashboard chart) or
 // the breakout channel.
 async function buildSignal(candles, now) {
+  if (config.STRATEGY === 'trend-pullback') return require('./pullback').series(candles);
   if (config.STRATEGY === 'atlas-flip') {
     const daily = await market.closedCandles(config.SYMBOL, 'D', 400, now);
     if (daily.note) console.log(`daily candles from ${daily.source} (${market.primary()} failed: ${daily.note})`);
@@ -360,6 +361,8 @@ async function run() {
     chart: candles.slice(-60).map((k, i, a) => {
       const s = sig[sig.length - a.length + i];
       const r = (x) => (x == null ? null : +x.toFixed(1));
+      // Trend pullback: EMA20 and EMA200 in the two line columns.
+      if (s && s.pullback) return [k.t, k.o, k.h, k.l, k.c, +s.ema20.toPrecision(7), +s.ema200.toPrecision(7), null];
       return [k.t, k.o, k.h, k.l, k.c, s ? r(s.upper) : null, s ? r(s.exitLower) : null, s && s.score != null ? s.score : null];
     }),
   };
@@ -432,7 +435,7 @@ function printSummary(events, st) {
   console.log(`\n=== BTCTradeBot ${COIN} [${config.EXCHANGE} ${MODE}${config.EXCHANGE === 'okx' ? ' ' + config.OKX_INSTRUMENT : ''}] (${config.STRATEGY}, ${P.STARTING_BALANCE} ${quote}, ${P.RISK_PCT}% risk, ${config.DIRECTION === 'both' ? 'long+short' : 'long-only'}) @ ${new Date().toISOString()} ===\n`);
   for (const ev of events) {
     if (ev.type === 'enter') {
-      const why = ev.breakout != null ? `breakout ${px(ev.breakout)}` : (ev.flipFrom == null ? `ATLAS extreme ${ev.score}` : ev.jump ? `ATLAS jump ${ev.flipFrom} → ${ev.score} in one 4H candle` : `ATLAS ${ev.flipFrom} → ${ev.score}`);
+      const why = ev.pullback ? `trend pullback (${ev.bias === 1 ? 'up' : 'down'}trend, back over EMA20)` : ev.breakout != null ? `breakout ${px(ev.breakout)}` : (ev.flipFrom == null ? `ATLAS extreme ${ev.score}` : ev.jump ? `ATLAS jump ${ev.flipFrom} → ${ev.score} in one 4H candle` : `ATLAS ${ev.flipFrom} → ${ev.score}`);
       console.log(`ENTER ${ev.bias === 1 ? 'LONG' : 'SHORT'} ${ev.qty} ${COIN} @ ${px(ev.entry)} | ${why} | SL ${px(ev.stop)} | value $${fmt(ev.notional)} risk $${fmt(ev.riskAmt)}`);
     } else if (ev.type === 'exit') {
       console.log(`EXIT — ${ev.reason} | pnl ${money(ev.pnl)}${ev.price ? ' @ ' + px(ev.price) : ''}`);

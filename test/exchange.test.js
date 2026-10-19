@@ -19,6 +19,8 @@ const FIXED_DEFAULTS = { ...config.FIXED };
 config.FIXED = { MARGIN: 500, SL_USDT: 100, TP_USDT: 200 }; // pinned: the fixed-mode tests below use this size
 config.CHANNEL_N = 20;
 config.EXIT_N = 20;
+config.TRAIL_ATR = 3; // the trailing tests below were written for 3 x ATR (live default: 4)
+config.MAX_OPEN_POSITIONS = null; // single-coin tests; the limit has its own test
 const signal = require('../src/signal');
 const exchange = require('../src/exchange');
 const { sign, createClient } = require('../src/bybit');
@@ -1025,6 +1027,42 @@ test('weekly report: per coin, last 7 days only, once per Sunday evening', () =>
   assert.match(m.message, /HYPE: 1 trade · 0W \/ 1L/);              // the win 8 days ago is not this week's
   assert.match(m.message, /Since the start: 3 trades · 1W \/ 2L/);
   assert.equal(summary.weeklyDue(st, sun + H), null);                 // sent once
+});
+
+test('trend pullback: long on a dip to EMA20 in an uptrend, short on the mirror, nothing without a trend', () => {
+  const pb = require('../src/pullback');
+  // 260 rising 4H candles (uptrend), then one that dips through EMA20 and closes back above it.
+  const mk = (n, f) => Array.from({ length: n }, (_, i) => { const c = f(i); return { t: i * TF, o: c, h: c * 1.002, l: c * 0.998, c }; });
+  const up = mk(260, i => 100 + i * 0.5);
+  let s = pb.series(up);
+  const last = s[s.length - 1];
+  assert.equal(last.trend, 1);
+  assert.equal(last.enter, 0);                             // far above EMA20: no pullback
+  const e20 = last.ema20;
+  up.push({ t: 260 * TF, o: up[259].c, h: up[259].c, l: e20 * 0.995, c: up[259].c * 0.999 });
+  s = pb.series(up);
+  assert.equal(s[s.length - 1].enter, 1);                  // touched EMA20, closed back above: long
+  assert.equal(s[s.length - 1].pullback, true);
+  const dn = mk(260, i => 300 - i * 0.5);
+  const d20 = pb.series(dn)[259].ema20;
+  dn.push({ t: 260 * TF, o: dn[259].c, h: d20 * 1.005, l: dn[259].c, c: dn[259].c * 1.001 });
+  assert.equal(pb.series(dn)[260].enter, -1);              // short mirror
+  const flat = mk(261, i => 100 + Math.sin(i / 3));
+  assert.ok(pb.series(flat).slice(-20).every(x => x.enter === 0 || x.trend !== 0));
+  assert.equal(pb.series(up.slice(0, 150)).filter(Boolean).length, 0);   // too little history for EMA200: no entries
+});
+
+test('MAX_OPEN_POSITIONS: no new entry while that many other coins hold a position', () => {
+  const now = Date.UTC(2026, 9, 1, 12);
+  const sig = { t: now - 4 * 3600000 - 600000, close: 100000, atr: 1000, enter: 1 };
+  const st = freshState();
+  config.MAX_OPEN_POSITIONS = 2;
+  try {
+    st.peers = { ETH: { position: { bias: 1 } }, HYPE: { position: null } };
+    assert.equal(exchange.entryBlock(st, sig, now), null);
+    st.peers.HYPE.position = { bias: -1 };
+    assert.match(exchange.entryBlock(st, sig, now), /2 positions already open \(ETH, HYPE\)/);
+  } finally { config.MAX_OPEN_POSITIONS = null; }
 });
 
 test('price text keeps the decimals a cheap coin needs (NEAR 4.807), BTC / ETH as before', () => {

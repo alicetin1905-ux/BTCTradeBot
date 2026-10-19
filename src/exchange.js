@@ -221,12 +221,18 @@ function entryBlock(st, s, now, { halt = false, live = null } = {}) {
   if (st.position) return 'a position is open';
   if (live) return `a ${SYMBOL} position the bot didn't open is on the account — left alone`;
   if (s.blocked) return `ATLAS flip, but the 4H close is more than ${config.TREND_BAND_PCT}% from its 200-candle average — skipped`;
-  if (!s.enter) return `no ${config.STRATEGY === 'atlas-flip' ? 'ATLAS flip' : 'breakout'} on the last 4H close`;
+  if (!s.enter) return `no ${config.STRATEGY === 'atlas-flip' ? 'ATLAS flip' : config.STRATEGY === 'trend-pullback' ? 'trend pullback' : 'breakout'} on the last 4H close`;
   if (!signal.allowed(s.enter, config.DIRECTION)) return 'short signal, but the bot trades long-only (DIRECTION)';
   if (st.meta && st.meta.lastEntryCandle === s.t) return 'already entered on this 4H candle';
   const ago = now - (s.t + TF_MS);
   if (config.ENTRY_FRESH_MIN != null && ago > config.ENTRY_FRESH_MIN * 60000) return `signal candle closed ${Math.round(ago / 60000)} min ago — entries only within ${config.ENTRY_FRESH_MIN} min of a 4H close`;
   if (halt) return 'trading halted (TRADEBOT_HALT)';
+  // At most MAX_OPEN_POSITIONS open across the coins (the others' positions: st.peers, read just before this run).
+  const max = config.MAX_OPEN_POSITIONS;
+  if (max) {
+    const open = Object.entries(st.peers || {}).filter(([, p]) => p && p.position).map(([c]) => c);
+    if (open.length >= max) return `${open.length} positions already open (${open.join(', ')}) — at most ${max} at a time`;
+  }
   if (dailyLossHit(st, now)) return `daily loss limit (${config.EXECUTION.DAILY_LOSS_LIMIT_PCT}%) reached — no new entries until 00:00 UTC`;
   return null;
 }
@@ -278,7 +284,7 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
     // Remembered here; adoptPending() takes it over on a later run, or books its P&L if it already closed.
     st.meta.pendingEntry = {
       orderId: entryId, bias, stopLoss, takeProfit, fixed, at: now, candleT: s.t, close: s.close, atr: s.atr,
-      tickSize: inst.tickSize, score: s.score ?? null, flipFrom: s.flipFrom ?? null, jump: !!s.jump,
+      tickSize: inst.tickSize, score: s.score ?? null, flipFrom: s.flipFrom ?? null, jump: !!s.jump, pullback: !!s.pullback, trend: s.trend ?? null,
     };
     events.push({ type: 'error', reason: `entry order ${entryId} sent but no position showed up after 5 s — taken over on a later run if it fills` });
     return;
@@ -290,12 +296,12 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
     stop: stopLoss, initialStop: stopLoss, takeProfit, fixed, ext: s.close, trailed: false,
     entryCandleT: s.t, lastExitCheckT: s.t, openedAt: now, orders: { entry: entryId }, tickSize: inst.tickSize,
     notional: pos.size * entry, margin: (pos.size * entry) / P.LEVERAGE, riskAmt: pos.size * Math.abs(entry - stopLoss),
-    atrAtEntry: s.atr, breakout: bias === 1 ? s.upper : s.lower, score: s.score ?? null, flipFrom: s.flipFrom ?? null, jump: !!s.jump,
+    atrAtEntry: s.atr, breakout: bias === 1 ? s.upper : s.lower, score: s.score ?? null, flipFrom: s.flipFrom ?? null, jump: !!s.jump, pullback: !!s.pullback, trend: s.trend ?? null,
     markPrice: pos.markPrice || entry, unrealisedPnl: pos.unrealisedPnl || 0, exchangeStop: pos.stopLoss || stopLoss,
   };
   events.push({
     type: 'enter', bias, entry, stop: stopLoss, takeProfit, fixed, qty: pos.size, notional: pos.size * entry,
-    riskAmt: st.position.riskAmt, breakout: st.position.breakout, score: s.score ?? null, flipFrom: s.flipFrom ?? null, jump: !!s.jump, close: s.close,
+    riskAmt: st.position.riskAmt, breakout: st.position.breakout, score: s.score ?? null, flipFrom: s.flipFrom ?? null, jump: !!s.jump, pullback: !!s.pullback, trend: s.trend ?? null, close: s.close,
   });
 }
 
