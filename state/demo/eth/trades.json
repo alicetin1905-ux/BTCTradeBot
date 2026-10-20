@@ -10,5 +10,17 @@
     "openedAt": 1792339323699,
     "closedAt": 1792374163926,
     "initialStop": 2426
+  },
+  {
+    "symbol": "ETHUSDT",
+    "bias": -1,
+    "entry": 2405.68,
+    "exit": 2515.32,
+    "qty": 0.469,
+    "pnl": -52.5751345,
+    "reason": "stop",
+    "openedAt": 1792454522385,
+    "closedAt": 1792508460481,
+    "initialStop": 2479.87
   }
 ]
