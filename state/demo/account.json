@@ -1,5 +1,5 @@
 {
-  "balance": 1789.0534400000001,
+  "balance": 1449.4651349,
   "startingBalance": 2000,
   "fundingSince": 1792242126819,
   "funding": {
@@ -7,7 +7,7 @@
   },
   "startedAt": 1792242126819,
   "fundingError": null,
-  "exchangeEquity": 1717.5594419565282,
+  "exchangeEquity": 1449.1138277165285,
   "settings": {
     "RISK_PCT": 2,
     "COIN_RISK_PCT": {
@@ -100,6 +100,6 @@
     "ETH",
     "BTC"
   ],
-  "updatedAt": 1792503303155,
+  "updatedAt": 1792503603710,
   "lastRunAt": 1792503126291
 }
