@@ -256,6 +256,24 @@ async function runCommands(client, st, events) {
       ran = true;
       continue;
     }
+    if (c.action === 'restop') {
+      // { "id": "...", "action": "restop" } (optionally "coin"): re-sends the open position's stop at the same price, so it
+      // picks up the current trigger type (index price since 2026-10-22). Nothing open: nothing to do.
+      if (c.coin && String(c.coin).toUpperCase() !== COIN) continue;
+      const pos = st.position;
+      if (pos && !pos.fixed && typeof client.setStopLoss === 'function') {
+        try {
+          await client.setStopLoss(SYMBOL_OF(COIN), pos.stop);
+          events.push({ type: 'info', reason: `${COIN} stop ${px(pos.stop)} re-sent (trigger: index price)` });
+        } catch (err) {
+          events.push({ type: 'error', reason: `restop ${c.id}: ${err.message} — retrying next run` });
+          continue;
+        }
+      }
+      st.commandsDone.push(c.id);
+      ran = true;
+      continue;
+    }
     if (c.action === 'adopt') {
       // { "id": "...", "action": "adopt", "coin": "BTC", "openedAt": "2026-10-07T08:02:00Z" }: the coin's position on the
       // exchange that the bot doesn't track (its entry fill showed up too late) becomes the tracked position, with its own
