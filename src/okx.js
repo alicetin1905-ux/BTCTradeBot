@@ -152,6 +152,10 @@ function createSwapClient(opts) {
   const ours = (instId) => instId === INST || /-USDT-SWAP$/.test(instId);
   // 'cross' (default) or 'isolated': each position's margin kept apart.
   const TDM = String(opts.marginMode || '').trim().toLowerCase() === 'isolated' ? 'isolated' : TD_MODE;
+  // What triggers the stop-loss / take-profit: 'index' (default) = the spot index of the big exchanges. On the demo
+  // account the futures' own mark/last price spiked through stops the real market never reached (BTC 2026-10-20:
+  // stop 80,977 filled at 77,432 while BTC's low was 81,166; ETH the same day 2,480 -> 2,515, high 2,478).
+  const TRIG = ['index', 'mark', 'last'].includes(String(opts.triggerPxType || '').trim()) ? String(opts.triggerPxType).trim() : 'index';
   // Instrument rules, cached per run.
   const instCache = {};
   async function inst(symbol) {
@@ -202,7 +206,7 @@ function createSwapClient(opts) {
   async function placeStop(symbol, bias, stopLoss) {
     await request('POST', '/api/v5/trade/order-algo', {
       instId: idOf(symbol), tdMode: TDM, side: bias === 1 ? 'sell' : 'buy', ...(await posSide(bias)),
-      ordType: 'conditional', slTriggerPx: String(stopLoss), slOrdPx: '-1', slTriggerPxType: 'mark',
+      ordType: 'conditional', slTriggerPx: String(stopLoss), slOrdPx: '-1', slTriggerPxType: TRIG,
       closeFraction: '1', reduceOnly: true,
     });
   }
@@ -290,8 +294,8 @@ function createSwapClient(opts) {
         instId: idOf(symbol), tdMode: TDM, side: bias === 1 ? 'buy' : 'sell', ...(await posSide(bias)),
         ordType: 'market', sz: await contracts(symbol, qty),
         attachAlgoOrds: [{
-          slTriggerPx: String(stopLoss), slOrdPx: '-1', slTriggerPxType: 'mark',
-          ...(takeProfit ? { tpTriggerPx: String(takeProfit), tpOrdPx: '-1', tpTriggerPxType: 'mark' } : {}),
+          slTriggerPx: String(stopLoss), slOrdPx: '-1', slTriggerPxType: TRIG,
+          ...(takeProfit ? { tpTriggerPx: String(takeProfit), tpOrdPx: '-1', tpTriggerPxType: TRIG } : {}),
         }],
       });
       return r[0].ordId;
@@ -309,7 +313,7 @@ function createSwapClient(opts) {
       try {
         for (const o of current) {
           await request('POST', '/api/v5/trade/amend-algos', {
-            instId: idOf(symbol), algoId: o.algoId, newSlTriggerPx: String(stopLoss), newSlOrdPx: '-1', newSlTriggerPxType: 'mark',
+            instId: idOf(symbol), algoId: o.algoId, newSlTriggerPx: String(stopLoss), newSlOrdPx: '-1', newSlTriggerPxType: TRIG,
           });
         }
       } catch (err) {
@@ -350,8 +354,8 @@ function createSwapClient(opts) {
         try {
           await request('POST', '/api/v5/trade/amend-algos', {
             instId: idOf(symbol), algoId: current[0].algoId,
-            newSlTriggerPx: String(stopLoss), newSlOrdPx: '-1', newSlTriggerPxType: 'mark',
-            newTpTriggerPx: String(takeProfit), newTpOrdPx: '-1', newTpTriggerPxType: 'mark',
+            newSlTriggerPx: String(stopLoss), newSlOrdPx: '-1', newSlTriggerPxType: TRIG,
+            newTpTriggerPx: String(takeProfit), newTpOrdPx: '-1', newTpTriggerPxType: TRIG,
           });
           return current[0].algoId;
         } catch (e) { /* not amendable that way: place a new pair below */ }
@@ -361,8 +365,8 @@ function createSwapClient(opts) {
       const place = async () => (await request('POST', '/api/v5/trade/order-algo', {
         instId: idOf(symbol), tdMode: TDM, side: live.bias === 1 ? 'sell' : 'buy', ...(await posSide(live.bias)),
         ordType: 'oco',
-        slTriggerPx: String(stopLoss), slOrdPx: '-1', slTriggerPxType: 'mark',
-        tpTriggerPx: String(takeProfit), tpOrdPx: '-1', tpTriggerPxType: 'mark',
+        slTriggerPx: String(stopLoss), slOrdPx: '-1', slTriggerPxType: TRIG,
+        tpTriggerPx: String(takeProfit), tpOrdPx: '-1', tpTriggerPxType: TRIG,
         closeFraction: '1', reduceOnly: true,
       }))[0].algoId;
       let id;

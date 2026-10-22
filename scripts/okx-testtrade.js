@@ -27,7 +27,7 @@ async function main() {
   const instrument = (process.env.OKX_INSTRUMENT || '').trim().toUpperCase() || config.OKX_INSTRUMENT;
   const client = createClient({
     apiKey: process.env.OKX_API_KEY, apiSecret: process.env.OKX_API_SECRET, passphrase: process.env.OKX_API_PASSPHRASE,
-    base: process.env.OKX_API_BASE, instrument, symbol: config.SYMBOL, marginMode: process.env.OKX_MARGIN_MODE,
+    base: process.env.OKX_API_BASE, instrument, symbol: config.SYMBOL, marginMode: process.env.OKX_MARGIN_MODE, triggerPxType: process.env.OKX_TRIGGER_PX,
   });
   const S = config.SYMBOL;
   const lev = client.spot ? 1 : config.PORTFOLIO.LEVERAGE;
