@@ -19,7 +19,7 @@
   "closeT": 1792684800000,
   "source": "okx",
   "at": 1792686723969,
-  "wait": "a position is open",
+  "wait": "no trend pullback on the last 4H close",
   "strategy": "trend-pullback",
   "chart": [
     [
