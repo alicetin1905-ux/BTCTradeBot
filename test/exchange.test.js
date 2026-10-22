@@ -538,14 +538,14 @@ test('OKX: sizes in BTC become contracts; the entry carries its stop-loss; long/
   await c.openMarket({ symbol: 'BTCUSDT', bias: 1, qty: 0.0234, stopLoss: 98000 });
   const order = f.S.calls.find(x => x.path === '/api/v5/trade/order').body;
   assert.deepEqual(order, { instId: 'BTC-USDT-SWAP', tdMode: 'cross', side: 'buy', ordType: 'market', sz: '2.34',
-    attachAlgoOrds: [{ slTriggerPx: '98000', slOrdPx: '-1', slTriggerPxType: 'mark' }] });
+    attachAlgoOrds: [{ slTriggerPx: '98000', slOrdPx: '-1', slTriggerPxType: 'index' }] });
   assert.deepEqual(f.S.calls.find(x => x.path === '/api/v5/account/set-leverage').body, { instId: 'BTC-USDT-SWAP', lever: '5', mgnMode: 'cross' });
 
   // With a take-profit it rides on the same attached algo order (one OCO pair on OKX).
   const h = fakeOkx();
   await okxClient(h).openMarket({ symbol: 'BTCUSDT', bias: -1, qty: 0.05, stopLoss: 102000, takeProfit: 96000 });
   assert.deepEqual(h.S.calls.find(x => x.path === '/api/v5/trade/order').body.attachAlgoOrds,
-    [{ slTriggerPx: '102000', slOrdPx: '-1', slTriggerPxType: 'mark', tpTriggerPx: '96000', tpOrdPx: '-1', tpTriggerPxType: 'mark' }]);
+    [{ slTriggerPx: '102000', slOrdPx: '-1', slTriggerPxType: 'index', tpTriggerPx: '96000', tpOrdPx: '-1', tpTriggerPxType: 'index' }]);
 
   const g = fakeOkx({ posMode: 'long_short_mode' });
   await okxClient(g).closeMarket({ symbol: 'BTCUSDT', bias: -1, qty: 0.03 });
@@ -576,7 +576,7 @@ test('OKX: moving the stop amends the stop-loss algo; wrong side of the mark is 
   const c = okxClient(f);
   await c.setStopLoss('BTCUSDT', 103000);
   assert.deepEqual(f.S.calls.find(x => x.path === '/api/v5/trade/amend-algos').body,
-    { instId: 'BTC-USDT-SWAP', algoId: 'a1', newSlTriggerPx: '103000', newSlOrdPx: '-1', newSlTriggerPxType: 'mark' });
+    { instId: 'BTC-USDT-SWAP', algoId: 'a1', newSlTriggerPx: '103000', newSlOrdPx: '-1', newSlTriggerPxType: 'index' });
   await assert.rejects(c.setStopLoss('BTCUSDT', 107000), /wrong side/);
   // No stop algo at all: a whole-position stop is placed.
   f.S.algos = [];
@@ -1159,7 +1159,7 @@ test('OKX setExits: amends the one existing stop in place (stop + take-profit); 
   const id = await okxClient(f).setExits('BTCUSDT', { stopLoss: 81485.1, takeProfit: 95059 });
   assert.equal(id, 'old1');
   assert.deepEqual(f.S.calls.find(x => x.path === '/api/v5/trade/amend-algos').body, { instId: 'BTC-USDT-SWAP', algoId: 'old1',
-    newSlTriggerPx: '81485.1', newSlOrdPx: '-1', newSlTriggerPxType: 'mark', newTpTriggerPx: '95059', newTpOrdPx: '-1', newTpTriggerPxType: 'mark' });
+    newSlTriggerPx: '81485.1', newSlOrdPx: '-1', newSlTriggerPxType: 'index', newTpTriggerPx: '95059', newTpOrdPx: '-1', newTpTriggerPxType: 'index' });
   assert.ok(!f.S.calls.some(x => x.path === '/api/v5/trade/order-algo' || x.path === '/api/v5/trade/cancel-algos'));
   const g = fakeOkx({ positions: [{ instId: 'BTC-USDT-SWAP', pos: '2.21', posSide: 'net', avgPx: '86000', markPx: '86000', upl: '0' }], mark: 86000 });
   await assert.rejects(okxClient(g).setExits('BTCUSDT', { stopLoss: 87000, takeProfit: 95000 }), /wrong side/);

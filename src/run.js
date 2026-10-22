@@ -135,7 +135,7 @@ function exchangeClient() {
     return require('./okx').createClient({
       apiKey: process.env.OKX_API_KEY, apiSecret: process.env.OKX_API_SECRET,
       passphrase: process.env.OKX_API_PASSPHRASE, base: process.env.OKX_API_BASE,
-      instrument: config.OKX_INSTRUMENT, symbol: config.SYMBOL, marginCcy: process.env.OKX_MARGIN_CCY, marginMode: process.env.OKX_MARGIN_MODE,
+      instrument: config.OKX_INSTRUMENT, symbol: config.SYMBOL, marginCcy: process.env.OKX_MARGIN_CCY, marginMode: process.env.OKX_MARGIN_MODE, triggerPxType: process.env.OKX_TRIGGER_PX,
     });
   }
   return require('./bybit').createClient({ env: MODE, apiKey: process.env.BYBIT_API_KEY, apiSecret: process.env.BYBIT_API_SECRET });
@@ -250,6 +250,24 @@ async function runCommands(client, st, events) {
           events.push({ type: 'error', reason: `scale-to-fixed ${c.id}: ${err.message} — retrying next run` });
           ran = true;
           continue; // not marked done
+        }
+      }
+      st.commandsDone.push(c.id);
+      ran = true;
+      continue;
+    }
+    if (c.action === 'restop') {
+      // { "id": "...", "action": "restop" } (optionally "coin"): re-sends the open position's stop at the same price, so it
+      // picks up the current trigger type (index price since 2026-10-22). Nothing open: nothing to do.
+      if (c.coin && String(c.coin).toUpperCase() !== COIN) continue;
+      const pos = st.position;
+      if (pos && !pos.fixed && typeof client.setStopLoss === 'function') {
+        try {
+          await client.setStopLoss(SYMBOL_OF(COIN), pos.stop);
+          events.push({ type: 'info', reason: `${COIN} stop ${px(pos.stop)} re-sent (trigger: index price)` });
+        } catch (err) {
+          events.push({ type: 'error', reason: `restop ${c.id}: ${err.message} — retrying next run` });
+          continue;
         }
       }
       st.commandsDone.push(c.id);

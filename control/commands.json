@@ -31,5 +31,9 @@
     "id": "2026-10-17-reset-2",
     "action": "reset",
     "clearHistory": true
+  },
+  {
+    "id": "2026-10-22-restop-index",
+    "action": "restop"
   }
 ]
