@@ -9,10 +9,10 @@
   "initialStop": 82.4537,
   "takeProfit": null,
   "fixed": false,
-  "ext": 77.193,
+  "ext": 77.117,
   "trailed": false,
   "entryCandleT": 1792627200000,
-  "lastExitCheckT": 1792771200000,
+  "lastExitCheckT": 1792785600000,
   "openedAt": 1792641721493,
   "orders": {
     "entry": "4031206740229484545"
