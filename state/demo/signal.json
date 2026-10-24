@@ -18,7 +18,7 @@
   "flipFrom": null,
   "closeT": 1792814400000,
   "source": "okx",
-  "at": 1792816323859,
+  "at": 1792818124470,
   "wait": "no trend pullback on the last 4H close",
   "strategy": "trend-pullback",
   "chart": [
