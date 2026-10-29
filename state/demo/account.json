@@ -7,7 +7,7 @@
   },
   "startedAt": 1792242126819,
   "fundingError": null,
-  "exchangeEquity": 1382.2094762733639,
+  "exchangeEquity": 1380.1209462733639,
   "settings": {
     "RISK_PCT": 2,
     "COIN_RISK_PCT": {
@@ -100,6 +100,6 @@
     "ETH",
     "BTC"
   ],
-  "updatedAt": 1793260804009,
-  "lastRunAt": 1793259125080
+  "updatedAt": 1793260925284,
+  "lastRunAt": 1793260925284
 }
