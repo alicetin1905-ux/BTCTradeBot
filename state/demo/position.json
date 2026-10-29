@@ -28,7 +28,7 @@
   "jump": false,
   "pullback": true,
   "trend": -1,
-  "markPrice": 80345.3,
-  "unrealisedPnl": 0.203960000000018,
+  "markPrice": 80403.3,
+  "unrealisedPnl": -0.787839999999982,
   "exchangeStop": 82015.5
 }
