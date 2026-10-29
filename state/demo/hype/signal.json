@@ -18,8 +18,8 @@
   "flipFrom": null,
   "closeT": 1793260800000,
   "source": "okx",
-  "at": 1793266321536,
-  "wait": "signal candle closed 120 min ago — entries only within 45 min of a 4H close",
+  "at": 1793268121349,
+  "wait": "signal candle closed 122 min ago — entries only within 45 min of a 4H close",
   "strategy": "trend-pullback",
   "chart": [
     [
