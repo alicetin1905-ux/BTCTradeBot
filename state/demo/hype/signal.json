@@ -19,7 +19,7 @@
   "closeT": 1793260800000,
   "source": "okx",
   "at": 1793262721580,
-  "wait": "signal candle closed 50 min ago — entries only within 45 min of a 4H close",
+  "wait": "signal candle closed 55 min ago — entries only within 45 min of a 4H close",
   "strategy": "trend-pullback",
   "chart": [
     [
