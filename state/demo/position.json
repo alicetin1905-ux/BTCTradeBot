@@ -5,7 +5,7 @@
   "entry": 80357.22748538012,
   "qty": 0.0171,
   "qtyTotal": 0.0171,
-  "stop": 80095.6,
+  "stop": 79628.1,
   "initialStop": 82015.5,
   "takeProfit": null,
   "fixed": false,
@@ -28,7 +28,7 @@
   "jump": false,
   "pullback": true,
   "trend": -1,
-  "markPrice": 76931.5,
-  "unrealisedPnl": 58.57994000000007,
+  "markPrice": 76854.7,
+  "unrealisedPnl": 59.89322000000012,
   "exchangeStop": 80095.6
 }
