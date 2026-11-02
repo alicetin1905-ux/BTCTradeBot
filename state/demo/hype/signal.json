@@ -18,7 +18,7 @@
   "flipFrom": null,
   "closeT": 1793577600000,
   "source": "okx",
-  "at": 1793577722192,
+  "at": 1793579521834,
   "wait": "2 positions already open (ETH, BTC) — at most 2 at a time",
   "strategy": "trend-pullback",
   "chart": [
