@@ -101,9 +101,7 @@ dl.kv dd{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-n
 .led.up{background:var(--up);box-shadow:0 0 10px var(--up),0 0 2px var(--up)}
 .led.dn{background:var(--dn);box-shadow:0 0 10px var(--dn),0 0 2px var(--dn)}
 .lt-head .led{margin-right:2px}
-@media(max-width:859px){.srcs{gap:6px}.src{padding:8px 9px}.src-h small{display:none}.src-h b{font-size:10px;letter-spacing:.03em;white-space:nowrap}.src-b{font-size:11px}}
-@media(max-width:420px){.src-b .sub{display:none}}
-@media(max-width:620px){.src-b .lg{display:none}}
+@media(max-width:859px){.flow{padding:0 12px}.srcs{grid-template-columns:minmax(0,1fr);gap:8px}.src{padding:11px 13px}.src-b{font-size:13px}.src-b .sub{font-size:11px}}
 @media (prefers-reduced-motion: reduce){.led,.bots>.card{transition:none}}
 .page{display:grid;gap:14px;min-width:0}
 .page[hidden]{display:none}
@@ -159,7 +157,6 @@ dl.kv dd{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-n
 .gs-first.up{color:var(--up);background:rgba(53,255,176,.10)}
 .gs-first.dn{color:var(--dn);background:rgba(255,77,106,.10)}
 .gs-first.nt{color:var(--faint);background:none;font-weight:500;padding:0}
-@media(max-width:420px){.src-b .sub.gs{display:block}.gs-rest{display:none}.gs-first{font-size:10px;padding:0 3px}}
 .bchart{height:64px;margin-top:8px;position:relative}
 .bchart.big{height:220px;margin-top:0}
 .bchart svg{display:block;width:100%;height:100%;overflow:visible}
@@ -740,7 +737,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
   function drawWires() {
     var svg = $('wires'), flow = $('flow');
     if (!svg || !flow || !flow.offsetParent) return;
-    var F = flow.getBoundingClientRect(), stacked = false; // phones use the desktop grid too
+    var F = flow.getBoundingClientRect(), stacked = window.innerWidth < 860; // phones: data tiles stacked, coins side by side
     svg.setAttribute('viewBox', '0 0 ' + F.width + ' ' + F.height);
     // only the wires are redrawn; pulses in flight live in their own groups and keep going
     var old = $('wireLines'); if (old) old.remove();
@@ -756,13 +753,12 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
         if (!stacked) {
           var tx = B.left - F.left + B.width * (0.3 + 0.2 * si);
           d = 'M' + sx + ' ' + sy + ' C' + sx + ' ' + (sy + 30) + ' ' + tx + ' ' + (ty - 30) + ' ' + tx + ' ' + ty;
-        } else if (ci === 0) {
-          var tx0 = B.left - F.left + B.width * (0.3 + 0.2 * si);
-          d = 'M' + sx + ' ' + sy + ' C' + sx + ' ' + (sy + 26) + ' ' + tx0 + ' ' + (ty - 26) + ' ' + tx0 + ' ' + ty;
         } else {
-          var lane = 4 + si * 3, mid = sy + 14 + si * 6;
-          d = 'M' + sx + ' ' + sy + ' Q' + sx + ' ' + mid + ' ' + (sx - 20) + ' ' + mid + ' L' + (lane + 10) + ' ' + mid + ' Q' + lane + ' ' + mid + ' ' + lane + ' ' + (mid + 10) +
-            ' L' + lane + ' ' + (ty + 14) + ' Q' + lane + ' ' + (ty + 4) + ' ' + (lane + 12) + ' ' + (ty + 4);
+          // from the tile's side, along the edge lane, into the coin's top
+          var left = ci === 0, ex = left ? A.left - F.left : A.right - F.left, ey = A.top - F.top + A.height / 2;
+          var lane = left ? 3 + si * 3 : F.width - 3 - si * 3, turn = ty - 12 - (2 - si) * 5;
+          var tx1 = B.left - F.left + B.width * (left ? 0.2 + 0.15 * si : 0.8 - 0.15 * si);
+          d = 'M' + ex + ' ' + ey + ' L' + lane + ' ' + ey + ' L' + lane + ' ' + turn + ' L' + tx1 + ' ' + turn + ' L' + tx1 + ' ' + ty;
         }
         var path = node('path', { d: d, fill: 'none', stroke: 'var(--line2)', 'stroke-width': 1, 'stroke-dasharray': '2 4', opacity: 0.7 }, lines);
         WIRES[k + '-' + c] = path;
@@ -1006,6 +1002,8 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
 
   function startSources() {
     drawWires();
+    // tiles change height as their data comes in: redraw the wires whenever the layout moves
+    if (window.ResizeObserver) { var ro = new ResizeObserver(function () { drawWires(); }); ro.observe($('flow')); Array.prototype.forEach.call(document.querySelectorAll('.src'), function (e) { ro.observe(e); }); }
     feedAtlas(); feedGlass(); feedGlassSlow(); load200w().then(feedHalving);
     setInterval(feedAtlas, 60000);
     setInterval(feedGlass, 8000);
