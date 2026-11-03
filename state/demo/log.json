@@ -20,5 +20,27 @@
     "side": 0,
     "expR": null,
     "decision": "no pullback or breakout setup on the last 4H close"
+  },
+  {
+    "at": 1793736124392,
+    "kind": "scan",
+    "candleT": 1793721600000,
+    "close": 77612,
+    "trend": -1,
+    "setup": "pullback",
+    "side": -1,
+    "expR": 0.201,
+    "decision": "entered"
+  },
+  {
+    "at": 1793736124392,
+    "kind": "enter",
+    "side": -1,
+    "price": 77511.73676470589,
+    "stop": 79062.8,
+    "qty": 0.0136,
+    "risk": 21.094459999999998,
+    "setup": "pullback",
+    "expR": 0.201
   }
 ]
