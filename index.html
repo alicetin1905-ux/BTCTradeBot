@@ -104,12 +104,16 @@ dl.kv dd{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-n
 /* phones: ATLAS full width on top, GlassSphere and BTC-Halving side by side under it */
 @media(max-width:859px){
   .flow{padding:0 12px}
-  .srcs{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-  #src-atlas{grid-column:1/-1}
+  .srcs{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+  /* three tiles of the same size: ATLAS centred on top, GlassSphere and BTC-Halving side by side under it */
+  #src-atlas{grid-column:2/4}
+  #src-glass{grid-column:1/3}
+  #src-halving{grid-column:3/5}
+  #src-atlas .src-h small{display:none}
+  #src-atlas .src-b .sub{white-space:normal;line-height:1.35}
   .src{padding:10px 11px}
   .src-b{font-size:13px}
   .src-b .sub{font-size:10.5px}
-  #src-atlas .src-b .sub{font-size:11px}
   #src-glass .src-h small,#src-halving .src-h small{display:none}
   #src-glass .lg{display:none}
   #src-glass .gs-rest{display:none}
