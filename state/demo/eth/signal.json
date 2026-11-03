@@ -75,8 +75,8 @@
   "minR": 0,
   "closeT": 1793707200000,
   "source": "binance",
-  "at": 1793718121829,
-  "wait": "signal candle closed 182 min ago — entries only within 45 min of a 4H close",
+  "at": 1793719921516,
+  "wait": "signal candle closed 212 min ago — entries only within 45 min of a 4H close",
   "strategy": "learning",
   "chart": [
     [
