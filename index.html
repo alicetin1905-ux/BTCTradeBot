@@ -158,6 +158,10 @@ dl.kv dd{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-n
 .gs-first.up{color:var(--up);background:rgba(53,255,176,.10)}
 .gs-first.dn{color:var(--dn);background:rgba(255,77,106,.10)}
 @media(max-width:420px){.src-b .sub.gs{display:block}.gs-rest{display:none}.gs-first{font-size:10px;padding:0 3px}}
+.bchart{height:64px;margin-top:8px;position:relative}
+.bchart.big{height:220px;margin-top:0}
+.bchart svg{display:block;width:100%;height:100%;overflow:visible}
+@media(max-width:859px){.pairs .bchart{height:48px;margin-top:6px}}
 .meter{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:4px 0 2px}
 .meter i{display:block;height:100%;background:var(--nt);border-radius:3px}
 .scorebar{position:relative;height:10px;margin:12px 0 2px;border-radius:5px;background:linear-gradient(90deg,rgba(255,77,106,.35),var(--line) 50%,rgba(53,255,176,.35))}
@@ -227,6 +231,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
  <div class="page" id="page-bot" hidden>
   <a class="back" href="#">← Overview</a>
   <section class="card" id="botDetail"></section>
+  <section class="card"><h2 id="botChartH">30m · trades</h2><div class="bchart big" id="botChart" data-n="300"></div><div class="legend"><span><i style="background:var(--up)"></i>▲ long opened</span><span><i style="background:var(--dn)"></i>▼ short opened</span><span><i style="background:var(--txt)"></i>● closed (green profit / red loss)</span><span><i style="background:var(--blue)"></i>entry</span><span><i style="background:var(--dn)"></i>stop</span></div></section>
   <section class="card"><h2>Log <span class="tag" id="botLogTag"></span></h2><div class="scroll" id="botLog"></div></section>
   <section class="card"><h2 id="botTradesH">Closed trades</h2><div class="scroll" id="botTrades"></div></section>
   <div class="note" style="margin:6px 2px -4px;letter-spacing:.12em;text-transform:uppercase;font-size:10px">Shared by both bots</div>
@@ -578,6 +583,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     var coins = coinList().slice().sort(function (a, b) { return a === 'BTC' ? -1 : b === 'BTC' ? 1 : a < b ? -1 : 1; });
     $('liveTiles').innerHTML = coins.map(function (c) { return liveTileHtml(c, false).replace('<section class="card compact">', '<section class="card compact ' + (c === 'BTC' ? 'o1' : 'o3') + '" id="bot-' + c + '" role="link" tabindex="0" onclick="location.hash=\'#' + c.toLowerCase() + '\'">'); }).join('') +
       coins.map(botCardHtml).join('');
+    drawBotCharts();
     if (ROUTE.page === 'bot') renderBotPage(ROUTE.coin);
     if (ROUTE.page === 'coin') renderCoinPage(ROUTE.coin, true);
     drawWires();
@@ -617,6 +623,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       '<span class="pill ' + (stale ? 'short' : p ? (p.bias === 1 ? 'long' : 'short') : 'flat') + '">' + (stale ? 'NO RECENT RUN' : p ? (p.bias === 1 ? 'IN A LONG' : 'IN A SHORT') : 'WATCHING') + '</span>' +
       '<span class="lt-px ' + (p ? cls(u) : '') + '" style="font-size:16px">' + (p ? esc(signed(u)) : esc(signed(real))) + '</span></div>' +
       '<div class="lt-status dim" style="margin:0">' + (p ? 'open P&L · entry ' + esc(px(p.entry)) + ' · stop ' + esc(px(p.stop)) : 'realized') + ' · ' + (trades.length ? trades.length + ' trades, ' + w + ' won' : 'no trades yet') + '</div>' +
+      '<div class="bchart" data-coin="' + c + '" data-n="96"></div>' +
       logListHtml(d.log, c, 3) + '<div class="more" style="margin-top:6px;text-align:right">log &amp; trades →</div></a>';
   }
   // After each state refresh: new log lines (entry, stop move, exit) pulse from the coin to its bot.
@@ -657,6 +664,9 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     $('botLog').innerHTML = logListHtml(d.log, c, 400).replace('class="loglist"', 'class="loglist" style="border-top:0;margin-top:0;padding-top:0"');
     $('botTradesH').textContent = c + ' closed trades';
     $('botTrades').innerHTML = coinTradesHtml(c);
+    $('botChartH').textContent = c + ' 30m · last ' + Math.round(300 / 48 * 10) / 10 + ' days · trades';
+    $('botChart').setAttribute('data-coin', c);
+    drawBotChart($('botChart'));
   }
   function botDetailHtml() {
     var a = S.account; if (!a) return '<div class="empty">Waiting for the bot\'s first upload.</div>';
@@ -923,12 +933,81 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     $('srcb-halving').innerHTML = Hh;
   }
 
+  /* ---------------- 30m charts with the bot's trades ---------------- */
+  var K30 = {};
+  async function feed30m() {
+    for (var ci = 0; ci < COINS2.length; ci++) {
+      var c = COINS2[ci];
+      try {
+        var d = await okx('market/candles?instId=' + c + '-USDT-SWAP&bar=30m&limit=300');
+        K30[c] = d.slice().reverse().map(function (r) { return { t: +r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4] }; });
+      } catch (e) { /* next round */ }
+    }
+    drawBotCharts();
+    if (ROUTE.page === 'bot' && $('botChart')) drawBotChart($('botChart'));
+  }
+  function drawBotCharts() { Array.prototype.forEach.call(document.querySelectorAll('#liveTiles .bchart'), drawBotChart); }
+  // A 30m price line with the bot's entries (▲ long / ▼ short at the entry price) and exits (● green profit, red loss);
+  // an open position adds its entry and stop lines. n = how many 30m candles (96 = 2 days); a position opened earlier
+  // widens the window to show its entry.
+  function drawBotChart(el) {
+    if (!el) return;
+    var c = el.getAttribute('data-coin'), all = K30[c]; if (!all || !all.length) { el.innerHTML = ''; return; }
+    var d = S.byCoin[c] || {}, p = d.position, n = +el.getAttribute('data-n') || 96;
+    if (p && p.openedAt) { var need = all.filter(function (k) { return k.t >= p.openedAt - 4 * 18e5; }).length; n = Math.max(n, Math.min(all.length, need)); }
+    var k = all.slice(-n), live = S.liveBy[c] && S.liveBy[c].px;
+    if (live) k = k.slice(0, -1).concat([{ t: k[k.length - 1].t, c: live, h: Math.max(k[k.length - 1].h, live), l: Math.min(k[k.length - 1].l, live) }]);
+    var t0 = k[0].t, t1 = k[k.length - 1].t + 18e5;
+    var trades = positionsFromTrades((d.trades || []).map(function (t) { var x = {}; for (var q in t) x[q] = t[q]; x.coin = c; return x; }));
+    var marks = [];
+    trades.forEach(function (t) {
+      if (t.openedAt >= t0 && t.openedAt <= t1) marks.push({ t: t.openedAt, px: t.entry, kind: 'in', side: t.bias });
+      if (t.closedAt >= t0 && t.closedAt <= t1 && t.exit) marks.push({ t: t.closedAt, px: t.exit, kind: 'out', win: t.pnl >= 0 });
+    });
+    if (p && p.openedAt >= t0) marks.push({ t: p.openedAt, px: p.entry, kind: 'in', side: p.bias });
+    var lo = Infinity, hi = -Infinity;
+    k.forEach(function (x) { lo = Math.min(lo, x.c); hi = Math.max(hi, x.c); });
+    marks.forEach(function (m) { lo = Math.min(lo, m.px); hi = Math.max(hi, m.px); });
+    if (p) { lo = Math.min(lo, p.entry, p.stop); hi = Math.max(hi, p.entry, p.stop); }
+    var pad = (hi - lo) * 0.1 || hi * 0.001; lo -= pad; hi += pad;
+    var W = el.clientWidth || 200, H = el.clientHeight || 64, big = H > 120, R = big ? 96 : 0;
+    var X = function (t) { return (t - t0) / (t1 - t0) * (W - R); }, Y = function (v) { return 3 + (hi - v) / (hi - lo) * (H - 6); };
+    var line = k.map(function (x, i) { return (i ? 'L' : 'M') + X(x.t + 9e5).toFixed(1) + ' ' + Y(x.c).toFixed(1); }).join('');
+    var last = k[k.length - 1], up = last.c >= k[0].c, col = up ? 'var(--up)' : 'var(--dn)';
+    var gid = 'bg' + c + (big ? 'B' : '');
+    var h = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" aria-label="' + esc(c) + ' 30m with the bot\'s trades">' +
+      '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9aaca4" stop-opacity=".16"/><stop offset="1" stop-color="#9aaca4" stop-opacity="0"/></linearGradient></defs>' +
+      '<path d="' + line + 'L' + X(last.t + 9e5).toFixed(1) + ' ' + H + 'L' + X(k[0].t + 9e5).toFixed(1) + ' ' + H + 'Z" fill="url(#' + gid + ')"/>' +
+      '<path d="' + line + '" fill="none" stroke="#9aaca4" stroke-opacity=".75" stroke-width="' + (big ? 1.4 : 1.1) + '"/>';
+    if (p) {
+      var x0 = p.openedAt >= t0 ? X(p.openedAt) : 0;
+      h += '<line x1="' + x0 + '" x2="' + (W - R) + '" y1="' + Y(p.entry) + '" y2="' + Y(p.entry) + '" stroke="var(--blue)" stroke-opacity=".8" stroke-dasharray="3 3"/>' +
+        '<line x1="' + x0 + '" x2="' + (W - R) + '" y1="' + Y(p.stop) + '" y2="' + Y(p.stop) + '" stroke="var(--dn)" stroke-opacity=".8" stroke-dasharray="3 3"/>';
+      if (big) h += '<text x="' + (W - R + 4) + '" y="' + (Y(p.entry) + 3) + '" fill="var(--blue)" font-size="10" font-family="monospace">entry ' + esc(px(p.entry)) + '</text>' +
+        '<text x="' + (W - R + 4) + '" y="' + (Y(p.stop) + 3) + '" fill="var(--dn)" font-size="10" font-family="monospace">stop ' + esc(px(p.stop)) + '</text>';
+    }
+    var s = big ? 7 : 5;
+    marks.forEach(function (m) {
+      var x = X(m.t), y = Y(m.px);
+      if (m.kind === 'in') {
+        var pts = m.side === 1 ? [x, y - s * 0.2, x - s, y + s * 1.2, x + s, y + s * 1.2] : [x, y + s * 0.2, x - s, y - s * 1.2, x + s, y - s * 1.2];
+        h += '<polygon points="' + pts.join(' ') + '" fill="' + (m.side === 1 ? 'var(--up)' : 'var(--dn)') + '" stroke="var(--bg)" stroke-width="1"/>';
+      } else {
+        h += '<circle cx="' + x + '" cy="' + y + '" r="' + (s * 0.75) + '" fill="' + (m.win ? 'var(--up)' : 'var(--dn)') + '" stroke="var(--txt)" stroke-width="1.2"/>';
+      }
+    });
+    h += '<circle cx="' + X(last.t + 9e5) + '" cy="' + Y(last.c) + '" r="2.6" fill="' + col + '"><animate attributeName="r" values="2;3.8;2" dur="1.6s" repeatCount="indefinite"/></circle>';
+    if (big) h += '<text x="' + (W - R + 4) + '" y="10" fill="var(--faint)" font-size="10" font-family="monospace">' + esc(px(hi - pad)) + '</text><text x="' + (W - R + 4) + '" y="' + (H - 2) + '" fill="var(--faint)" font-size="10" font-family="monospace">' + esc(px(lo + pad)) + '</text>';
+    el.innerHTML = h + '</svg>';
+  }
+
   function startSources() {
     drawWires();
     feedAtlas(); feedGlass(); feedGlassSlow(); load200w().then(feedHalving);
     setInterval(feedAtlas, 60000);
     setInterval(feedGlass, 8000);
     setInterval(feedGlassSlow, 5 * 60000);
+    feed30m(); setInterval(feed30m, 60000);
     setInterval(function () { load200w(); }, 15 * 60000);
   }
 
