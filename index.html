@@ -102,6 +102,7 @@ dl.kv dd{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-n
 .lt-head .led{margin-right:2px}
 @media(max-width:859px){.flow{padding-left:12px}.srcs{gap:6px}.src{padding:8px 9px}.src-h small{display:none}.src-h b{font-size:10px;letter-spacing:.03em;white-space:nowrap}.src-b{font-size:11px}}
 @media(max-width:420px){.src-b .sub{display:none}}
+@media(max-width:620px){.src-b .lg{display:none}}
 @media (prefers-reduced-motion: reduce){.led,.bots>.card{transition:none}}
 .page{display:grid;gap:14px;min-width:0}
 .page[hidden]{display:none}
@@ -188,7 +189,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
   <div class="flow" id="flow">
     <div class="srcs">
       <section class="card src" id="src-atlas"><div class="src-h"><span class="led" id="led-atlas"></span><b>ATLAS</b><small>live 15m score</small></div><div class="src-b" id="srcb-atlas"><div class="faint">connecting…</div></div></section>
-      <section class="card src" id="src-glass"><div class="src-h"><span class="led" id="led-glass"></span><b>GLASSSPHERE</b><small>order flow</small></div><div class="src-b" id="srcb-glass"><div class="faint">connecting…</div></div></section>
+      <section class="card src" id="src-glass"><div class="src-h"><span class="led" id="led-glass"></span><b>GLASSSPHERE</b><small>weekly reading</small></div><div class="src-b" id="srcb-glass"><div class="faint">connecting…</div></div></section>
       <section class="card src" id="src-halving"><svg class="src-bg" id="bg-halving" aria-hidden="true" preserveAspectRatio="none"></svg><div class="src-h"><span class="led" id="led-halving"></span><b>BTC-HALVING</b><small>cycle</small></div><div class="src-b" id="srcb-halving"><div class="faint">connecting…</div></div></section>
     </div>
     <div class="pairs" id="liveTiles"></div>
@@ -830,19 +831,19 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     }
     renderSources();
   }
+  // GlassSphere's own weekly reading (its page publishes it every hour): which liquidity target the price is more likely
+  // to reach first within 7 days, with the calibrated chance — 'up', 'down', or 'neutral' below 65%.
   async function feedGlassSlow() {
-    for (var ci = 0; ci < COINS2.length; ci++) {
-      var c = COINS2[ci];
-      try {
-        var f = (await okx('public/funding-rate?instId=' + c + '-USDT-SWAP'))[0], oi = (await okx('public/open-interest?instId=' + c + '-USDT-SWAP'))[0];
-        var g = SRC.glass[c] || (SRC.glass[c] = {});
-        var o = +oi.oiUsd, oiChg = g.oi ? o / g.oi - 1 : 0;
-        g.funding = +f.fundingRate * 100; g.oiPrev = g.oi; g.oi = o; g.oiChg = oiChg;
-        // funding read contrarian (crowded longs paying = bearish); rising OI follows the price direction
-        var fdir = g.funding > 0.03 ? -1 : g.funding < -0.005 ? 1 : 0;
-        if (fdir) emit('glass', c, fdir, 600 + ci * 350);
-      } catch (e) { /* next round */ }
-    }
+    try {
+      var j = await (await fetch('https://alicetin1905-ux.github.io/GlassSphere/glasssphere-summary.json?_=' + Date.now(), { cache: 'no-store' })).json();
+      COINS2.forEach(function (c, ci) {
+        var a = j.assets && j.assets[c.toLowerCase()], w = a && a.hz && a.hz['7'];
+        if (!w) return;
+        var g = SRC.glass[c] || (SRC.glass[c] = {}), changed = g.weekTs !== a.ts;
+        g.week = w; g.weekTs = a.ts;
+        if (changed) emit('glass', c, w.v === 'up' ? 1 : w.v === 'down' ? -1 : 0, 600 + ci * 350);
+      });
+    } catch (e) { /* next round */ }
     renderSources();
   }
 
@@ -915,10 +916,12 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     }).join('');
     $('srcb-atlas').innerHTML = A;
     var G = COINS2.map(function (c) {
-      var g = SRC.glass[c]; if (!g || g.buyPct == null) return '<div class="row"><span>' + c + '</span><b class="faint">…</b></div>';
-      var d = g.buyPct > 52 ? 1 : g.buyPct < 48 ? -1 : 0;
-      return '<div class="row"><span>' + c + ' ' + arrow(d) + '</span><b class="' + cls(d) + '">' + g.buyPct.toFixed(0) + '% buy</b></div>' +
-        '<div class="sub">' + (g.funding != null ? 'funding ' + (g.funding >= 0 ? '+' : '') + g.funding.toFixed(4) + '%' : 'funding …') + (g.oi ? ' · OI $' + (g.oi / 1e9).toFixed(2) + 'B' + (g.oiPrev ? ' ' + (g.oiChg >= 0 ? '+' : '−') + Math.abs(g.oiChg * 100).toFixed(2) + '%' : '') : '') + '</div>';
+      var g = SRC.glass[c] || {}, w = g.week;
+      var wd = w ? (w.v === 'up' ? 1 : w.v === 'down' ? -1 : 0) : 0;
+      var main = w && w.v ? '<b class="' + cls(wd) + '"><span class="lg">1w ' + (w.v === 'neutral' ? 'neutral' : w.v) + ' </span>' + Math.round(w.prob * 100) + '%</b>' : '<b class="faint">…</b>';
+      var flow = g.buyPct != null ? 'live ' + g.buyPct.toFixed(0) + '% buy' : '';
+      return '<div class="row"><span>' + c + ' ' + arrow(wd) + '</span>' + main + '</div>' +
+        '<div class="sub">' + (w && w.first ? '→ ' + esc(px(w.first)) + ' first · ' + esc(px(w.other)) + (flow ? ' · ' + flow : '') : flow) + '</div>';
     }).join('');
     $('srcb-glass').innerHTML = G;
     var now = Date.now(), last = HALVINGS.filter(function (t) { return t <= now; }).pop(), next = HALVINGS.filter(function (t) { return t > now; })[0];
@@ -937,7 +940,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     feedAtlas(); feedGlass(); feedGlassSlow(); load200w().then(loadWeekly).then(feedHalving);
     setInterval(feedAtlas, 30000);
     setInterval(feedGlass, 8000);
-    setInterval(feedGlassSlow, 60000);
+    setInterval(feedGlassSlow, 5 * 60000);
     setInterval(function () { load200w(); }, 15 * 60000);
   }
 
