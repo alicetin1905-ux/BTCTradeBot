@@ -1,5 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <!-- BTCTradeBot app icon: price ranging inside a channel, then breaking
+  <!-- BTC-ETH-BOT app icon: price ranging inside a channel, then breaking
        out above it, with a Bitcoin-orange ₿ mark. Full-bleed square — iOS rounds it. -->
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">

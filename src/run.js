@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// BTCTradeBot — trades BTC and ETH (config.COINS), one process per coin
+// BTC-ETH-BOT — trades BTC and ETH (config.COINS), one process per coin
 // (COIN=ETH node src/run.js), on a demo account: OKX Demo Trading
 // (x-simulated-trading) or Bybit Demo Trading (api-demo.bybit.com) — mainnet
 // prices, demo funds — via src/exchange.js. config.EXCHANGE / EXCHANGE in .env.
@@ -33,7 +33,7 @@ loadEnv();
 // TRADEBOT_MODE is optional; 'demo' is the only mode.
 const MODE = (process.env.TRADEBOT_MODE || 'demo').toLowerCase();
 if (MODE !== 'demo') {
-  console.error(`Unknown TRADEBOT_MODE "${MODE}" — BTCTradeBot only trades demo accounts (TRADEBOT_MODE=demo).`);
+  console.error(`Unknown TRADEBOT_MODE "${MODE}" — BTC-ETH-BOT only trades demo accounts (TRADEBOT_MODE=demo).`);
   process.exit(1);
 }
 if (process.env.EXCHANGE) config.EXCHANGE = process.env.EXCHANGE.trim().toLowerCase();
@@ -471,7 +471,7 @@ function reset() {
 function printSummary(events, st) {
   const quote = config.EXCHANGE !== 'okx' ? 'USDT' : require('./okx').isSpot(config.OKX_INSTRUMENT) ? config.OKX_INSTRUMENT.split('-')[1]
     : /-USD_/.test(config.OKX_INSTRUMENT) ? 'USDC' : 'USDT';
-  console.log(`\n=== BTCTradeBot ${COIN} [${config.EXCHANGE} ${MODE}${config.EXCHANGE === 'okx' ? ' ' + config.OKX_INSTRUMENT : ''}] (${config.STRATEGY}, ${P.STARTING_BALANCE} ${quote}, ${P.RISK_PCT}% risk, ${config.DIRECTION === 'both' ? 'long+short' : 'long-only'}) @ ${new Date().toISOString()} ===\n`);
+  console.log(`\n=== BTC-ETH-BOT ${COIN} [${config.EXCHANGE} ${MODE}${config.EXCHANGE === 'okx' ? ' ' + config.OKX_INSTRUMENT : ''}] (${config.STRATEGY}, ${P.STARTING_BALANCE} ${quote}, ${P.RISK_PCT}% risk, ${config.DIRECTION === 'both' ? 'long+short' : 'long-only'}) @ ${new Date().toISOString()} ===\n`);
   for (const ev of events) {
     if (ev.type === 'enter') {
       const why = ev.setup ? `${ev.setup} setup, learner expects ${ev.expR == null ? '?' : (ev.expR >= 0 ? '+' : '') + ev.expR.toFixed(2) + ' R'}` : ev.pullback ? `trend pullback (${ev.bias === 1 ? 'uptrend, back above' : 'downtrend, back below'} EMA20)` : ev.breakout != null ? `breakout ${px(ev.breakout)}` : (ev.flipFrom == null ? `ATLAS extreme ${ev.score}` : ev.jump ? `ATLAS jump ${ev.flipFrom} → ${ev.score} in one 4H candle` : `ATLAS ${ev.flipFrom} → ${ev.score}`);

@@ -59,7 +59,7 @@ function build(st, now) {
     pos.length ? `All trades: ${wins}W / ${losses}L (${Math.round((wins / pos.length) * 100)}% win)` : 'No closed trades yet',
     ...coins.map(c => (c.position ? positionLine(c.position, c.coin) : `${c.coin} flat`)),
   ];
-  return { title: `Bot daily · ${money(since)}`, message: lines.join('\n'), tags: ['bar_chart'] };
+  return { title: `BTC-ETH-BOT daily ·${money(since)}`, message: lines.join('\n'), tags: ['bar_chart'] };
 }
 
 // Returns the message if today's summary is due (and marks it sent), else null.
@@ -95,7 +95,7 @@ function weekly(st, now) {
   lines.push(`Balance $${a.balance.toFixed(2)} (${money(a.balance - a.startingBalance)} since the start, $${a.startingBalance.toFixed(0)})`);
   lines.push(all.n ? `Since the start: ${all.n} trades · ${all.w}W / ${all.l}L (${Math.round((all.w / all.n) * 100)}% win)` : 'Since the start: no closed trades');
   for (const c of coins) if (c.position) lines.push(positionLine(c.position, c.coin));
-  return { title: `Bot weekly · ${money(t.pnl)}`, message: lines.join('\n'), tags: ['calendar'] };
+  return { title: `BTC-ETH-BOT weekly ·${money(t.pnl)}`, message: lines.join('\n'), tags: ['calendar'] };
 }
 
 // Returns the weekly report if it is due (and marks it sent in st.meta.weekly), else null.
@@ -140,7 +140,7 @@ function status(st) {
     lines.push(`Long on a swing from −${X} to +${X} within ${h}h` + (config.EXTREME_SCORE ? ` or a score of +${config.EXTREME_SCORE}` : '') + (config.JUMP_SCORE ? ` or a +${config.JUMP_SCORE} jump in one 4H candle` : '') + (config.DIRECTION === 'both' ? ', short on the mirror' : ''));
   }
   lines.push(`Balance $${a.balance.toFixed(2)}`);
-  return { title: `Bot $${equity.toFixed(2)} (${pct >= 0 ? '+' : ''}${pct}%)`, message: lines.join('\n'), tags: ['clock3'], priority: 2 };
+  return { title: `BTC-ETH-BOT $${equity.toFixed(2)} (${pct >= 0 ? '+' : ''}${pct}%)`, message: lines.join('\n'), tags: ['clock3'], priority: 2 };
 }
 
 module.exports = { due, build, status, statusDue, positionsFrom, weekly, weeklyDue };

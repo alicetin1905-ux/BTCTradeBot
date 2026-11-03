@@ -409,12 +409,12 @@ test('status push: flat shows the next breakout level; a position shows its live
   const flat = summary.status({ account: { balance: 2000, startingBalance: 2000 }, position: null, signal: { close: 100000, upper: 103000, lower: 95000 } });
   assert.match(flat.message, /BTC flat · 4H close 100,000 · long above 103,000/);
   const open = summary.status({ account: { balance: 2000, startingBalance: 2000 }, position: { bias: 1, qty: 0.02, entry: 100000, stop: 103000, trailed: true, unrealisedPnl: 100 } });
-  assert.equal(open.title, 'Bot $2100.00 (+5.0%)');
+  assert.equal(open.title, 'BTC-ETH-BOT $2100.00 (+5.0%)');
   assert.match(open.message, /BTC long 0.02 @ 100,000 · \+\$100.00 · stop 103,000 \(trailed\)/);
   // Two coins: the peer's position and the combined equity.
   const both = summary.status({ account: { balance: 2000, startingBalance: 2000 }, position: { bias: 1, qty: 0.02, entry: 100000, stop: 98000, unrealisedPnl: 100 },
     peers: { ETH: { position: { bias: -1, qty: 1, entry: 4000, stop: 4200, unrealisedPnl: -30 }, trades: [], signal: null } } });
-  assert.equal(both.title, 'Bot $2070.00 (+3.5%)');
+  assert.equal(both.title, 'BTC-ETH-BOT $2070.00 (+3.5%)');
   assert.match(both.message, /BTC long 0.02 @ 100,000/);
   assert.match(both.message, /ETH short 1 @ 4,000 · -\$30.00 · stop 4,200/);
   const at = (h) => Date.UTC(2026, 8, 24, h, 1);

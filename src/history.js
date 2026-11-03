@@ -11,7 +11,7 @@ let fetchFn = (...a) => fetch(...a);
 function setFetch(f) { fetchFn = f; }
 
 async function getJson(url) {
-  const r = await fetchFn(url, { headers: { 'User-Agent': 'btctradebot' } });
+  const r = await fetchFn(url, { headers: { 'User-Agent': 'btc-eth-bot' } });
   if (!r.ok) throw new Error(`${url.split('?')[0]} → HTTP ${r.status}`);
   return r.json();
 }

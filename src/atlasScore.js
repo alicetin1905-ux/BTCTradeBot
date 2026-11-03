@@ -1,6 +1,6 @@
 // The ATLAS score — copied unchanged from TradeBot (src/atlasScore.js), itself
 // ported from ATLAS's analyse() (alicetin1905-ux/atlas index.html): the same
-// ~25-indicator weighted score the ATLAS dashboard shows. BTCTradeBot uses
+// ~25-indicator weighted score the ATLAS dashboard shows. BTC-ETH-BOT used
 // only its score and ATR (src/flip.js), computed from price and volume alone
 // so live scores match the backtest; the trade plan below is unused here.
 'use strict';

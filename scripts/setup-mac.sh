@@ -15,7 +15,7 @@ REPO_DIR="$(pwd)"
 USER_NAME="alicetin1905-ux"
 CRED_FILE="$HOME/.btctradebot-git-credentials"
 
-echo "BTCTradeBot setup in $REPO_DIR"
+echo "BTC-ETH-BOT setup in $REPO_DIR"
 
 if [ ! -f .env ]; then
   echo "No .env here — create it first (cp .env.example .env, then add your OKX (or Bybit) demo key)." >&2

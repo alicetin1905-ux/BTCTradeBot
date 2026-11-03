@@ -18,14 +18,14 @@ const REPEAT_MS = 6 * 3600000;
 function decide({ ok, prev, now, lastLines }) {
   if (ok) {
     if (!prev.failing) return { message: null, state: prev };
-    return { message: { title: 'BTC bot runs work again', message: 'The last GitHub Actions run went through.', tags: ['white_check_mark'] }, state: { failing: false } };
+    return { message: { title: 'BTC-ETH-BOT runs work again', message: 'The last GitHub Actions run went through.', tags: ['white_check_mark'] }, state: { failing: false } };
   }
   const due = !prev.failing || now - (prev.alertedAt || 0) >= REPEAT_MS;
   const state = { failing: true, since: prev.failing ? prev.since : now, alertedAt: due ? now : prev.alertedAt };
   if (!due) return { message: null, state };
   return {
     message: {
-      title: 'BTC bot run failed',
+      title: 'BTC-ETH-BOT run failed',
       message: `${lastLines || 'no output'}\nAn open position keeps its stop on OKX. Details: the repo's Actions tab.`,
       tags: ['warning'], priority: 4,
     },

@@ -1,5 +1,5 @@
 {
-  "name": "btctradebot",
+  "name": "btc-eth-bot",
   "version": "1.0.0",
   "private": true,
   "description": "Learning trading bot for BTC and ETH on OKX Demo Trading: trend setups filtered by a model that retrains on every finished setup.",

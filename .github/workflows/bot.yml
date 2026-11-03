@@ -1,4 +1,4 @@
-name: BTC bot
+name: BTC-ETH-BOT
 
 # Runs the bot on GitHub's servers — no Mac needed (scripts/actions-run.sh),
 # for every coin in config.js COINS (BTC, ETH and HYPE).

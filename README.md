@@ -1,4 +1,6 @@
-# BTCTradeBot — the learning bot
+# BTC-ETH-BOT — the learning bot
+
+(The repository and the dashboard address keep the old name `BTCTradeBot`.)
 
 A trading bot for **BTC and ETH** on the **OKX demo account** (EEA site): 2000 USDC, 10x leverage, isolated margin.
 It started on 2026-11-03.

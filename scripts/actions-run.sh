@@ -57,7 +57,7 @@ done
 # Phone alert when runs start failing (repeated every 6h) and when they recover.
 node scripts/actions-alert.js "$STATUS" "$LOG" || true
 
-git config user.name "btctradebot"
+git config user.name "btc-eth-bot"
 git config user.email "actions@users.noreply.github.com"
 git add state/
 if ! git diff --cached --quiet; then

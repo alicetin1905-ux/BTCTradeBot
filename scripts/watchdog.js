@@ -26,7 +26,7 @@ function check({ lastRun, wd, now }) {
     if (!due) return { message: null, wd };
     return {
       message: {
-        title: 'BTC bot is not running',
+        title: 'BTC-ETH-BOT is not running',
         message: `No hourly run for ${hours}h (last ${new Date(lastRun).toISOString().slice(0, 16).replace('T', ' ')} UTC). ` +
           'Check the Actions tab of the repo (or the Mac, if it runs there). An open position keeps its stop on the exchange, but the stop does not trail and exits do not fire.',
         tags: ['warning'], priority: 4,
@@ -36,7 +36,7 @@ function check({ lastRun, wd, now }) {
   }
   if (wd.down) {
     return {
-      message: { title: 'BTC bot is running again', message: `Last hourly run ${Math.round(ageMin)} min ago.`, tags: ['white_check_mark'] },
+      message: { title: 'BTC-ETH-BOT is running again', message: `Last hourly run ${Math.round(ageMin)} min ago.`, tags: ['white_check_mark'] },
       wd: { down: false },
     };
   }
