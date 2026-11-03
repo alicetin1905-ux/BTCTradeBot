@@ -103,6 +103,24 @@ dl.kv dd{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-n
 @media(max-width:859px){.flow{padding-left:12px}.srcs{gap:6px}.src{padding:8px 9px}.src-h small{display:none}.src-h b{font-size:10px;letter-spacing:.03em;white-space:nowrap}.src-b{font-size:11px}}
 @media(max-width:420px){.src-b .sub{display:none}}
 @media (prefers-reduced-motion: reduce){.led,.bots>.card{transition:none}}
+.page{display:grid;gap:14px;min-width:0}
+.page[hidden]{display:none}
+.back{font-size:13px;color:var(--dim);text-decoration:none;justify-self:start;padding:4px 0}
+.back:hover{color:var(--txt)}
+.bots>.card.compact{cursor:pointer}
+.bots>.card.compact:hover,.botcard:hover{border-color:var(--line2)}
+.botcard{display:block;color:inherit;text-decoration:none;margin-top:46px;position:relative;z-index:1;transition:box-shadow .5s}
+.botcard.hit-up{box-shadow:0 0 0 1px rgba(53,255,176,.55),0 0 22px rgba(53,255,176,.18)}
+.botcard.hit-dn{box-shadow:0 0 0 1px rgba(255,77,106,.55),0 0 22px rgba(255,77,106,.18)}
+.bc-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media(max-width:700px){.bc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.bc-grid .k{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--faint)}
+.bc-grid .v{font-family:var(--mono);font-size:15px;font-weight:700;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bc-grid .s{font-family:var(--mono);font-size:10px;color:var(--faint);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bc-ev{font-size:12px;margin-top:10px;padding-top:9px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;min-width:0}
+.bc-ev span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.more{margin-left:auto;font-size:11px;color:var(--faint);white-space:nowrap}
+@media(max-width:859px){.flow{padding-right:12px}}
 .meter{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:4px 0 2px}
 .meter i{display:block;height:100%;background:var(--nt);border-radius:3px}
 .scorebar{position:relative;height:10px;margin:12px 0 2px;border-radius:5px;background:linear-gradient(90deg,rgba(255,77,106,.35),var(--line) 50%,rgba(53,255,176,.35))}
@@ -145,6 +163,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
 
 
 <main>
+ <div class="page" id="page-main">
   <section class="tiles">
     <div class="tile"><div class="k">Equity</div><div class="v" id="tEq">—</div><div class="s" id="tEqS"></div></div>
     <div class="tile"><div class="k">Realized since start</div><div class="v" id="tPnl">—</div><div class="s" id="tPnlS"></div></div>
@@ -159,44 +178,37 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       <section class="card src" id="src-halving"><div class="src-h"><span class="led" id="led-halving"></span><b>BTC-HALVING</b><small>cycle</small></div><div class="src-b" id="srcb-halving"><div class="faint">connecting…</div></div></section>
     </div>
     <div class="grid2 bots" id="liveTiles"></div>
+    <a class="card botcard" id="botcard" href="#bot"></a>
     <svg class="wires" id="wires" aria-hidden="true"></svg>
   </div>
   <div class="note" style="margin:-4px 2px 0">Each new reading sends a pulse to the coin it is about: <span class="up">green</span> = bullish, <span class="dn">red</span> = bearish.
-    The learner itself uses the ATLAS indicators and the BTC-Halving cycle on 4H closes; GlassSphere's order flow is shown for information only (in the tests it made the bot worse).</div>
+    An entry or exit sends a pulse from the coin to the bot. The learner itself uses the ATLAS indicators and the BTC-Halving cycle on 4H closes;
+    GlassSphere's order flow is shown for information only (in the tests it made the bot worse). Tap a tile for its page.</div>
+ </div>
 
+ <div class="page" id="page-coin" hidden></div>
+
+ <div class="page" id="page-bot" hidden>
+  <a class="back" href="#">← Overview</a>
+  <section class="card" id="botDetail"></section>
   <section class="card" id="learnCard">
     <h2>What the bot learned <span class="tag" id="learnTag"></span></h2>
     <div id="learn"><div class="empty">Loading…</div></div>
   </section>
-
-  <div class="grid2">
-    <section class="card">
-      <h2>BTC 4H · last 60 candles <span class="tag" id="chartTag-BTC"></span></h2>
-      <div class="chartbox" id="pxBox-BTC"></div>
-      <div class="legend" id="pxLegend-BTC"></div>
-    </section>
-    <section class="card">
-      <h2>ETH 4H · last 60 candles <span class="tag" id="chartTag-ETH"></span></h2>
-      <div class="chartbox" id="pxBox-ETH"></div>
-      <div class="legend" id="pxLegend-ETH"></div>
-    </section>
-  </div>
-
   <section class="card">
     <h2>Balance after each closed trade <span class="tag" id="eqTag"></span></h2>
     <div class="chartbox" id="eqBox"></div>
   </section>
-
   <section class="card">
     <h2>Closed trades <span class="tag" id="trTag"></span></h2>
     <div class="scroll" id="trades"><div class="empty">Loading…</div></div>
   </section>
-
   <section class="card">
     <h2>Settings</h2>
     <div id="settings"><div class="empty">Loading…</div></div>
     <a class="btn" href="https://github.com/alicetin1905-ux/BTCTradeBot/edit/main/control/settings.json" target="_blank" rel="noopener">Edit settings on GitHub</a>
   </section>
+ </div>
 </main>
 
 <footer>
@@ -481,7 +493,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     }).join('') + '</div>';
   }
 
-  function liveTileHtml(coin) {
+  function liveTileHtml(coin, full) {
     var c = S.byCoin[coin] || {}, s = c.signal, p = c.position, l = S.liveBy[coin];
     var price = l && l.px ? l.px : s ? s.close : null;
     var head = '<div class="lt-head"><span class="led" id="led-bot-' + esc(coin) + '"></span><span class="lt-coin">' + esc(coin) + '</span>' +
@@ -510,22 +522,129 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
         body = '<div class="lt-head" style="margin-bottom:0"><span class="lt-big">' + Math.round(r.pct) + '%</span><span class="dim" style="font-size:12px">ready for a ' + esc(r.dir) + ' ' + esc(o.setup) + '</span></div>' +
           '<div class="lt-bar"><i style="left:0;width:' + Math.max(1, r.pct) + '%;background:' + col + '"></i></div>' +
           '<div class="lt-scale"><span>3 ATR away</span><span>at the level</span></div>' +
-          '<div class="lt-status">' + r.all.map(function (x) {
+          '<div class="lt-status">' + r.all.filter(function (x, i) { return full || i === 0; }).map(function (x) {
             return '<div><b>' + esc(x.setup) + '</b>: ' + esc(x.text) + (x.exp != null ? ' · learner ' + '<span class="' + (x.take ? 'up' : 'nt') + '">' + esc(rr(x.exp)) + (x.take ? ' → would take' : ' → would skip') + '</span>' : '') + '</div>';
-          }).join('') + (s.wait ? '<div class="faint">Waiting: ' + esc(s.wait) + '</div>' : '') + '</div>';
+          }).join('') + (s.wait && full ? '<div class="faint">Waiting: ' + esc(s.wait) + '</div>' : '') + '</div>';
       } else {
         body = '<div class="lt-head" style="margin-bottom:0"><span class="lt-big">0%</span></div><div class="lt-bar"><i style="left:0;width:1%;background:var(--faint)"></i></div>' +
           '<div class="lt-status dim">' + esc(r ? r.text : 'Indicators appear after the next run.') + '</div>';
       }
     }
+    if (!full) return '<section class="card compact">' + head + body + '<div class="more" style="margin-top:6px;text-align:right">all indicators →</div></section>';
     return '<section class="card">' + head + body + indicatorRows(s, price) +
       '<div class="note">Indicators from the 4H close of ' + esc(when(s.closeT)) + '; price live (OKX). Entries are decided at the next 4H close.</div></section>';
   }
   function renderLiveTiles() {
     var coins = coinList().slice().sort(function (a, b) { return a === 'BTC' ? -1 : b === 'BTC' ? 1 : a < b ? -1 : 1; });
-    $('liveTiles').innerHTML = coins.map(function (c) { return liveTileHtml(c).replace('<section class="card">', '<section class="card" id="bot-' + c + '">'); }).join('');
+    $('liveTiles').innerHTML = coins.map(function (c) { return liveTileHtml(c, false).replace('<section class="card compact">', '<section class="card compact" id="bot-' + c + '" role="link" tabindex="0" onclick="location.hash=\'#' + c.toLowerCase() + '\'">'); }).join('');
+    renderBotCard();
+    if (ROUTE.page === 'coin') renderCoinPage(ROUTE.coin, true);
     drawWires();
   }
+
+  /* ---------------- the BOT tile, entry / exit pulses, pages ---------------- */
+  function renderBotCard() {
+    var a = S.account, el = $('botcard'); if (!el) return;
+    if (!a) { el.innerHTML = '<div class="lt-head"><span class="led" id="led-botcard"></span><span class="lt-coin">BOT</span></div><div class="empty">Waiting for the bot\'s first upload.</div>'; return; }
+    var open = coinList().filter(function (c) { return (S.byCoin[c] || {}).position; });
+    var u = openPnl(), eq = a.balance + u, real = a.balance - a.startingBalance;
+    var pos = positionsFromTrades(S.trades), w = pos.filter(function (x) { return x.pnl > 0.005; }).length;
+    var last = a.lastRunAt || a.updatedAt, stale = last && Date.now() - last > 130 * 60000, m = S.model;
+    var ev = lastEvent();
+    el.innerHTML = '<div class="lt-head"><span class="led" id="led-botcard"></span><span class="lt-coin">BOT</span>' +
+      '<span class="pill ' + (stale ? 'short' : 'long') + '">' + (stale ? 'NO RECENT RUN' : 'RUNNING') + '</span>' +
+      '<span class="lt-px">' + esc(usd(eq)) + '</span><span class="lt-chg ' + cls(eq - a.startingBalance) + '">' + esc(pct((eq / a.startingBalance - 1) * 100)) + '</span></div>' +
+      '<div class="bc-grid">' +
+        '<div><div class="k">Open</div><div class="v">' + (open.length ? open.map(function (c) { var p = S.byCoin[c].position; return '<span class="' + (p.bias === 1 ? 'up' : 'dn') + '">' + c + '</span>'; }).join(' ') : '<span class="faint">none</span>') + '</div><div class="s">' + (open.length ? 'open P&L ' + esc(signed(u)) : 'max ' + ((a.settings && a.settings.MAX_OPEN_POSITIONS) || 2) + ' at a time') + '</div></div>' +
+        '<div><div class="k">Realized</div><div class="v ' + cls(real) + '">' + esc(signed(real)) + '</div><div class="s">' + (pos.length ? pos.length + ' trades · ' + w + ' won' : 'no trades yet') + '</div></div>' +
+        '<div><div class="k">Last run</div><div class="v' + (stale ? ' dn' : '') + '">' + (last ? esc(ago(last)) : '—') + '</div><div class="s">runs :02 :32 · sync 5 min</div></div>' +
+        '<div><div class="k">Learner</div><div class="v">' + (m && m.trainedOn ? m.trainedOn.toLocaleString('en-US') : '—') + '</div><div class="s">finished setups learned</div></div>' +
+      '</div>' +
+      '<div class="bc-ev"><span class="' + (ev ? cls(ev.dir) : 'faint') + '">' + (ev ? (ev.dir > 0 ? '▲' : '▼') : '•') + '</span><span>' + esc(ev ? ev.text : 'No trades yet — the bot enters when a setup forms that the learner expects to win.') + '</span><span class="more">details →</span></div>';
+  }
+  // The newest entry or exit across the coins.
+  function lastEvent() {
+    var evs = [];
+    coinList().forEach(function (c) {
+      var p = (S.byCoin[c] || {}).position;
+      if (p) evs.push({ t: p.openedAt || 0, dir: p.bias, text: c + ' ' + (p.bias === 1 ? 'long' : 'short') + ' opened at ' + px(p.entry) + ' · ' + when(p.openedAt) });
+    });
+    positionsFromTrades(S.trades).forEach(function (t) { evs.push({ t: t.closedAt, dir: t.pnl >= 0 ? 1 : -1, text: (t.coin || 'BTC') + ' ' + (t.bias === 1 ? 'long' : 'short') + ' closed ' + signed(t.pnl) + ' · ' + when(t.closedAt) }); });
+    evs.sort(function (a, b) { return b.t - a.t; });
+    return evs[0] || null;
+  }
+  // After each state refresh: a new position = entry pulse (green long / red short), a new closed trade = exit pulse (green profit / red loss).
+  var SEEN = null;
+  function detectBotEvents() {
+    var now = {};
+    coinList().forEach(function (c) {
+      var p = (S.byCoin[c] || {}).position, t = (S.byCoin[c] || {}).trades || [];
+      now[c] = { open: p ? String(p.openedAt) : null, bias: p ? p.bias : 0, closed: t.length, lastPnl: t.length ? t[t.length - 1].pnl : 0 };
+    });
+    if (SEEN) Object.keys(now).forEach(function (c, i) {
+      var a = now[c], b = SEEN[c] || {};
+      if (a.open && a.open !== b.open) setTimeout(function () { pulseWire('coin-' + c, 'led-bot-' + c, 'botcard', 'led-botcard', a.bias); }, 300 + i * 400);
+      if (a.closed > (b.closed || 0)) setTimeout(function () { pulseWire('coin-' + c, 'led-bot-' + c, 'botcard', 'led-botcard', a.lastPnl >= 0 ? 1 : -1); }, 300 + i * 400);
+    });
+    SEEN = now;
+  }
+
+  function botDetailHtml() {
+    var a = S.account; if (!a) return '<div class="empty">Waiting for the bot\'s first upload.</div>';
+    var set = a.settings || {}, u = openPnl(), eq = a.balance + u;
+    var rows = [
+      ['Equity (balance + open P&L)', usd(eq)], ['Balance', usd(a.balance)], ['Started with', usd(a.startingBalance) + (a.startedAt ? ' · ' + when(a.startedAt) : '')],
+      ['OKX account equity', a.exchangeEquity != null ? usd(a.exchangeEquity) : '—'], ['Funding booked', a.funding && a.funding.total ? signed(a.funding.total) : '$0.00'],
+      ['Coins', coinList().join(' + ') + (a.instruments ? ' · ' + Object.values(a.instruments).join(', ') : '')],
+      ['Risk per trade', (set.RISK_PCT || '?') + '% of the balance at the initial stop'], ['Stops', (set.STOP_ATR || 2) + '×ATR, trailing ' + (set.TRAIL_ATR || 5) + '×ATR on OKX (index price)'],
+      ['Leverage', (set.LEVERAGE || 10) + '× isolated'], ['Last full run', a.lastRunAt ? when(a.lastRunAt) + ' (' + ago(a.lastRunAt) + ')' : '—'], ['Last update', a.updatedAt ? ago(a.updatedAt) : '—'],
+    ];
+    return '<h2>Bot <span class="tag">' + esc(EXCHANGE_NAME[a.exchange] || '') + ' demo</span></h2><dl class="kv">' + rows.map(function (r) { return '<dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1]) + '</dd>'; }).join('') + '</dl>' +
+      '<div class="note">On every 4H close the bot looks for a trend pullback or a 20-candle breakout on BTC and ETH, asks the learner what it expects from it, and only trades setups it expects to win.</div>';
+  }
+
+  function coinTradesHtml(coin) {
+    var pos = positionsFromTrades(S.trades.filter(function (t) { return (t.coin || 'BTC') === coin; })).reverse();
+    if (!pos.length) return '<div class="empty">No closed ' + esc(coin) + ' trades yet.</div>';
+    return '<table><thead><tr><th class="l">Closed</th><th class="l">Side</th><th>Entry</th><th>Exit</th><th>Size</th><th>P&amp;L</th><th class="l">Why</th></tr></thead><tbody>' +
+      pos.map(function (t) {
+        return '<tr><td class="l">' + esc(when(t.closedAt)) + '</td><td class="l ' + (t.bias === 1 ? 'up' : 'dn') + '">' + (t.bias === 1 ? 'long' : 'short') + '</td><td>' + esc(px(t.entry)) + '</td><td>' + esc(px(t.exit)) + '</td><td>' + esc(+t.qty.toFixed(3)) + '</td><td class="' + cls(t.pnl) + '">' + esc(signed(t.pnl)) + '</td><td class="l">' + esc(t.reason) + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+  // The coin page: the full live tile (all indicators), its 4H chart, the setup / learner read and its trades.
+  // light = only the live parts (every 10 s), so the chart isn't redrawn each time.
+  function renderCoinPage(coin, light) {
+    var el = $('page-coin'); if (!el) return;
+    var keep = S.coin; select(coin);
+    var s = S.signal, set = (S.account && S.account.settings) || {};
+    if (!light || !$('coinLive')) {
+      el.innerHTML = '<a class="back" href="#">← Overview</a><div id="coinLive"></div>' +
+        '<section class="card"><h2>' + esc(coin) + ' 4H · last 60 candles <span class="tag" id="chartTag-' + coin + '"></span></h2><div class="chartbox" id="pxBox-' + coin + '"></div><div class="legend" id="pxLegend-' + coin + '"></div></section>' +
+        '<section class="card"><h2>Signal · last 4H close</h2><div id="coinSig"></div></section>' +
+        '<section class="card"><h2>' + esc(coin) + ' closed trades</h2><div class="scroll" id="coinTrades"></div></section>';
+      renderPriceChart(coin);
+    }
+    $('coinLive').innerHTML = liveTileHtml(coin, true).replace('<section class="card">', '<section class="card" id="bot-' + coin + '">');
+    $('coinSig').innerHTML = s ? learningSignalHtml(s, set) : '<div class="empty">After the first full run.</div>';
+    $('coinTrades').innerHTML = coinTradesHtml(coin);
+    select(keep);
+  }
+
+  var ROUTE = { page: 'main' };
+  function route() {
+    var h = (location.hash || '').slice(1).toLowerCase();
+    var coin = coinList().filter(function (c) { return c.toLowerCase() === h; })[0];
+    ROUTE = coin ? { page: 'coin', coin: coin } : h === 'bot' ? { page: 'bot' } : { page: 'main' };
+    $('page-main').hidden = ROUTE.page !== 'main';
+    $('page-coin').hidden = ROUTE.page !== 'coin';
+    $('page-bot').hidden = ROUTE.page !== 'bot';
+    if (ROUTE.page === 'coin') renderCoinPage(coin);
+    if (ROUTE.page === 'bot') { $('botDetail').innerHTML = botDetailHtml(); renderEquity(); renderTrades(); renderSettings(); renderLearn(); }
+    if (ROUTE.page === 'main') { drawWires(); }
+    window.scrollTo(0, 0);
+  }
+  window.addEventListener('hashchange', route);
+  document.addEventListener('keydown', function (e) { if (e.key === 'Enter' && e.target && e.target.id && /^bot-/.test(e.target.id) && e.target.getAttribute('role') === 'link') e.target.click(); });
 
   /* ---------------- live sources → pulses → bot tiles ---------------- */
   var SRC = { atlas: {}, glass: {}, halving: {} }, COINS2 = ['BTC', 'ETH'];
@@ -537,7 +656,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
   var WIRES = {};
   function drawWires() {
     var svg = $('wires'), flow = $('flow');
-    if (!svg || !flow) return;
+    if (!svg || !flow || !flow.offsetParent) return;
     var F = flow.getBoundingClientRect(), stacked = window.innerWidth < 860;
     svg.setAttribute('viewBox', '0 0 ' + F.width + ' ' + F.height);
     // only the wires are redrawn; pulses in flight live in their own groups and keep going
@@ -566,6 +685,26 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
         WIRES[k + '-' + c] = path;
       });
     });
+    var bc = $('botcard');
+    if (bc) {
+      var Z = bc.getBoundingClientRect(), zy = Z.top - F.top;
+      COINS2.forEach(function (c, ci) {
+        var b = $('bot-' + c); if (!b) return;
+        var B = b.getBoundingClientRect(), bx = B.left - F.left + B.width / 2, by = B.bottom - F.top, d;
+        if (!stacked) {
+          var zx = Z.left - F.left + Z.width * (ci ? 0.62 : 0.38);
+          d = 'M' + bx + ' ' + by + ' C' + bx + ' ' + (by + 28) + ' ' + zx + ' ' + (zy - 28) + ' ' + zx + ' ' + zy;
+        } else if (ci === 1) {
+          d = 'M' + bx + ' ' + by + ' L' + bx + ' ' + zy;
+        } else {
+          // BTC sits above ETH on a phone: along the right-hand lane
+          var lane = F.width - 5, ry = by + 12;
+          d = 'M' + bx + ' ' + by + ' Q' + bx + ' ' + ry + ' ' + (bx + 20) + ' ' + ry + ' L' + (lane - 10) + ' ' + ry + ' Q' + lane + ' ' + ry + ' ' + lane + ' ' + (ry + 10) +
+            ' L' + lane + ' ' + (zy - 14) + ' Q' + lane + ' ' + (zy - 4) + ' ' + (lane - 12) + ' ' + (zy - 4) + ' L' + (Z.right - F.left - 30) + ' ' + (zy - 4) + ' Q' + (Z.right - F.left - 40) + ' ' + (zy - 4) + ' ' + (Z.right - F.left - 40) + ' ' + zy;
+        }
+        WIRES['coin-' + c] = node('path', { d: d, fill: 'none', stroke: 'var(--line2)', 'stroke-width': 1, 'stroke-dasharray': '2 4', opacity: 0.7 }, lines);
+      });
+    }
   }
 
   function flashLed(id, dir) {
@@ -574,13 +713,15 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     clearTimeout(el._t); el._t = setTimeout(function () { el.className = 'led'; }, 900);
   }
   // A pulse of light from source k to coin c: green bullish, red bearish.
-  function pulse(k, c, dir) {
+  function pulse(k, c, dir) { pulseWire(k + '-' + c, 'led-' + k, 'bot-' + c, 'led-bot-' + c, dir); }
+  function pulseWire(key, fromLed, toCard, toLed, dir) {
     if (!dir) return;
-    flashLed('led-' + k, dir);
-    var path = WIRES[k + '-' + c], svg = $('wires');
+    flashLed(fromLed, dir);
+    var path = WIRES[key], svg = $('wires');
+    if (ROUTE.page !== 'main') path = null;
     var arrive = function () {
-      flashLed('led-bot-' + c, dir);
-      var t = $('bot-' + c); if (!t) return;
+      flashLed(toLed, dir);
+      var t = $(toCard); if (!t) return;
       t.classList.remove('hit-up', 'hit-dn'); void t.offsetWidth; t.classList.add(dir > 0 ? 'hit-up' : 'hit-dn');
       clearTimeout(t._t); t._t = setTimeout(function () { t.classList.remove('hit-up', 'hit-dn'); }, 700);
     };
@@ -1059,7 +1200,9 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
   function renderAll() {
     var ex = S.account && EXCHANGE_NAME[S.account.exchange];
     $('subtitle').textContent = (ex ? ex + ' ' : '') + 'demo · ' + coinList().join(' + ') + ' futures · learning bot';
-    renderTiles(); renderCharts(); renderEquity(); renderTrades(); renderSettings(); renderLearn(); renderLive(); renderLiveTiles();
+    renderTiles(); renderLive(); renderLiveTiles(); detectBotEvents();
+    if (ROUTE.page === 'coin') renderCoinPage(ROUTE.coin);
+    if (ROUTE.page === 'bot') { $('botDetail').innerHTML = botDetailHtml(); renderEquity(); renderTrades(); renderSettings(); renderLearn(); }
   }
 
   function select(coin) {
@@ -1104,10 +1247,11 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     renderLiveTiles();
   }
 
-  refreshState().then(refreshLive).then(startSources);
+  ROUTE = { page: 'main' };
+  refreshState().then(function () { route(); }).then(refreshLive).then(startSources);
   setInterval(refreshState, 60000);
   setInterval(refreshLive, 10000);
-  var rt; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { renderCharts(); renderEquity(); drawWires(); }, 150); });
+  var rt; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { if (ROUTE.page === 'coin') renderCoinPage(ROUTE.coin); if (ROUTE.page === 'bot') renderEquity(); drawWires(); }, 150); });
 })();
 </script>
 </body>
