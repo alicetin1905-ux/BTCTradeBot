@@ -100,7 +100,7 @@ dl.kv dd{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-n
 .led.up{background:var(--up);box-shadow:0 0 10px var(--up),0 0 2px var(--up)}
 .led.dn{background:var(--dn);box-shadow:0 0 10px var(--dn),0 0 2px var(--dn)}
 .lt-head .led{margin-right:2px}
-@media(max-width:859px){.flow{padding-left:12px}.srcs{gap:6px}.src{padding:8px 9px}.src-h small{display:none}.src-h b{font-size:10px;letter-spacing:.03em;white-space:nowrap}.src-b{font-size:11px}}
+@media(max-width:859px){.srcs{gap:6px}.src{padding:8px 9px}.src-h small{display:none}.src-h b{font-size:10px;letter-spacing:.03em;white-space:nowrap}.src-b{font-size:11px}}
 @media(max-width:420px){.src-b .sub{display:none}}
 @media(max-width:620px){.src-b .lg{display:none}}
 @media (prefers-reduced-motion: reduce){.led,.bots>.card{transition:none}}
@@ -121,17 +121,37 @@ dl.kv dd{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-n
 .bc-ev{font-size:12px;margin-top:10px;padding-top:9px;border-top:1px solid var(--line);display:flex;gap:8px;align-items:center;min-width:0}
 .bc-ev span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .more{margin-left:auto;font-size:11px;color:var(--faint);white-space:nowrap}
-@media(max-width:859px){.flow{padding-right:12px}}
 .pairs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));column-gap:14px;row-gap:46px;position:relative;z-index:1}
 .pairs>.card{position:relative;transition:box-shadow .5s;min-width:0}
 .card.hit-up{box-shadow:0 0 0 1px rgba(53,255,176,.55),0 0 22px rgba(53,255,176,.18)}
 .card.hit-dn{box-shadow:0 0 0 1px rgba(255,77,106,.55),0 0 22px rgba(255,77,106,.18)}
-@media(max-width:859px){.pairs{grid-template-columns:minmax(0,1fr);row-gap:30px}.pairs .o1{order:1}.pairs .o2{order:2}.pairs .o3{order:3}.pairs .o4{order:4}}
+/* phones: the same grid as on desktop — 3 data tiles, 2 coins, 2 bots — with compact tiles */
+@media(max-width:859px){
+  .srcs{margin-bottom:34px}
+  .pairs{column-gap:6px;row-gap:34px}
+  .pairs>.card{padding:9px 9px}
+  .pairs .lt-head{gap:4px 5px;margin-bottom:6px}
+  .pairs .lt-coin{font-size:12px;letter-spacing:.04em}
+  .pairs .lt-px{font-size:13px;margin-left:auto}
+  .pairs .lt-chg{font-size:10px;width:100%;text-align:right;margin-top:-4px}
+  .pairs .pill{font-size:9px;padding:2px 6px}
+  .pairs .lt-big{font-size:14px}
+  .pairs .lt-bar{height:10px;margin:5px 0 3px}
+  .pairs .lt-scale{font-size:8px}
+  .pairs .lt-status{font-size:10.5px;line-height:1.4}
+  .pairs .more{display:none}
+  .pairs .loglist{font-size:10.5px;gap:3px;margin-top:6px;padding-top:6px}
+  .pairs .loglist time{display:none}
+  .pairs .loglist div:nth-child(n+3){display:none}
+  .pairs .led{width:7px;height:7px}
+}
+@media(max-width:400px){.pairs .lt-scale span:nth-child(2){display:none}.pairs .lt-status div+div{display:none}}
 .botcard{margin-top:0}
 .loglist{display:grid;gap:4px;margin-top:9px;padding-top:9px;border-top:1px solid var(--line);font-size:12px}
 .loglist div{display:flex;gap:7px;min-width:0}
 .loglist time{font-family:var(--mono);font-size:10px;color:var(--faint);flex:none;padding-top:2px}
 .loglist span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.loglist time+span{flex:none;overflow:visible}
 .src{overflow:hidden}
 .src-bg{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
 .src-h,.src-b{position:relative;z-index:1}
@@ -705,7 +725,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
   function drawWires() {
     var svg = $('wires'), flow = $('flow');
     if (!svg || !flow || !flow.offsetParent) return;
-    var F = flow.getBoundingClientRect(), stacked = window.innerWidth < 860;
+    var F = flow.getBoundingClientRect(), stacked = false; // phones use the desktop grid too
     svg.setAttribute('viewBox', '0 0 ' + F.width + ' ' + F.height);
     // only the wires are redrawn; pulses in flight live in their own groups and keep going
     var old = $('wireLines'); if (old) old.remove();
