@@ -34,5 +34,17 @@
     "openedAt": 1792641724640,
     "closedAt": 1792687632331,
     "initialStop": 81145.1
+  },
+  {
+    "symbol": "BTCUSDT",
+    "bias": -1,
+    "entry": 80357.22748538012,
+    "exit": 77373.48888888893,
+    "qty": 0.0171,
+    "pnl": 49.67333237499999,
+    "reason": "trailing stop",
+    "openedAt": 1793030523906,
+    "closedAt": 1793708710948,
+    "initialStop": 82015.5
   }
 ]
