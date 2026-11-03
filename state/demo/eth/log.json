@@ -9,5 +9,16 @@
     "side": -1,
     "expR": 0.345,
     "decision": "signal candle closed 182 min ago — entries only within 45 min of a 4H close"
+  },
+  {
+    "at": 1793721723054,
+    "kind": "scan",
+    "candleT": 1793707200000,
+    "close": 2299.41,
+    "trend": -1,
+    "setup": null,
+    "side": 0,
+    "expR": null,
+    "decision": "no pullback or breakout setup on the last 4H close"
   }
 ]

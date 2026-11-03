@@ -1,6 +1,6 @@
 {
   "trainedOn": 6691,
-  "at": 1793707200000,
+  "at": 1793721600000,
   "minR": 0,
   "halfLifeDays": 1460,
   "weights": {
@@ -31,5 +31,5 @@
     "avgRTaken": 0.97,
     "avgRSkipped": -0.53
   },
-  "updatedAt": 1793719922503
+  "updatedAt": 1793721725422
 }
