@@ -153,9 +153,7 @@ dl.kv dd{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-n
 .loglist span{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .loglist time+span{flex:none;overflow:visible}
 .src{overflow:hidden}
-.src-bg{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
 .src-h,.src-b{position:relative;z-index:1}
-#src-halving .src-b,#src-halving .src-h{text-shadow:0 0 4px var(--panel),0 0 8px var(--panel),0 1px 2px var(--panel)}
 .meter{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:4px 0 2px}
 .meter i{display:block;height:100%;background:var(--nt);border-radius:3px}
 .scorebar{position:relative;height:10px;margin:12px 0 2px;border-radius:5px;background:linear-gradient(90deg,rgba(255,77,106,.35),var(--line) 50%,rgba(53,255,176,.35))}
@@ -210,7 +208,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     <div class="srcs">
       <section class="card src" id="src-atlas"><div class="src-h"><span class="led" id="led-atlas"></span><b>ATLAS</b><small>daily score · ATLAS page</small></div><div class="src-b" id="srcb-atlas"><div class="faint">connecting…</div></div></section>
       <section class="card src" id="src-glass"><div class="src-h"><span class="led" id="led-glass"></span><b>GLASSSPHERE</b><small>weekly reading</small></div><div class="src-b" id="srcb-glass"><div class="faint">connecting…</div></div></section>
-      <section class="card src" id="src-halving"><svg class="src-bg" id="bg-halving" aria-hidden="true" preserveAspectRatio="none"></svg><div class="src-h"><span class="led" id="led-halving"></span><b>BTC-HALVING</b><small>cycle</small></div><div class="src-b" id="srcb-halving"><div class="faint">connecting…</div></div></section>
+      <section class="card src" id="src-halving"><div class="src-h"><span class="led" id="led-halving"></span><b>BTC-HALVING</b><small>cycle</small></div><div class="src-b" id="srcb-halving"><div class="faint">connecting…</div></div></section>
     </div>
     <div class="pairs" id="liveTiles"></div>
     <svg class="wires" id="wires" aria-hidden="true"></svg>
@@ -868,41 +866,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
   }
 
   // BTC-Halving: live price against each coin's 200-week average, and where BTC is in its 4-year cycle.
-  var W200 = {}, WEEKLY = {};
-  async function loadWeekly() {
-    try {
-      var r = await (await fetch('https://data-api.binance.vision/api/v3/klines?symbol=BTCUSDT&interval=1w&limit=320', { cache: 'no-store' })).json();
-      var c = r.map(function (x) { return { t: +x[0], c: +x[4] }; }), out = [];
-      for (var i = 199; i < c.length; i++) {
-        var sum = 0; for (var j = i - 199; j <= i; j++) sum += c[j].c;
-        out.push({ t: c[i].t, c: c[i].c, w: sum / 200 });
-      }
-      WEEKLY.BTC = out.slice(-104);
-    } catch (e) { /* later */ }
-  }
-  // The halving tile's background: BTC's weekly close (2 years) against its 200-week average, the live price at the end,
-  // and a dashed line at today's 200-week average — the level a fall to the 200 WMA would reach.
-  function drawHalvingBg() {
-    var svg = $('bg-halving'), d = WEEKLY.BTC; if (!svg || !d || !d.length) return;
-    var box = svg.getBoundingClientRect(), W = Math.max(100, box.width), H = Math.max(60, box.height);
-    var live = S.liveBy.BTC && S.liveBy.BTC.px, w200 = W200.BTC || d[d.length - 1].w;
-    var pts = d.map(function (x) { return { c: x.c, w: x.w }; });
-    if (live) pts.push({ c: live, w: w200 });
-    var lo = Infinity, hi = -Infinity; pts.forEach(function (p) { lo = Math.min(lo, p.c, p.w); hi = Math.max(hi, p.c, p.w); });
-    var pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
-    var X = function (i) { return i / (pts.length - 1) * W; }, Y = function (v) { return 8 + (hi - v) / (hi - lo) * (H - 16); };
-    var line = function (k) { return pts.map(function (p, i) { return (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(p[k]).toFixed(1); }).join(''); };
-    var area = line('c') + 'L' + W + ' ' + H + 'L0 ' + H + 'Z';
-    svg.setAttribute('viewBox', '0 0 ' + W + ' ' + H);
-    var down = live && live > w200;
-    svg.innerHTML = '<defs><linearGradient id="hvGrad" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f7931a" stop-opacity=".14"/><stop offset="1" stop-color="#f7931a" stop-opacity="0"/></linearGradient></defs>' +
-      '<path d="' + area + '" fill="url(#hvGrad)"/>' +
-      '<path d="' + line('c') + '" fill="none" stroke="#f7931a" stroke-opacity=".42" stroke-width="1.2"/>' +
-      '<path d="' + line('w') + '" fill="none" stroke="#b98bff" stroke-opacity=".7" stroke-width="1.2"/>' +
-      '<line x1="0" x2="' + W + '" y1="' + Y(w200) + '" y2="' + Y(w200) + '" stroke="#b98bff" stroke-opacity=".55" stroke-dasharray="3 4"/>' +
-      (live ? '<line x1="' + (W - 1) + '" x2="' + (W - 1) + '" y1="' + Y(live) + '" y2="' + Y(w200) + '" stroke="' + (down ? 'var(--dn)' : 'var(--up)') + '" stroke-opacity=".6" stroke-width="2"/>' +
-        '<circle cx="' + (W - 2) + '" cy="' + Y(live) + '" r="3" fill="#f7931a"><animate attributeName="r" values="2.5;4.5;2.5" dur="1.6s" repeatCount="indefinite"/></circle>' : '');
-  }
+  var W200 = {};
   async function load200w() {
     for (var ci = 0; ci < COINS2.length; ci++) {
       var c = COINS2[ci];
@@ -952,12 +916,11 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
         '<div class="sub">200 WMA ' + esc(px(W200[c])) + ' · ' + (to < 0 ? '−' : '+') + Math.abs(to * 100).toFixed(1) + '% to reach</div>';
     }).join('') + '<div class="sub" style="margin-top:2px">day ' + Math.floor((now - last) / 864e5) + ' since halving · next in ~' + Math.round((next - now) / 864e5) + ' d</div>';
     $('srcb-halving').innerHTML = Hh;
-    drawHalvingBg();
   }
 
   function startSources() {
     drawWires();
-    feedAtlas(); feedGlass(); feedGlassSlow(); load200w().then(loadWeekly).then(feedHalving);
+    feedAtlas(); feedGlass(); feedGlassSlow(); load200w().then(feedHalving);
     setInterval(feedAtlas, 60000);
     setInterval(feedGlass, 8000);
     setInterval(feedGlassSlow, 5 * 60000);
@@ -1341,7 +1304,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
   refreshState().then(function () { route(); }).then(refreshLive).then(startSources);
   setInterval(refreshState, 60000);
   setInterval(refreshLive, 10000);
-  var rt; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { drawHalvingBg(); if (ROUTE.page === 'coin') renderCoinPage(ROUTE.coin); if (ROUTE.page === 'bot') renderEquity(); drawWires(); }, 150); });
+  var rt; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { if (ROUTE.page === 'coin') renderCoinPage(ROUTE.coin); if (ROUTE.page === 'bot') renderEquity(); drawWires(); }, 150); });
 })();
 </script>
 </body>
