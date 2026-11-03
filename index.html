@@ -24,6 +24,7 @@
   --sans:'Inter',system-ui,sans-serif;
 }
 *{box-sizing:border-box;margin:0;padding:0}
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%} /* iOS: don't enlarge small text */
 html,body{background:var(--bg);color:var(--txt);font-family:var(--sans);-webkit-font-smoothing:antialiased}
 body{padding:0 0 calc(24px + env(safe-area-inset-bottom))}
 .up{color:var(--up)} .dn{color:var(--dn)} .nt{color:var(--nt)} .dim{color:var(--dim)} .faint{color:var(--faint)}
@@ -163,7 +164,7 @@ dl.kv dd{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-n
 .bchart.big{height:220px;margin-top:0}
 .bchart svg{display:block;width:100%;height:100%;overflow:visible}
 @media(max-width:859px){.pairs .bchart{height:48px;margin-top:6px}}
-@media(max-width:859px){body>footer,main #page-main>.note{font-size:8.5px;line-height:1.45;color:var(--faint)}}
+@media(max-width:859px){body>footer,main #page-main>.note{font-size:7px;line-height:1.4;color:var(--faint)}}
 .meter{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:4px 0 2px}
 .meter i{display:block;height:100%;background:var(--nt);border-radius:3px}
 .scorebar{position:relative;height:10px;margin:12px 0 2px;border-radius:5px;background:linear-gradient(90deg,rgba(255,77,106,.35),var(--line) 50%,rgba(53,255,176,.35))}
@@ -1385,6 +1386,20 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     if (S.live) { renderLive(); renderTiles(); }
     renderLiveTiles();
   }
+
+  // A new version of the dashboard on GitHub Pages: reload (a home-screen app otherwise keeps the old one).
+  var BUILT = null;
+  async function checkVersion() {
+    try {
+      var r = await fetch(location.pathname + '?v=' + Date.now(), { method: 'HEAD', cache: 'no-store' });
+      var v = r.headers.get('last-modified') || r.headers.get('etag');
+      if (!v) return;
+      if (BUILT && v !== BUILT) location.reload();
+      BUILT = v;
+    } catch (e) { /* offline */ }
+  }
+  checkVersion(); setInterval(checkVersion, 2 * 60000);
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) checkVersion(); });
 
   ROUTE = { page: 'main' };
   refreshState().then(function () { route(); }).then(refreshLive).then(startSources);
