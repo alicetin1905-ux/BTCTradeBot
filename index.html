@@ -154,6 +154,10 @@ dl.kv dd{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-n
 .loglist time+span{flex:none;overflow:visible}
 .src{overflow:hidden}
 .src-h,.src-b{position:relative;z-index:1}
+.gs-first{font-weight:700;font-size:11px;padding:0 5px;border-radius:5px;background:rgba(255,255,255,.04)}
+.gs-first.up{color:var(--up);background:rgba(53,255,176,.10)}
+.gs-first.dn{color:var(--dn);background:rgba(255,77,106,.10)}
+@media(max-width:420px){.src-b .sub.gs{display:block}.gs-rest{display:none}.gs-first{font-size:10px;padding:0 3px}}
 .meter{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:4px 0 2px}
 .meter i{display:block;height:100%;background:var(--nt);border-radius:3px}
 .scorebar{position:relative;height:10px;margin:12px 0 2px;border-radius:5px;background:linear-gradient(90deg,rgba(255,77,106,.35),var(--line) 50%,rgba(53,255,176,.35))}
@@ -905,7 +909,8 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       var main = w && w.v ? '<b class="' + cls(wd) + '"><span class="lg">1w ' + (w.v === 'neutral' ? 'neutral' : w.v) + ' </span>' + Math.round(w.prob * 100) + '%</b>' : '<b class="faint">…</b>';
       var flow = g.buyPct != null ? 'live ' + g.buyPct.toFixed(0) + '% buy' : '';
       return '<div class="row"><span>' + c + ' ' + arrow(wd) + '</span>' + main + '</div>' +
-        '<div class="sub">' + (w && w.first ? '→ ' + esc(px(w.first)) + ' first · ' + esc(px(w.other)) + (flow ? ' · ' + flow : '') : flow) + '</div>';
+        // the target GlassSphere expects to be reached first, highlighted in its direction; the other one dimmed
+        '<div class="sub gs">' + (w && w.first ? '<span class="gs-first ' + (w.first < w.other ? 'dn' : 'up') + '">' + (w.first < w.other ? '▼ ' : '▲ ') + esc(px(w.first)) + '</span><span class="gs-rest"> first · then ' + esc(px(w.other)) + (flow ? ' · ' + flow : '') + '</span>' : flow) + '</div>';
     }).join('');
     $('srcb-glass').innerHTML = G;
     var now = Date.now(), last = HALVINGS.filter(function (t) { return t <= now; }).pop(), next = HALVINGS.filter(function (t) { return t > now; })[0];
