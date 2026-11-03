@@ -72,11 +72,14 @@
   "mode": "demo",
   "exchange": "okx",
   "instruments": {
-    "ETH": "ETH-USD_UM_XPERP-310328"
+    "ETH": "ETH-USD_UM_XPERP-310328",
+    "BTC": "BTC-USD_UM_XPERP-310328"
   },
   "coins": [
     "ETH",
     "BTC"
   ],
-  "updatedAt": 1793715003009
+  "updatedAt": 1793715164656,
+  "lastRunAt": 1793715164656,
+  "instrument": "BTC-USD_UM_XPERP-310328"
 }

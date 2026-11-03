@@ -1,0 +1,35 @@
+{
+  "trainedOn": 6691,
+  "at": 1793707200000,
+  "minR": 0,
+  "halfLifeDays": 1460,
+  "weights": {
+    "ema_stack": 0.0538,
+    "px_vs_ema200": -0.486,
+    "supertrend": 0.1202,
+    "adx_di": 0.0906,
+    "adx_level": 0.1242,
+    "rsi": 0.1613,
+    "macd_hist": 0.0435,
+    "stoch_rsi": 0.0836,
+    "obv_slope": -0.019,
+    "bb_pos": -0.007,
+    "ret_1d": 0.0453,
+    "ret_1w": 0.0959,
+    "wma200_ratio": -0.0389,
+    "cycle_sin": 0.0605,
+    "cycle_cos": 0.4792,
+    "setup_pullback": -0.0012,
+    "setup_breakout": 0.0012,
+    "coin_btc": -0.1508,
+    "side_long": 0.1833
+  },
+  "bias": 0.2421,
+  "lastYear": {
+    "candidates": 655,
+    "wouldTake": 354,
+    "avgRTaken": 0.97,
+    "avgRSkipped": -0.53
+  },
+  "updatedAt": 1793715164151
+}
