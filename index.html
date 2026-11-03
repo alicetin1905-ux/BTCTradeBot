@@ -152,7 +152,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
   The learning bot (BTC and ETH, each with its own position and stop, sharing one balance, at most 2 open at once): on every 4H close it looks for a
   trend pullback (with the EMA50/EMA200 trend, a dip to EMA20 that closes back) or a 20-candle breakout with the trend. A model trained on every earlier
   setup and how it ended — features from the ATLAS indicators and the BTC-Halving 200-week average and cycle — estimates the expected result, and the bot
-  only trades setups it expects to win. It retrains on every new finished setup. 2% risk, initial stop 2×ATR, trailed 4×ATR behind the best close, no take-profit.
+  only trades setups it expects to win. It retrains on every new finished setup. 1% risk, initial stop 2×ATR, trailed 5×ATR behind the best close, no take-profit.
   Walk-forward test: <a href="https://github.com/alicetin1905-ux/BTCTradeBot/blob/main/research/LEARNING.md" target="_blank" rel="noopener">research/LEARNING.md</a>.
   State refreshes every minute from the repo; the live price every 10 s.
 </footer>

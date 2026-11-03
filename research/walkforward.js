@@ -13,7 +13,8 @@ const MAXX = arg('MAXX', config.PORTFOLIO.MAX_POSITION_X), MAX_OPEN = arg('MAX_O
 const UNTIL = Date.UTC(arg('UNTIL', 2100), 0, 1);
 
 (async () => {
-  const o = L.defaults({ ...config.LEARN, STOP_ATR: config.STOP_ATR, TRAIL_ATR: config.TRAIL_ATR, MIN_R: arg('MINR', config.LEARN.MIN_R) });
+  const o = L.defaults({ ...config.LEARN, STOP_ATR: arg('STOP', config.STOP_ATR), TRAIL_ATR: arg('TRAIL', config.TRAIL_ATR), MIN_R: arg('MINR', config.LEARN.MIN_R),
+    BREAKOUT_N: arg('BN', config.LEARN.BREAKOUT_N), HALF_LIFE_BARS: arg('HL', config.LEARN.HALF_LIFE_BARS), LAMBDA: arg('L', config.LEARN.LAMBDA) });
   const data = await H.loadAll(config.COINS);
   const { byCoin, all } = L.candidates(data, o);
   all.sort((a, b) => a.t0 - b.t0);

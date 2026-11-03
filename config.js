@@ -63,7 +63,8 @@ const config = module.exports = {
   // +834%, 25%, PF 1.56 - fewer, better trades; breakout: 74, +374%, 32%).
   //   'learning'    (live since 2026-11-03) trend pullback + 20-candle breakout setups, each traded only when the
   //                 learner (src/learner.js) expects a profit from it; it retrains on every finished setup.
-  //                 Walk-forward 2021 - Oct 2026, BTC+ETH, 2% risk: PF 1.48, every year positive (research/LEARNING.md).
+  //                 Walk-forward 2021 - Oct 2026, BTC+ETH, 1% risk, trail 5 ATR: PF 1.73, $2,000 -> $9,766, worst drop 21%
+  //                 (research/LEARNING.md).
   STRATEGY: 'learning',
 
   // The learner (src/learner.js).
@@ -138,14 +139,15 @@ const config = module.exports = {
   // Stops ('atr' mode), in ATRs of the 4H candles. Both live on the exchange as the position's
   // stop-loss, so they work while the machine running the bot is off.
   STOP_ATR: 2,         // initial stop: entry -/+ 2 x ATR
-  TRAIL_ATR: 4,        // after each 4H close: best close since entry -/+ 4 x ATR (never loosens); trend pullback backtest: 3 -> PF 1.34, 4 -> 1.56
+  TRAIL_ATR: 5,        // after each 4H close: best close since entry -/+ 5 x ATR (never loosens). Learning bot, 1% risk, 2021-26 (stop 2):
+                       // trail 4 -> PF 1.58, 4.5 -> 1.68, 5 -> 1.73, 5.5 -> 1.57, 6 -> 1.54 (research/LEARNING.md, 2026-11-03)
   // At most this many positions open at once across all coins (null = no limit). BTC, ETH and HYPE move together.
   MAX_OPEN_POSITIONS: 2,
 
   // Money rules.
   PORTFOLIO: {
     STARTING_BALANCE: 2000, // USDT — the bot's allocation; it trades like a 2000 USDT account
-    RISK_PCT: 2,            // loss at the initial stop per trade, % of the balance, per coin (COIN_RISK_PCT overrides it for one coin). Backtest BTC+ETH (graded, ±10/8h, ±90): 1% = +629%, 21% worst drop; 2% = +3,692%, 32%; 3% = +6,492%, 50%
+    RISK_PCT: 1,            // loss at the initial stop per trade, % of the balance (owner's choice 2026-11-03). Learning bot 2021-26: 1% = PF 1.73, $2,000 -> $9,766, worst drop 21%
     MAX_POSITION_X: 2,      // position value at most this many x the balance (caps size on tight stops)
     LEVERAGE: 10,           // exchange leverage (cross margin); margin = position value / leverage.
                             // Sizing is by risk, so leverage changes the margin tied up, not the loss at the stop.

@@ -26,8 +26,8 @@ bot took it or not. Older results count half after 4 years. The bot only trades 
 (`LEARN.MIN_R` 0). So every finished setup is something it learns from.
 
 **Money rules:**
-- 2% of the balance at risk per trade.
-- Initial stop 2×ATR, trailed 4×ATR behind the best close; no take-profit.
+- 1% of the balance at risk per trade.
+- Initial stop 2×ATR, trailed 5×ATR behind the best close; no take-profit.
 - At most 2 positions (one per coin), each at most 2× the balance.
 - Daily loss limit 20%.
 
@@ -36,17 +36,18 @@ The stop sits on OKX and triggers on the index price, so it works while the Mac 
 ## The test (`node research/walkforward.js`, details in `research/LEARNING.md`)
 
 Walk-forward test: the model only learns from what happened before each decision. Binance spot candles, 2021 - Oct
-2026, BTC + ETH, 2% risk:
+2026, BTC + ETH:
 
 | | Trades | Winners | Profit factor | $2,000 → | Worst drop |
 |---|---|---|---|---|---|
-| Setups alone | 516 | 30% | 1.31 | $15,444 | 36% |
-| **With the learner** | 419 | 32% | **1.48** | $22,490 | 37% |
+| Setups alone (2% risk, trail 4) | 516 | 30% | 1.31 | $15,444 | 36% |
+| With the learner (2% risk, trail 4) | 419 | 32% | 1.48 | $22,490 | 37% |
+| **Live settings: learner, 1% risk, trail 5** | 355 | 31% | **1.73** | **$9,766** | **21%** |
 
-Every year was positive or flat in R (2022: 0.0). With features shuffled at random, the learner gives no
+With the live settings every year was positive: +34, +7, +55, +35, +28 and +28 R (2021 - 2026). With features shuffled at random, the learner gives no
 improvement, so the learning is real.
 
-It still loses about 7 trades in 10. A drop of a third of the balance has happened before, and will happen again.
+It still loses about 7 trades in 10. A drop of a fifth of the balance has happened before, and will happen again.
 Expect less going forward than the test shows. This is demo money and not investment advice.
 
 ## Running it

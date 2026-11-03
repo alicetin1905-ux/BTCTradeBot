@@ -73,6 +73,47 @@ The same improvement shows on each setup alone (futures data):
 
 **Memory.** Results counting half after 4 years (`LEARN.HALF_LIFE_BARS` 8760) did better than equal weight or a 1-2 year half-life (profit factor 1.48 vs 1.37 / 1.43).
 
+## 4. Settings at 1% risk (2026-11-03)
+
+The owner chose 1% risk and asked for the most profitable settings. The search covered:
+- the stop (1.5 - 3 ATR) and the trailing distance (3 - 6 ATR);
+- the minimum expected R, the breakout length and the memory.
+
+Each combination was judged in both halves, 2021-23 and 2024-26. A setting only counted when **both** halves were
+strong and its neighbours were close, not when one corner of the grid happened to shine.
+
+The best corner was stop 1.5 / trail 6 / minimum 0.2 R: profit factor 1.88. Its neighbours sit around 1.55, which
+looks like luck, so it was not taken.
+
+| Stop | Trail | 2021-23 PF | 2024-26 PF | 2021-26 PF | $2,000 → | Worst drop |
+|---|---|---|---|---|---|---|
+| 2 | 4 (before) | 1.56 | 1.60 | 1.58 | $8,395 | 21% |
+| 2 | 4.5 | 1.57 | 1.75 | 1.68 | $9,096 | 21% |
+| **2** | **5 (live)** | **1.65** | **1.77** | **1.73** | **$9,766** | **21%** |
+| 2 | 5.5 | 1.65 | 1.52 | 1.57 | $7,495 | 21% |
+| 2.25 | 5 | 1.66 | 1.69 | 1.68 | $7,911 | 19% |
+| 1.75 | 5 | 1.69 | 1.36 | 1.48 | $8,653 | 25% |
+
+R per year with the live settings:
+
+| Year | 2021 | 2022 | 2023 | 2024 | 2025 | 2026 (to Oct) |
+|---|---|---|---|---|---|---|
+| R | +34.3 | +7.4 | +55.1 | +34.9 | +27.6 | +28.2 |
+
+The other choices stayed as they were. Each of the alternatives below did worse than the live 1.73:
+
+| Choice | Alternative | Profit factor |
+|---|---|---|
+| Minimum expected R | −0.1 | 1.66 |
+| | +0.1 | 1.52 |
+| Breakout length | 15 candles | 1.60 |
+| | 30 candles | 1.58 |
+| Memory (half-life) | 2 years | 1.51 |
+| | none | 1.59 |
+| Positions at once | 1 | 1.60 (drop only 11%, but $5,014) |
+
+Even this choice was made on the same data. A profit factor around 1.5 - 1.6 live would already be in line with it.
+
 ## Honest limits
 
 - **Winners and losers:** about 70% of trades lose, and the winners pay for them. Runs of 8-10 losses happen.
