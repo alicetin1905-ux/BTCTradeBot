@@ -157,6 +157,7 @@ dl.kv dd{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-n
 .gs-first{font-weight:700;font-size:11px;padding:0 5px;border-radius:5px;background:rgba(255,255,255,.04)}
 .gs-first.up{color:var(--up);background:rgba(53,255,176,.10)}
 .gs-first.dn{color:var(--dn);background:rgba(255,77,106,.10)}
+.gs-first.nt{color:var(--faint);background:none;font-weight:500;padding:0}
 @media(max-width:420px){.src-b .sub.gs{display:block}.gs-rest{display:none}.gs-first{font-size:10px;padding:0 3px}}
 .bchart{height:64px;margin-top:8px;position:relative}
 .bchart.big{height:220px;margin-top:0}
@@ -921,7 +922,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       var flow = g.buyPct != null ? 'live ' + g.buyPct.toFixed(0) + '% buy' : '';
       return '<div class="row"><span>' + c + ' ' + arrow(wd) + '</span>' + main + '</div>' +
         // the target GlassSphere expects to be reached first, highlighted in its direction; the other one dimmed
-        '<div class="sub gs">' + (w && w.first ? '<span class="gs-first ' + (w.first < w.other ? 'dn' : 'up') + '">' + (w.first < w.other ? '▼ ' : '▲ ') + esc(px(w.first)) + '</span><span class="gs-rest"> first · then ' + esc(px(w.other)) + (flow ? ' · ' + flow : '') + '</span>' : flow) + '</div>';
+        '<div class="sub gs">' + (w && w.first ? '<span class="gs-first ' + (w.v === 'neutral' ? 'nt' : w.first < w.other ? 'dn' : 'up') + '">' + (w.first < w.other ? '▼ ' : '▲ ') + esc(px(w.first)) + '</span><span class="gs-rest"> first · then ' + esc(px(w.other)) + (flow ? ' · ' + flow : '') + '</span>' : flow) + '</div>';
     }).join('');
     $('srcb-glass').innerHTML = G;
     var now = Date.now(), last = HALVINGS.filter(function (t) { return t <= now; }).pop(), next = HALVINGS.filter(function (t) { return t > now; })[0];
