@@ -1,0 +1,13 @@
+[
+  {
+    "at": 1793718121829,
+    "kind": "scan",
+    "candleT": 1793692800000,
+    "close": 2267.14,
+    "trend": -1,
+    "setup": "pullback",
+    "side": -1,
+    "expR": 0.345,
+    "decision": "signal candle closed 182 min ago — entries only within 45 min of a 4H close"
+  }
+]
