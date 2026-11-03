@@ -188,7 +188,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
 
   <div class="flow" id="flow">
     <div class="srcs">
-      <section class="card src" id="src-atlas"><div class="src-h"><span class="led" id="led-atlas"></span><b>ATLAS</b><small>4H score · ATLAS page</small></div><div class="src-b" id="srcb-atlas"><div class="faint">connecting…</div></div></section>
+      <section class="card src" id="src-atlas"><div class="src-h"><span class="led" id="led-atlas"></span><b>ATLAS</b><small>daily score · ATLAS page</small></div><div class="src-b" id="srcb-atlas"><div class="faint">connecting…</div></div></section>
       <section class="card src" id="src-glass"><div class="src-h"><span class="led" id="led-glass"></span><b>GLASSSPHERE</b><small>weekly reading</small></div><div class="src-b" id="srcb-glass"><div class="faint">connecting…</div></div></section>
       <section class="card src" id="src-halving"><svg class="src-bg" id="bg-halving" aria-hidden="true" preserveAspectRatio="none"></svg><div class="src-h"><span class="led" id="led-halving"></span><b>BTC-HALVING</b><small>cycle</small></div><div class="src-b" id="srcb-halving"><div class="faint">connecting…</div></div></section>
     </div>
@@ -796,7 +796,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       return st;
     } catch (e) {
       var ok = function (bar, n) { return okx('market/candles?instId=' + c + '-USDT-SWAP&bar=' + bar + '&limit=' + n).then(function (d) { return d.slice().reverse().map(function (r) { return { t: +r[0], o: +r[1], h: +r[2], l: +r[3], c: +r[4], v: +r[6] }; }); }); };
-      return { tf: '240', candles: { '240': await ok('4H', 300), D: await ok('1Dutc', 60) }, oi: [], live: S.liveBy[c] && S.liveBy[c].px, src: 'OKX, price/volume only' };
+      return { tf: '240', candles: { '240': await ok('4H', 300), D: await ok('1Dutc', 300) }, oi: [], live: S.liveBy[c] && S.liveBy[c].px, src: 'OKX, price/volume only' };
     }
   }
   async function feedAtlas() {
@@ -804,10 +804,11 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     for (var ci = 0; ci < COINS2.length; ci++) {
       var c = COINS2[ci];
       try {
-        var st = await atlasState(c), a = window.AtlasPage.analyse(st);
+        // the page's score on its daily timeframe (the main number) and on 4H (the small line)
+        var st = await atlasState(c), a = window.AtlasPage.analyse(Object.assign({}, st, { tf: 'D' })), a4 = window.AtlasPage.analyse(st);
         if (!a) continue;
         var prev = SRC.atlas[c];
-        SRC.atlas[c] = { score: a.score, bull: a.sig.filter(function (x) { return x.dir > 0; }).length, bear: a.sig.filter(function (x) { return x.dir < 0; }).length, n: a.sig.length, mtfDir: a.mtfDir, src: st.src, closedAt: a.closedAt };
+        SRC.atlas[c] = { score: a.score, bull: a.sig.filter(function (x) { return x.dir > 0; }).length, bear: a.sig.filter(function (x) { return x.dir < 0; }).length, n: a.sig.length, mtfDir: a.mtfDir, src: st.src, closedAt: a.closedAt, score4h: a4 ? a4.score : null };
         var dir = a.score > 0 ? 1 : a.score < 0 ? -1 : prev ? Math.sign(a.score - prev.score) : 0;
         emit('atlas', c, dir, ci * 350);
       } catch (e) { /* next round */ }
@@ -911,7 +912,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     var A = COINS2.map(function (c) {
       var a = SRC.atlas[c]; if (!a) return '<div class="row"><span>' + c + '</span><b class="faint">…</b></div>';
       return '<div class="row"><span>' + c + ' ' + arrow(a.score) + '</span><b class="' + cls(a.score) + '">' + (a.score > 0 ? '+' : '') + a.score + '</b></div>' +
-        '<div class="sub">' + a.bull + ' bull · ' + a.bear + ' bear of ' + a.n + (a.mtfDir ? ' · TFs ' + (a.mtfDir > 0 ? 'bull' : 'bear') : '') + (a.src !== 'Bybit' ? ' · ' + esc(a.src) : '') + '</div>';
+        '<div class="sub">' + a.bull + ' bull · ' + a.bear + ' bear of ' + a.n + (a.score4h != null ? ' · 4H ' + (a.score4h > 0 ? '+' : '') + a.score4h : '') + (a.src !== 'Bybit' ? ' · ' + esc(a.src) : '') + '</div>';
     }).join('');
     $('srcb-atlas').innerHTML = A;
     var G = COINS2.map(function (c) {
