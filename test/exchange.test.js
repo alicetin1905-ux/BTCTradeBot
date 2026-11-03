@@ -428,13 +428,13 @@ test('watchdog: alert when the bot stops, repeat every 6h, all-clear when back',
   let r = check({ lastRun: t0, wd, now: t0 + 1.5 * H });
   assert.equal(r.message, null);
   r = check({ lastRun: t0, wd, now: t0 + 2.5 * H });
-  assert.equal(r.message.title, 'BTC bot is not running'); wd = r.wd;
+  assert.equal(r.message.title, 'BTC-ETH-BOT is not running'); wd = r.wd;
   r = check({ lastRun: t0, wd, now: t0 + 4 * H });
   assert.equal(r.message, null); wd = r.wd;
   r = check({ lastRun: t0, wd, now: t0 + 8.6 * H });
-  assert.equal(r.message.title, 'BTC bot is not running'); wd = r.wd;
+  assert.equal(r.message.title, 'BTC-ETH-BOT is not running'); wd = r.wd;
   r = check({ lastRun: t0 + 9 * H, wd, now: t0 + 9.2 * H });
-  assert.equal(r.message.title, 'BTC bot is running again');
+  assert.equal(r.message.title, 'BTC-ETH-BOT is running again');
 });
 
 test('back-to-back trades keep their own fills: a quick second close is not claimed by the first', async () => {
@@ -588,15 +588,15 @@ test('Actions failure alerts: on the first failure, every 6h while failing, all-
   let r = decide({ ok: true, prev: { failing: false }, now: t0 });
   assert.equal(r.message, null);
   r = decide({ ok: false, prev: r.state, now: t0, lastLines: 'OKX 50110: IP' });
-  assert.equal(r.message.title, 'BTC bot run failed');
+  assert.equal(r.message.title, 'BTC-ETH-BOT run failed');
   assert.match(r.message.message, /50110/);
   r = decide({ ok: false, prev: r.state, now: t0 + 30 * 60000 });
   assert.equal(r.message, null);
   r = decide({ ok: false, prev: r.state, now: t0 + 6 * H + 60000 });
-  assert.equal(r.message.title, 'BTC bot run failed');
+  assert.equal(r.message.title, 'BTC-ETH-BOT run failed');
   assert.equal(r.state.since, t0);
   r = decide({ ok: true, prev: r.state, now: t0 + 7 * H });
-  assert.equal(r.message.title, 'BTC bot runs work again');
+  assert.equal(r.message.title, 'BTC-ETH-BOT runs work again');
   assert.deepEqual(r.state, { failing: false });
 });
 
