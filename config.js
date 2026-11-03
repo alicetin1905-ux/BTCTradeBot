@@ -1,0 +1,190 @@
+// Central knobs for the whole bot. Everything else reads from here.
+// control/settings.json can override the adjustable ones (src/settings.js)
+// without touching this file — these are the defaults.
+const config = module.exports = {
+  // The coins it trades, each on its own USD-settled future with its own
+  // position, stop and state (BTC in state/demo/, the others in
+  // state/demo/<coin>/), all sharing one balance. COINS is the run order:
+  // scripts/actions-run.sh runs `COIN=<coin> node src/run.js` for each, and
+  // the last one also sends the combined daily / status pushes.
+  // 2026-11-03: the learning bot trades BTC and ETH (SOL has no usable contract on the OKX EEA demo).
+  COINS: ['ETH', 'BTC'],
+  // Where each coin trades. BTC and ETH: the USD-settled futures (long + short,
+  // 10x). NEAR: its futures are refused on the EEA site (OKX 51155, local
+  // compliance), so it trades the SPOT pair NEAR-USDC: long only, no leverage,
+  // the position at most 1x the balance, stop-loss as a bot-tagged algo order.
+  // Per-coin instruments come from scripts/actions-run.sh (OKX_INSTRUMENT_<COIN>).
+  // Backtest NEAR spot: 19 trades/yr, PF 1.41, profitable every year.
+  // A coin's own risk per trade (% of the balance); the others use PORTFOLIO.RISK_PCT.
+  // BTC+ETH at 2% + NEAR at 1%: 139 trades/yr, +4,247%, worst drop 37% (BTC+ETH alone: 120, +3,692%, 32%).
+  // UNI (USD-settled future, long + short) at 1%: BTC+ETH+UNI 164 trades/yr, +4,377%, worst drop 35%, PF 1.56 (UNI's edge is the weakest: PF 0.96 before 2024, 1.62 since).
+  COIN_RISK_PCT: {},
+  // The coin this process handles (COIN env var, default BTC) and its symbol
+  // (USDT perpetual naming: BTCUSDT on Bybit, BTC-USDT-SWAP on OKX).
+  COIN: (process.env.COIN || 'BTC').trim().toUpperCase(),
+  get SYMBOL() { return this.COIN + 'USDT'; },
+
+  // Where it trades, always in demo mode: 'okx' (OKX Demo Trading) or
+  // 'bybit' (Bybit Demo Trading). EXCHANGE in .env overrides this; the keys
+  // for it go in .env too (.env.example).
+  EXCHANGE: 'okx',
+  // On OKX: the BTC perpetual 'BTC-USDT-SWAP'; on OKX's EEA site (no USDT,
+  // no perpetual swaps) the USD-settled, USDC-margined BTC future
+  // 'BTC-USD_UM_XPERP-310328' (perpetual-style, runs to 2031, max 10x); or a
+  // spot pair such as 'BTC-USDC' (long-only, unleveraged). OKX_INSTRUMENT in
+  // .env (or the GitHub workflow) overrides this.
+  OKX_INSTRUMENT: `${(process.env.COIN || 'BTC').trim().toUpperCase()}-USDT-SWAP`,
+
+  // Signal timeframe: closed 4H candles (UTC-aligned: 00/04/08/12/16/20).
+  // backtest/RESEARCH.md: 1D breakouts were much weaker on BTC.
+  ENTRY_TF: '240',
+  // New entries only within this many minutes of the 4H close; an older
+  // signal isn't chased. The Mac runs at :02 and :32, so both runs after a
+  // close fit. (180 while GitHub's cron ran the bot and delayed runs by hours:
+  // BTC 2026-10-02 then entered 2h47 late, ~360 points worse.) Stops and exits
+  // still update on any run.
+  ENTRY_FRESH_MIN: 45,
+
+  // Where the candles come from: null = the exchange it trades on (the
+  // other one as a fallback), or 'bybit' / 'okx'.
+  MARKET_DATA: null,
+
+  // Which signal trades, on closed 4H candles:
+  //   'atlas-flip'  the ATLAS score swings from <= -FLIP_SCORE to >= +FLIP_SCORE
+  //                 (or back) within FLIP_WINDOW candles (src/flip.js) — live
+  //   'breakout'    Donchian channel breakout (src/signal.js) — the first setup
+  //   'trend-pullback'  trade with the 4H trend (EMA50 vs EMA200), enter when a candle dips to EMA20 and
+  //                 closes back on the trend side (src/pullback.js) — live since 2026-10-19. Backtest
+  //                 BTC+ETH+HYPE, max 2 open, $40 risk: 2024-26 PF 1.56, +$2,300; 5 of 6 years positive
+  //                 (2022 -$770). The ATLAS flip lost 66% in its first two forward weeks
+  //                 (backtest/TREND_PULLBACK.md).
+  // backtest/REPORT.md (+ research in ATLAS_FLIP.md): ±10 within 2 candles (8h) with the trend band, long and
+  // short: ~97 trades a year, +644% 2021-26, worst drop 29%, PF 1.37 (±25 / 16h: ~60 a year,
+  // +834%, 25%, PF 1.56 - fewer, better trades; breakout: 74, +374%, 32%).
+  //   'learning'    (live since 2026-11-03) trend pullback + 20-candle breakout setups, each traded only when the
+  //                 learner (src/learner.js) expects a profit from it; it retrains on every finished setup.
+  //                 Walk-forward 2021 - Oct 2026, BTC+ETH, 2% risk: PF 1.48, every year positive (research/LEARNING.md).
+  STRATEGY: 'learning',
+
+  // The learner (src/learner.js).
+  LEARN: {
+    MIN_R: 0,              // take a setup only when the model expects at least this many R (R = the initial risk)
+    HALF_LIFE_BARS: 8760,  // older setups count half after this many 4H candles (4 years): it adapts slowly
+    LAMBDA: 3,             // ridge penalty
+    WARMUP_TRADES: 40,     // finished setups needed before it trusts itself
+    BREAKOUT_N: 20,        // breakout setup: close beyond the previous 20 candles' high / low
+  },
+  // How the ATLAS score is computed (src/atlasScore.js): 'graded' — the ATLAS
+  // page's method: each indicator counts by its strength (RSI 85 more than
+  // RSI 56), each group is averaged on its own and the groups are blended
+  // Trend 35 / Momentum 25 / Structure 20 / Flow 20 — or 'classic', every
+  // indicator a flat -1/0/+1 vote. Backtest at ±10 within 8h: graded ~60
+  // trades a year, PF 1.47, worst drop 28%; classic ~97 a year, PF 1.37, 29%
+  // (backtest/REPORT.md).
+  SCORE_MODE: 'graded',
+  FLIP_SCORE: 10,
+  FLIP_WINDOW: 2,
+  // Also enter when the score closes at +EXTREME_SCORE or higher (long) or
+  // -EXTREME_SCORE or lower (short), the candle before being inside it (null =
+  // off). BTC+ETH backtest, 2% risk each: flip only +3,086%, PF 1.56, worst
+  // drop 38%; with 90 +3,692%, PF 1.60, 32%; 85 +3,514%, 1.59, 32%; 80 +2,924%,
+  // PF 1.56, 34%; 75 +2,699%, PF 1.51, 36% (the lower the level, the more late
+  // entries and the weaker the result). 80 chosen by the owner so that a steady
+  // climb to +80 (BTC 2026-10-02: 8 -> 80 in a day, no swing) is traded.
+  EXTREME_SCORE: 80,
+  // Also enter when the score jumps by this much or more in ONE 4H candle and
+  // ends strong (BTC 2026-10-01: 25 -> 45 at 18-22h, then
+  // 56, 71, 75, 80 - the climb was visible 16h before the extreme level). The
+  // trend band applies. null = off. Chosen by the owner, forward-tested only.
+  JUMP_SCORE: 20,
+  // ...and the score ends at +JUMP_MIN_SCORE or more (-JUMP_MIN_SCORE or less for a short), so a wobble around zero (-8 -> +14) is not an entry.
+  JUMP_MIN_SCORE: 30,
+  // Ignore a swing when the 4H close is more than this % from its 200-candle
+  // 4H average (null = off). Backtest: PF 1.47 -> 1.56-1.61, better in both
+  // halves and across the score/window grid; the losses were counter-trend
+  // and over-extended entries.
+  TREND_BAND_PCT: 10,
+
+  // The breakout signal (src/signal.js), when STRATEGY is 'breakout'.
+  CHANNEL_N: 15,       // enter when a 4H close breaks the high (low) of the previous 15 candles
+  EXIT_N: 15,          // exit when a 4H close breaks the opposite side of the previous 15 candles
+  ATR_LEN: 14,
+  // 'long' = long-only, 'both' = longs and shorts. backtest/FREQUENCY.md:
+  // long+short with a 15-candle channel trades ~74x a year (long-only 20: ~31)
+  // and made more (+374% vs +324%, 2021-26) with a deeper worst drop (32% vs
+  // 26%); profit factor 1.41 before / 1.51 from 2024. 1H and 2H signals didn't
+  // hold up after fees.
+  DIRECTION: 'both',
+
+  // How a trade is sized and exited (the entry signals above are the same):
+  //   'fixed' — every trade uses FIXED.MARGIN USDT of margin at PORTFOLIO.LEVERAGE (550 x 10x = $5500
+  //             of position), a stop-loss at -FIXED.SL_USDT and a take-profit at +FIXED.TP_USDT of that
+  //             position (-$100 / +$200 = 1.8% / 3.6% away), both on the exchange as one OCO pair. No
+  //             trailing, no signal exit. A trade that loses = 5% of a 2000 balance, one that wins = +10%.
+  //             Chosen (2026-10-02) for a sideways BTC: bounces of about 2-2.7%, 4H candles about 1%.
+  //             With 2000 USDC of margin, two such trades fit at once; a third is cut to the free margin.
+  //   'atr'   — the earlier rules: RISK_PCT of the balance at a 2 x ATR stop that trails 3 x ATR.
+  // Spot coins (NEAR-USDC) can't be leveraged and keep the 'atr' rules.
+  // 2026-10-19: 'atr' with the trend pullback (risk 2%, stop 2 ATR, trailing 4 ATR, no take-profit).
+  TRADE_MODE: 'atr',
+  // 2026-10-03: margins lowered so the stop sits about 2 average 4H moves (ATR) from the entry; at 750 / 667 / 400
+  // it was only 1.2-1.5 ATR and an ordinary candle could hit it (both first trades stopped out within hours).
+  FIXED: { MARGIN: 550, SL_USDT: 100, TP_USDT: 200 },
+  // A coin's own fixed-mode numbers (merged over FIXED for that coin). BTC (4H ~0.9%): 550 -> 1.8% / 3.6%.
+  // ETH (4H ~1.1%): 450 margin = a 4,500 position, -$100 / +$200 at 2.2% / 4.4%.
+  // HYPE (4H ~2.2%): 230 margin = a 2,300 position, -$100 / +$200 at 4.3% / 8.7%.
+  COIN_FIXED: {},
+
+  // Stops ('atr' mode), in ATRs of the 4H candles. Both live on the exchange as the position's
+  // stop-loss, so they work while the machine running the bot is off.
+  STOP_ATR: 2,         // initial stop: entry -/+ 2 x ATR
+  TRAIL_ATR: 4,        // after each 4H close: best close since entry -/+ 4 x ATR (never loosens); trend pullback backtest: 3 -> PF 1.34, 4 -> 1.56
+  // At most this many positions open at once across all coins (null = no limit). BTC, ETH and HYPE move together.
+  MAX_OPEN_POSITIONS: 2,
+
+  // Money rules.
+  PORTFOLIO: {
+    STARTING_BALANCE: 2000, // USDT — the bot's allocation; it trades like a 2000 USDT account
+    RISK_PCT: 2,            // loss at the initial stop per trade, % of the balance, per coin (COIN_RISK_PCT overrides it for one coin). Backtest BTC+ETH (graded, ±10/8h, ±90): 1% = +629%, 21% worst drop; 2% = +3,692%, 32%; 3% = +6,492%, 50%
+    MAX_POSITION_X: 2,      // position value at most this many x the balance (caps size on tight stops)
+    LEVERAGE: 10,           // exchange leverage (cross margin); margin = position value / leverage.
+                            // Sizing is by risk, so leverage changes the margin tied up, not the loss at the stop.
+  },
+
+  // Execution safety limits.
+  EXECUTION: {
+    // No new entries for the rest of the UTC day once today's realized loss
+    // reaches this % of the day's starting balance. Open positions keep
+    // their exchange-side stop either way.
+    DAILY_LOSS_LIMIT_PCT: 20,
+  },
+
+  // Phone alerts through the ntfy app (src/notify.js). Subscribe to this
+  // topic in ntfy; NTFY_TOPIC in .env overrides it, NTFY_TOPIC=off disables.
+  NOTIFY: {
+    SERVER: 'https://ntfy.sh/',
+    NTFY_TOPIC: 'btctradebot-q7m2kx9vfa3c',
+    CLICK_URL: 'https://alicetin1905-ux.github.io/BTCTradeBot/',
+    // Daily summary: sent by the first hourly run at/after this hour, in the
+    // running Mac's local time.
+    DAILY_SUMMARY_HOUR: 8,
+    // Weekly report (trades, wins / losses and P&L per coin over the last 7 days, the balance):
+    // sent by the first full run on this weekday (0 = Sunday) at/after this hour, Mac local time.
+    WEEKLY_REPORT_DAY: 0,
+    WEEKLY_REPORT_HOUR: 20,
+    // Status push (position with live P&L, stop, equity), low priority.
+    HOURLY_STATUS: true,
+    // ...only on the run right after every Nth UTC hour — 4 = after each 4H close.
+    STATUS_EVERY_H: 4,
+    // Watchdog (GitHub Actions, scripts/watchdog.js): alert when the bot's
+    // last hourly run is older than this, repeat every REPEAT_H while it stays down.
+    WATCHDOG_MAX_AGE_MIN: 130,
+    WATCHDOG_REPEAT_H: 6,
+  },
+};
+
+// control/settings.json overrides (validated; see src/settings.js).
+const settings = require('./src/settings').load(config);
+config.SETTINGS_APPLIED = settings.applied;
+config.SETTINGS_ERRORS = settings.errors;
+config.SETTINGS_DEFAULTS = settings.defaults;

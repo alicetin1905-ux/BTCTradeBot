@@ -1,0 +1,18 @@
+{
+  "name": "btctradebot",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Learning trading bot for BTC and ETH on OKX Demo Trading: trend setups filtered by a model that retrains on every finished setup.",
+  "main": "src/run.js",
+  "scripts": {
+    "start": "node src/run.js",
+    "sync": "node src/run.js --sync",
+    "walkforward": "node research/walkforward.js",
+    "reset": "bash scripts/reset.sh",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "UNLICENSED"
+}
