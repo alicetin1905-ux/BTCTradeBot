@@ -474,7 +474,7 @@ function printSummary(events, st) {
   console.log(`\n=== BTCTradeBot ${COIN} [${config.EXCHANGE} ${MODE}${config.EXCHANGE === 'okx' ? ' ' + config.OKX_INSTRUMENT : ''}] (${config.STRATEGY}, ${P.STARTING_BALANCE} ${quote}, ${P.RISK_PCT}% risk, ${config.DIRECTION === 'both' ? 'long+short' : 'long-only'}) @ ${new Date().toISOString()} ===\n`);
   for (const ev of events) {
     if (ev.type === 'enter') {
-      const why = ev.setup ? `${ev.setup} setup, learner expects ${ev.expR == null ? '?' : (ev.expR >= 0 ? '+' : '') + ev.expR.toFixed(2) + ' R'}` : ev.pullback ? `trend pullback (${ev.bias === 1 ? 'up' : 'down'}trend, back over EMA20)` : ev.breakout != null ? `breakout ${px(ev.breakout)}` : (ev.flipFrom == null ? `ATLAS extreme ${ev.score}` : ev.jump ? `ATLAS jump ${ev.flipFrom} → ${ev.score} in one 4H candle` : `ATLAS ${ev.flipFrom} → ${ev.score}`);
+      const why = ev.setup ? `${ev.setup} setup, learner expects ${ev.expR == null ? '?' : (ev.expR >= 0 ? '+' : '') + ev.expR.toFixed(2) + ' R'}` : ev.pullback ? `trend pullback (${ev.bias === 1 ? 'uptrend, back above' : 'downtrend, back below'} EMA20)` : ev.breakout != null ? `breakout ${px(ev.breakout)}` : (ev.flipFrom == null ? `ATLAS extreme ${ev.score}` : ev.jump ? `ATLAS jump ${ev.flipFrom} → ${ev.score} in one 4H candle` : `ATLAS ${ev.flipFrom} → ${ev.score}`);
       console.log(`ENTER ${ev.bias === 1 ? 'LONG' : 'SHORT'} ${ev.qty} ${COIN} @ ${px(ev.entry)} | ${why} | SL ${px(ev.stop)} | value $${fmt(ev.notional)} risk $${fmt(ev.riskAmt)}`);
     } else if (ev.type === 'exit') {
       console.log(`EXIT — ${ev.reason} | pnl ${money(ev.pnl)}${ev.price ? ' @ ' + px(ev.price) : ''}`);
