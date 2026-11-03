@@ -64,6 +64,22 @@ dl.kv{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;font-size:13px}
 dl.kv dt{color:var(--dim)}
 dl.kv dd{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums}
 .note{font-size:12px;color:var(--dim);margin-top:10px;line-height:1.5}
+/* live coin tiles */
+.lt-head{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin-bottom:10px}
+.lt-coin{font-size:15px;font-weight:700;letter-spacing:.08em}
+.lt-px{font-family:var(--mono);font-size:20px;font-weight:700;margin-left:auto}
+.lt-chg{font-family:var(--mono);font-size:11px}
+.lt-bar{position:relative;height:14px;background:var(--line);border-radius:7px;overflow:hidden;margin:8px 0 4px}
+.lt-bar i{position:absolute;top:0;bottom:0;border-radius:7px}
+.lt-bar b{position:absolute;top:-2px;bottom:-2px;width:2px;background:var(--txt);opacity:.7}
+.lt-scale{display:flex;justify-content:space-between;font-family:var(--mono);font-size:10px;color:var(--faint)}
+.lt-big{font-family:var(--mono);font-size:18px;font-weight:700}
+.lt-status{font-size:12px;line-height:1.5;margin:6px 0 2px}
+.lt-ind{display:grid;grid-template-columns:1fr auto 16px;gap:3px 8px;font-size:12px;margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
+.lt-ind span{color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lt-ind b{font-family:var(--mono);font-weight:500;text-align:right;white-space:nowrap}
+.lt-ind em{font-style:normal;text-align:center}
+.lt-sub{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);grid-column:1/-1;margin-top:6px}
 .meter{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:4px 0 2px}
 .meter i{display:block;height:100%;background:var(--nt);border-radius:3px}
 .scorebar{position:relative;height:10px;margin:12px 0 2px;border-radius:5px;background:linear-gradient(90deg,rgba(255,77,106,.35),var(--line) 50%,rgba(53,255,176,.35))}
@@ -113,6 +129,8 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     <div class="tile"><div class="k">Trades</div><div class="v" id="tTr">—</div><div class="s" id="tTrS"></div></div>
     <div class="tile"><div class="k">Last run</div><div class="v" id="tRun">—</div><div class="s" id="tRunS"></div></div>
   </section>
+
+  <div class="grid2" id="liveTiles"></div>
 
   <div class="grid2">
     <section class="card" id="posCard"><h2>Position <span class="tag" id="posTag"></span></h2><div id="pos"><div class="empty">Loading…</div></div></section>
@@ -359,6 +377,118 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     var y = m.lastYear;
     if (y && y.candidates) html += '<div class="note">Last 12 months: ' + y.candidates + ' setups; the current model would take ' + y.wouldTake + ' (avg ' + (y.avgRTaken >= 0 ? '+' : '') + y.avgRTaken + ' R) and skip the rest (avg ' + (y.avgRSkipped >= 0 ? '+' : '') + y.avgRSkipped + ' R). In-sample — the honest test is research/LEARNING.md.</div>';
     el.innerHTML = html;
+  }
+
+  /* ---------------- live coin tiles ---------------- */
+  function vote(d) { return d > 0 ? '<em class="up">▲</em>' : d < 0 ? '<em class="dn">▼</em>' : '<em class="faint">•</em>'; }
+  function pc(x, dp) { return (x >= 0 ? '+' : '−') + Math.abs(x * 100).toFixed(dp == null ? 2 : dp) + '%'; }
+  function rr(x) { return (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(2) + ' R'; }
+
+  // How close a flat coin is to an entry: the nearest setup with the trend, measured from the live price.
+  function readiness(s, price) {
+    var I = s.ind, t = s.trend, minR = s.minR != null ? s.minR : 0;
+    if (!I) return null;
+    if (!t) {
+      var ema = I.ema50 > I.ema200 ? 'EMA50 above EMA200, price below it' : I.ema50 < I.ema200 ? 'EMA50 below EMA200, price above it' : 'EMA50 = EMA200';
+      return { pct: 0, label: 'no trend', text: 'No trend (' + ema + ') — no setups until price and EMA50 are on the same side of EMA200 (' + px(I.ema200) + ', ' + pc(I.ema200 / price - 1) + ').' };
+    }
+    var dir = t === 1 ? 'long' : 'short', out = [];
+    // pullback: price to EMA20, and a 4H close back on the trend side; the last close must be beyond EMA50
+    var pbOk = (s.close - I.ema50) * t > 0;
+    var dPb = (price - I.ema20) * t; // > 0: still away from EMA20
+    out.push({ setup: 'pullback', ok: pbOk, distPct: dPb / price, distAtr: dPb / I.atr, level: I.ema20,
+      text: pbOk ? (dPb <= 0 ? 'touching EMA20 ' + px(I.ema20) + ' — needs a 4H close back ' + (t === 1 ? 'above' : 'below') + ' it'
+                               : pc(-t * dPb / price) + ' to EMA20 ' + px(I.ema20))
+                 : 'the last close is not ' + (t === 1 ? 'above' : 'below') + ' EMA50 — no pullback entry on the next close' });
+    // breakout: a 4H close beyond the 20-candle high / low
+    var lvl = t === 1 ? I.high20 : I.low20, dBo = (lvl - price) * t;
+    out.push({ setup: 'breakout', ok: true, distPct: dBo / price, distAtr: dBo / I.atr, level: lvl,
+      text: dBo <= 0 ? 'beyond the 20-candle ' + (t === 1 ? 'high ' : 'low ') + px(lvl) + ' — needs the 4H close to stay there'
+                     : pc(t * dBo / price) + ' to the 20-candle ' + (t === 1 ? 'high ' : 'low ') + px(lvl) });
+    out.forEach(function (o) {
+      o.exp = s.hypo && s.hypo[o.setup] ? s.hypo[o.setup][dir] : null;
+      o.take = o.exp == null || o.exp >= minR;
+      o.score = o.ok ? Math.max(0, Math.min(1, 1 - Math.max(0, o.distAtr) / 3)) : 0;
+    });
+    out.sort(function (a, b) { return b.score - a.score; });
+    return { dir: dir, best: out[0], all: out, pct: out[0].score * 100 };
+  }
+
+  function indicatorRows(s, price) {
+    var I = s.ind; if (!I) return '';
+    var stack = I.ema20 > I.ema50 && I.ema50 > I.ema200 ? 1 : I.ema20 < I.ema50 && I.ema50 < I.ema200 ? -1 : 0;
+    var rows = [
+      ['sub', 'Trend · ATLAS'],
+      ['EMA 20/50/200', stack === 1 ? 'bullish stack' : stack === -1 ? 'bearish stack' : 'tangled', stack],
+      ['Price vs EMA200', pc(price / I.ema200 - 1), price > I.ema200 ? 1 : -1],
+      ['Supertrend 10/3', (I.supertrend === 1 ? 'long' : 'short') + ' · ' + px(I.supertrendLine), I.supertrend],
+      ['ADX / DI 14', I.adx.toFixed(1) + (I.adx < 20 ? ' no trend' : I.adx > 40 ? ' strong' : ''), I.adx < 20 ? 0 : I.pdi > I.ndi ? 1 : -1],
+      ['sub', 'Momentum · ATLAS'],
+      ['RSI 14', I.rsi.toFixed(1), I.rsi > 55 ? 1 : I.rsi < 45 ? -1 : 0],
+      ['MACD hist', (I.macdHist >= 0 ? '+' : '−') + px(Math.abs(I.macdHist)), I.macdHist > 0 ? 1 : -1],
+      ['Stoch RSI K', I.stochK.toFixed(0) + (I.stochK > 80 ? ' overbought' : I.stochK < 20 ? ' oversold' : ''), I.stochK > 50 ? 1 : -1],
+      ['1-day / 1-week', pc(I.ret1d, 1) + ' / ' + pc(I.ret1w, 1), I.ret1w > 0 ? 1 : -1],
+      ['sub', 'Structure & flow · ATLAS'],
+      ['Bollinger 20/2', I.bbUpper ? ((price - I.bbLower) / (I.bbUpper - I.bbLower) * 100).toFixed(0) + '% of band' : '—', I.bbMid ? (price > I.bbMid ? 1 : -1) : 0],
+      ['OBV (10)', I.obvUp ? 'accumulating' : 'distributing', I.obvUp ? 1 : -1],
+      ['ATR 14 × 4H', px(I.atr) + ' · ' + (I.atr / price * 100).toFixed(2) + '%', 0],
+      ['sub', 'Cycle · BTC-Halving'],
+      ['200-week average', I.wma200w ? px(I.wma200w) + ' · ' + pc(price / I.wma200w - 1, 0) : '—', I.wma200w ? (price > I.wma200w ? 1 : -1) : 0],
+      ['Halving cycle', 'day ' + I.cycleDays + ' of ~1458', 0],
+    ];
+    if (s.hypo) {
+      rows.push(['sub', 'Learner expects (now)']);
+      rows.push(['Pullback long / short', rr(s.hypo.pullback.long) + ' / ' + rr(s.hypo.pullback.short), 0]);
+      rows.push(['Breakout long / short', rr(s.hypo.breakout.long) + ' / ' + rr(s.hypo.breakout.short), 0]);
+    }
+    return '<div class="lt-ind">' + rows.map(function (r) {
+      return r[0] === 'sub' ? '<div class="lt-sub">' + esc(r[1]) + '</div>' : '<span>' + esc(r[0]) + '</span><b>' + esc(r[1]) + '</b>' + vote(r[2]);
+    }).join('') + '</div>';
+  }
+
+  function liveTileHtml(coin) {
+    var c = S.byCoin[coin] || {}, s = c.signal, p = c.position, l = S.liveBy[coin];
+    var price = l && l.px ? l.px : s ? s.close : null;
+    var head = '<div class="lt-head"><span class="lt-coin">' + esc(coin) + '</span>' +
+      (s ? (s.trend === 1 ? '<span class="pill long">UPTREND</span>' : s.trend === -1 ? '<span class="pill short">DOWNTREND</span>' : '<span class="pill flat">NO TREND</span>') : '') +
+      '<span class="lt-px">' + (price ? esc(px(price)) : '—') + '</span>' +
+      (l ? '<span class="lt-chg ' + cls(l.chg) + '">' + esc(pct(l.chg)) + ' 24h</span>' : '') + '</div>';
+    if (!s) return '<section class="card">' + head + '<div class="empty">Waiting for the first run.</div></section>';
+    var body = '';
+    if (p) {
+      // Live P&L: the bar runs from the stop (left) through the entry (middle) to +3 R (right).
+      var pnl = price ? (price - p.entry) * p.bias * p.qty : livePnl(p, coin), risk = p.riskAmt || Math.abs(p.entry - p.initialStop) * p.qty;
+      var R = risk ? pnl / risk : 0, stopR = risk ? (p.stop - p.entry) * p.bias * p.qty / risk : -1;
+      var lo = Math.min(-1, stopR, R), hi = Math.max(3, R + 0.5), X = function (v) { return (v - lo) / (hi - lo) * 100; };
+      var a = X(Math.min(0, R)), b = X(Math.max(0, R));
+      body = '<div class="lt-head" style="margin-bottom:0"><span class="pill ' + (p.bias === 1 ? 'long' : 'short') + '">' + (p.bias === 1 ? 'LONG' : 'SHORT') + '</span>' +
+        '<span class="lt-big ' + cls(pnl) + '">' + esc(signed(pnl)) + '</span><span class="lt-chg ' + cls(pnl) + '">' + esc(pc((price / p.entry - 1) * p.bias)) + ' · ' + esc(rr(R)) + '</span></div>' +
+        '<div class="lt-bar"><i style="left:' + a + '%;width:' + Math.max(0.5, b - a) + '%;background:' + (R >= 0 ? 'var(--up)' : 'var(--dn)') + '"></i>' +
+        '<b style="left:' + X(0) + '%"></b><b style="left:' + X(stopR) + '%;background:var(--dn)"></b></div>' +
+        '<div class="lt-scale"><span>stop ' + esc(px(p.stop)) + ' (' + esc(rr(stopR)) + ')</span><span>entry ' + esc(px(p.entry)) + '</span><span>' + esc(rr(hi)) + '</span></div>' +
+        '<div class="lt-status dim">' + esc(p.qty) + ' ' + esc(coin) + ' · $' + Math.round(p.notional || p.qty * p.entry).toLocaleString('en-US') + ' · margin $' + Math.round(p.margin || 0) +
+        ' · risk $' + Math.round(risk) + (p.trailed ? ' · stop trailed' : '') + (p.setup ? ' · ' + esc(p.setup) + ' setup' : '') + '</div>';
+    } else {
+      var r = readiness(s, price);
+      if (r && r.best) {
+        var o = r.best, col = !o.ok ? 'var(--faint)' : o.take ? (r.dir === 'long' ? 'var(--up)' : 'var(--dn)') : 'var(--nt)';
+        body = '<div class="lt-head" style="margin-bottom:0"><span class="lt-big">' + Math.round(r.pct) + '%</span><span class="dim" style="font-size:12px">ready for a ' + esc(r.dir) + ' ' + esc(o.setup) + '</span></div>' +
+          '<div class="lt-bar"><i style="left:0;width:' + Math.max(1, r.pct) + '%;background:' + col + '"></i></div>' +
+          '<div class="lt-scale"><span>3 ATR away</span><span>at the level</span></div>' +
+          '<div class="lt-status">' + r.all.map(function (x) {
+            return '<div><b>' + esc(x.setup) + '</b>: ' + esc(x.text) + (x.exp != null ? ' · learner ' + '<span class="' + (x.take ? 'up' : 'nt') + '">' + esc(rr(x.exp)) + (x.take ? ' → would take' : ' → would skip') + '</span>' : '') + '</div>';
+          }).join('') + '</div>';
+      } else {
+        body = '<div class="lt-head" style="margin-bottom:0"><span class="lt-big">0%</span></div><div class="lt-bar"><i style="left:0;width:1%;background:var(--faint)"></i></div>' +
+          '<div class="lt-status dim">' + esc(r ? r.text : 'Indicators appear after the next run.') + '</div>';
+      }
+    }
+    return '<section class="card">' + head + body + indicatorRows(s, price) +
+      '<div class="note">Indicators from the 4H close of ' + esc(when(s.closeT)) + '; price live (OKX). Entries are decided at the next 4H close.</div></section>';
+  }
+  function renderLiveTiles() {
+    var coins = coinList().slice().sort(function (a, b) { return a === 'BTC' ? -1 : b === 'BTC' ? 1 : a < b ? -1 : 1; });
+    $('liveTiles').innerHTML = coins.map(liveTileHtml).join('');
   }
 
   function renderSignal() {
@@ -682,7 +812,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     var ex = S.account && EXCHANGE_NAME[S.account.exchange];
     $('subtitle').textContent = (ex ? ex + ' ' : '') + 'demo · ' + coinList().join(' + ') + ' futures · learning bot';
     $('chartTitle').textContent = S.coin;
-    renderTabs(); renderTiles(); renderPosition(); renderSignal(); renderPriceChart(); renderEquity(); renderTrades(); renderSettings(); renderLearn(); renderLive();
+    renderTabs(); renderTiles(); renderPosition(); renderSignal(); renderPriceChart(); renderEquity(); renderTrades(); renderSettings(); renderLearn(); renderLive(); renderLiveTiles();
   }
 
   function select(coin) {
@@ -722,9 +852,10 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     coins.forEach(function (c, i) { if (r[i]) S.liveBy[c] = r[i]; });
     S.live = S.liveBy[S.coin] || null;
     if (S.live) { renderLive(); renderTiles(); renderPosition(); renderSignal(); }
+    renderLiveTiles();
   }
 
-  refreshState(); refreshLive();
+  refreshState().then(refreshLive);
   setInterval(refreshState, 60000);
   setInterval(refreshLive, 10000);
   var rt; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { renderPriceChart(); renderEquity(); }, 150); });

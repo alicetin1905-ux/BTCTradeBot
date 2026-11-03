@@ -129,6 +129,10 @@ function series(data, coin, cfg = {}, { from = 500 } = {}) {
         if (expR == null || expR >= o.minR) { e.setup = s; e.setupSide = side; e.expR = expR; e.enter = side; break; }
       }
       e.features = Object.fromEntries(FEATURES.map((n, k) => [n, +f.X[i][KEEP[k]].toFixed(3)]));
+      // For the dashboard: the raw indicators, and what the learner would expect from each setup if it formed now.
+      e.ind = f.raw(i);
+      if (model) e.hypo = Object.fromEntries(SETUPS.map(s => [s, { long: +M.predict(model, vec(f, i, 1, s, coin)).toFixed(3), short: +M.predict(model, vec(f, i, -1, s, coin)).toFixed(3) }]));
+      e.minR = o.minR;
     }
     out.push(e);
   }

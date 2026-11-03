@@ -31,7 +31,7 @@ function adx(c, p = 14) {
   return { adx: ad.map(x => x || 0), pdi, ndi };
 }
 function supertrend(c, p = 10, m = 3) {
-  const a = atr(c, p), dir = new Array(c.length).fill(1);
+  const a = atr(c, p), dir = new Array(c.length).fill(1), line = new Array(c.length).fill(null);
   let up = 0, dn = 0;
   for (let i = 0; i < c.length; i++) {
     const hl = (c[i].h + c[i].l) / 2, A = a[i] || (c[i].h - c[i].l);
@@ -42,7 +42,9 @@ function supertrend(c, p = 10, m = 3) {
       dir[i] = dir[i - 1] === 1 ? (c[i].c < dn ? -1 : 1) : (c[i].c > up ? 1 : -1);
     }
     up = bu; dn = bl;
+    line[i] = dir[i] === 1 ? bl : bu; // the level that flips it
   }
+  dir.line = line;
   return dir;
 }
 const clip = (x, a = 3) => Math.max(-a, Math.min(a, x));
@@ -83,11 +85,11 @@ function build(candles, funding = [], daily = []) {
     return v > 0 ? clip((rec / rn - mu) / Math.sqrt(v)) : 0;
   });
   // 200-week MA from daily closes (weekly sampled = 1400 daily closes)
-  let di = 0; const wma = new Array(n).fill(0);
+  let di = 0; const wma = new Array(n).fill(0), wmaPx = new Array(n).fill(null);
   const dc = daily.map(d => d.c), dsum = [0]; for (const x of dc) dsum.push(dsum.at(-1) + x);
   for (let i = 0; i < n; i++) {
     const T = candles[i].t + 144e5; while (di < daily.length && daily[di].t + 864e5 <= T) di++;
-    if (di >= 1400) { const ma = (dsum[di] - dsum[di - 1400]) / 1400; wma[i] = clip(Math.log(close[i] / ma), 2); }
+    if (di >= 1400) { const ma = (dsum[di] - dsum[di - 1400]) / 1400; wma[i] = clip(Math.log(close[i] / ma), 2); wmaPx[i] = ma; }
     else if (di >= 200) { const ma = (dsum[di] - dsum[di - 200]) / 200; wma[i] = clip(Math.log(close[i] / ma) * 1.5, 2); }
   }
   const X = new Array(n).fill(null);
@@ -114,7 +116,22 @@ function build(candles, funding = [], daily = []) {
       Math.sin(ph), Math.cos(ph),
     ];
   }
-  return { X, atr: A, close, e20, e50, e200 };
+  // Raw indicator values at candle i, for the dashboard (the model uses X).
+  const raw = (i) => {
+    let hi = -Infinity, lo = Infinity;
+    for (let j = Math.max(0, i - 19); j <= i; j++) { hi = Math.max(hi, candles[j].h); lo = Math.min(lo, candles[j].l); }
+    return {
+      ema20: e20[i], ema50: e50[i], ema200: e200[i], atr: A[i],
+      supertrend: st[i], supertrendLine: st.line[i],
+      adx: dm.adx[i], pdi: dm.pdi[i], ndi: dm.ndi[i],
+      rsi: r[i], macdHist: ml[i] - msig[i], stochK: (srk[i] ?? 0.5) * 100,
+      obvUp: obv[i] > obv[i - 10], bbMid: b20[i], bbUpper: sd[i] ? b20[i] + 2 * sd[i] : null, bbLower: sd[i] ? b20[i] - 2 * sd[i] : null,
+      ret1d: close[i] / close[i - 6] - 1, ret1w: close[i] / close[i - 42] - 1,
+      wma200w: wmaPx[i], cycleDays: Math.round(cyclePhase(candles[i].t) * 1458),
+      high20: hi, low20: lo, prevClose: close[i - 1], prevEma50: e50[i - 1],
+    };
+  };
+  return { X, atr: A, close, e20, e50, e200, raw };
 }
 
 module.exports = { build, NAMES, ema, atr, rsi, cyclePhase };

@@ -66,6 +66,10 @@ test('learner: the last candle enters only when the expected R reaches MIN_R; th
   if (a.setup) assert.strictEqual(a.enter, a.setupSide, 'MIN_R -100 takes any setup');
   assert.ok(lo.model.trainedOn > 40);
   assert.ok('cycle_cos' in lo.model.weights && !('funding_z' in lo.model.weights));
+  // the dashboard's live tiles: raw indicators and the learner's view of each setup on the last candle
+  for (const k of ['ema20', 'ema50', 'ema200', 'rsi', 'adx', 'supertrend', 'high20', 'low20', 'cycleDays']) assert.ok(a.ind && Number.isFinite(+a.ind[k]), k);
+  assert.ok(a.ind.high20 >= a.ind.low20);
+  for (const s of ['pullback', 'breakout']) assert.ok(Number.isFinite(a.hypo[s].long) && Number.isFinite(a.hypo[s].short));
   // only the last candle can enter
   assert.ok(lo.series.slice(0, -1).every(s => !s || s.enter === 0));
 });
