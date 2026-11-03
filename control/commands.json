@@ -35,5 +35,9 @@
   {
     "id": "2026-10-22-restop-index",
     "action": "restop"
+  },
+  {
+    "id": "2026-11-03-close-all",
+    "action": "close-all"
   }
 ]
