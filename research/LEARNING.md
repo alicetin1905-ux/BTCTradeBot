@@ -114,6 +114,38 @@ The other choices stayed as they were. Each of the alternatives below did worse 
 
 Even this choice was made on the same data. A profit factor around 1.5 - 1.6 live would already be in line with it.
 
+## 5. More coins? No (2026-11-03)
+
+These contracts on the OKX EEA demo trade at a price that matches the real market: DOGE, HYPE, ETC, AVAX, BCH, FIL.
+Broken in demo (bid/ask 3 - 55% off the real price, or empty): XRP, NEAR, UNI, ONDO, LINK, DOT, SUI, ARB, SOL.
+
+HYPE has only 6 weeks of Binance spot history, so it couldn't be tested. All tests below use 1% risk, stop 2, trail 5.
+
+| Coins | Max open | 2021-23 PF | 2024-26 PF | 2024-26 $2,000 → | Worst drop | 2021-26 $2,000 → |
+|---|---|---|---|---|---|---|
+| **BTC, ETH (live)** | 2 | 1.65 | **1.77** | **$4,266** | **16%** | $9,766 |
+| + AVAX | 2 | 1.96 | 1.50 | $4,071 | 24% | $18,088 |
+| + AVAX | 3 | 1.80 | 1.47 | $4,284 | 31% | $19,810 |
+| + DOGE | 3 | 1.54 | 1.47 | $4,501 | 22% | $16,574 |
+| + AVAX, DOGE | 4 | 1.64 | 1.35 | $4,523 | 30% | $34,395 |
+| + AVAX, DOGE, ETC, FIL | 4 | 1.81 | 1.20 | $3,646 | 32% | $85,778 |
+
+**Result:**
+- The altcoins made a lot in 2021-23, the altcoin years.
+- Since 2024 they add trades but no profit: the profit factor falls and the drops get deeper.
+- 2025-26 alone shows the same: BTC + ETH PF 1.72, with all six coins PF 1.10.
+
+**Learning from the altcoins but trading only BTC and ETH** also made it worse:
+
+| Learns from | 2024-26 PF | 2021-26 PF |
+|---|---|---|
+| BTC, ETH | 1.77 | 1.73 |
+| + AVAX | 1.67 | 1.65 |
+| + AVAX, DOGE | 1.58 | 1.61 |
+| + all six | 1.40 | 1.49 |
+
+So the bot stays on BTC and ETH. Commands: `node research/walkforward.js COINS=BTC,ETH,AVAX MAX_OPEN=3 [TRADE=BTC,ETH]`.
+
 ## Honest limits
 
 - **Winners and losers:** about 70% of trades lose, and the winners pay for them. Runs of 8-10 losses happen.

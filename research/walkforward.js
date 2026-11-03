@@ -15,7 +15,9 @@ const UNTIL = Date.UTC(arg('UNTIL', 2100), 0, 1);
 (async () => {
   const o = L.defaults({ ...config.LEARN, STOP_ATR: arg('STOP', config.STOP_ATR), TRAIL_ATR: arg('TRAIL', config.TRAIL_ATR), MIN_R: arg('MINR', config.LEARN.MIN_R),
     BREAKOUT_N: arg('BN', config.LEARN.BREAKOUT_N), HALF_LIFE_BARS: arg('HL', config.LEARN.HALF_LIFE_BARS), LAMBDA: arg('L', config.LEARN.LAMBDA) });
-  const data = await H.loadAll(config.COINS);
+  const COINS = (process.argv.find(x => x.startsWith('COINS=')) || '').slice(6).split(',').filter(Boolean);
+  const TRADE = (process.argv.find(x => x.startsWith('TRADE=')) || '').slice(6).split(',').filter(Boolean); // learn from all COINS, trade only these
+  const data = await H.loadAll(COINS.length ? COINS : config.COINS);
   const { byCoin, all } = L.candidates(data, o);
   all.sort((a, b) => a.t0 - b.t0);
   let eq = config.PORTFOLIO.STARTING_BALANCE, peak = eq, mdd = 0, model = null, nTrained = -1;
@@ -23,6 +25,7 @@ const UNTIL = Date.UTC(arg('UNTIL', 2100), 0, 1);
   const settle = (t) => { for (const k of Object.keys(busy)) if (busy[k].t1 <= t) { eq += busy[k].pnl; done.push(busy[k]); delete busy[k]; peak = Math.max(peak, eq); mdd = Math.max(mdd, 1 - eq / peak); } };
   for (const cd of all) {
     settle(cd.t0);
+    if (TRADE.length && !TRADE.includes(cd.coin)) continue;
     if (cd.t0 < FROM || cd.t0 >= UNTIL || busy[cd.coin] || Object.keys(busy).length >= MAX_OPEN) continue;
     const now = cd.t0 + 144e5;
     let expR = null;
@@ -40,5 +43,7 @@ const UNTIL = Date.UTC(arg('UNTIL', 2100), 0, 1);
   const years = {};
   for (const x of done) { const y = new Date(x.t1).getUTCFullYear(); const r = years[y] || (years[y] = { trades: 0, R: 0 }); r.trades++; r.R += x.R; }
   console.log(`learning ${LEARN ? 'on' : 'off'}, from ${new Date(FROM).toISOString().slice(0, 10)}, risk ${RISK * 100}%: ${done.length} trades, ${Math.round(wins.length / done.length * 100)}% winners, PF ${(gw / gl).toFixed(2)}, ${config.PORTFOLIO.STARTING_BALANCE} → ${Math.round(eq)}, worst drop ${Math.round(mdd * 100)}%`);
+  const byCoin2 = {}; for (const x of done) { const r = byCoin2[x.coin] || (byCoin2[x.coin] = { n: 0, R: 0 }); r.n++; r.R += x.R; }
+  console.log('  per coin: ' + Object.entries(byCoin2).map(([c, r]) => `${c} ${r.n} trades ${r.R >= 0 ? '+' : ''}${r.R.toFixed(1)} R`).join(' · '));
   for (const [y, r] of Object.entries(years)) console.log(`  ${y}: ${r.trades} trades, ${r.R >= 0 ? '+' : ''}${r.R.toFixed(1)} R`);
 })().catch(e => { console.error(e); process.exit(1); });
