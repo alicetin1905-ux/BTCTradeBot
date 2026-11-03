@@ -11,6 +11,7 @@ const arg = (k, d) => { const a = process.argv.find(x => x.startsWith(k + '='));
 const FROM = Date.UTC(arg('FROM', 2021), 0, 1), RISK = arg('RISK', config.PORTFOLIO.RISK_PCT / 100), LEARN = arg('LEARN', 1);
 const MAXX = arg('MAXX', config.PORTFOLIO.MAX_POSITION_X), MAX_OPEN = arg('MAX_OPEN', config.MAX_OPEN_POSITIONS || 2);
 const UNTIL = Date.UTC(arg('UNTIL', 2100), 0, 1);
+const SEPARATE = arg('SEPARATE', 0), MODELS = {}; // SEPARATE=1: a model per coin instead of one shared model
 
 (async () => {
   const o = L.defaults({ ...config.LEARN, STOP_ATR: arg('STOP', config.STOP_ATR), TRAIL_ATR: arg('TRAIL', config.TRAIL_ATR), MIN_R: arg('MINR', config.LEARN.MIN_R),
@@ -31,7 +32,13 @@ const UNTIL = Date.UTC(arg('UNTIL', 2100), 0, 1);
     let expR = null;
     if (LEARN) {
       const n = all.filter(q => !q.open && q.t1 <= now).length;
-      if (n !== nTrained) { model = L.train(all, now, o); nTrained = n; }
+      if (SEPARATE) {
+        // one model per coin, trained on that coin's setups only
+        const mine = all.filter(q => q.coin === cd.coin);
+        const k = cd.coin + mine.filter(q => !q.open && q.t1 <= now).length;
+        if (!MODELS[k]) MODELS[k] = L.train(mine, now, o);
+        model = MODELS[k];
+      } else if (n !== nTrained) { model = L.train(all, now, o); nTrained = n; }
       if (model) { expR = M.predict(model, cd.x); if (expR < o.minR) continue; }
     }
     const c = byCoin[cd.coin].c[cd.i], dist = o.stopAtr * byCoin[cd.coin].f.atr[cd.i];

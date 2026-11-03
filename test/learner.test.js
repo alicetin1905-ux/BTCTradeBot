@@ -120,3 +120,22 @@ test('history: tops up the cache from Binance, refuses a history that misses the
   fs.unlinkSync(file);
   H.setFetch((...a) => fetch(...a));
 });
+
+test('bot log: one scan line per 4H close, plus entries, stop moves, exits and errors; capped', () => {
+  const { logRun, LOG_MAX } = require('../src/botlog');
+  const st = { log: [], meta: {}, position: null };
+  const s = { t: 1000, close: 50, trend: -1, setup: 'pullback', setupSide: -1, expR: 0.3456, wait: null };
+  logRun(st, [{ type: 'enter', bias: -1, entry: 50, stop: 52, qty: 1, riskAmt: 2, setup: 'pullback', expR: 0.3456 }], 5, s);
+  assert.deepStrictEqual(st.log.map(e => e.kind), ['scan', 'enter']);
+  assert.strictEqual(st.log[0].decision, 'entered');
+  assert.strictEqual(st.log[1].expR, 0.346);
+  // the :32 run on the same candle adds no second scan line; a trailed stop and an exit are logged
+  logRun(st, [{ type: 'info', reason: 'stop trailed 52 → 51' }, { type: 'hold', reason: 'x' }], 6, s);
+  logRun(st, [{ type: 'exit', pnl: 1.5, price: 48.5, reason: 'trailing stop' }, { type: 'exit', pnl: 0, reason: 'P&L record pending' }], 7, null);
+  assert.deepStrictEqual(st.log.map(e => e.kind), ['scan', 'enter', 'trail', 'exit']);
+  // the next close: a skipped setup is logged with the reason
+  logRun(st, [], 8, { ...s, t: 2000, expR: -0.2, wait: 'skipped by the learner' });
+  assert.strictEqual(st.log[4].decision, 'skipped by the learner');
+  for (let i = 0; i < LOG_MAX + 50; i++) logRun(st, [{ type: 'error', reason: 'e' + i }], 9, null);
+  assert.strictEqual(st.log.length, LOG_MAX);
+});

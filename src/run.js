@@ -67,7 +67,7 @@ const dirOf = (coin) => (coin === 'BTC' ? ROOT : path.join(ROOT, coin.toLowerCas
 const DIR = dirOf(COIN);
 // One balance for all coins (account, daily summary); everything else is per coin.
 const SHARED = ['account', 'summary'];
-const OWN = ['position', 'trades', 'closing', 'signal', 'seenOrderIds', 'commandsDone', 'meta'];
+const OWN = ['position', 'trades', 'closing', 'signal', 'seenOrderIds', 'commandsDone', 'meta', 'log'];
 const FILES = [...SHARED, ...OWN];
 if (Object.keys(config.SETTINGS_APPLIED).length) console.log('settings.json:', JSON.stringify(config.SETTINGS_APPLIED));
 for (const e of config.SETTINGS_ERRORS) console.log('settings.json ignored —', e);
@@ -110,6 +110,7 @@ function loadState() {
     summary: readJson('summary', null),         // last daily summary { date, balance }
     commandsDone: readJson('commandsDone', []), // ids of control/commands.json entries already carried out
     meta: readJson('meta', {}),                 // { lastEntryCandle }
+    log: readJson('log', []),                   // this coin's bot log for the dashboard: every 4H decision, entry, stop move, exit
   };
 }
 function saveState(st, { fullRun = false } = {}) {
@@ -127,6 +128,8 @@ function saveState(st, { fullRun = false } = {}) {
   if (fullRun) st.account.lastRunAt = Date.now(); // the watchdog checks full runs, not syncs
   for (const k of FILES) writeJson(k, st[k]);
 }
+
+const { logRun } = require('./botlog');
 
 /* ---------------- one run ---------------- */
 
@@ -405,6 +408,7 @@ async function run() {
   const hour = Math.floor(now / 3600000);
   const status = LEAD && !daily && config.NOTIFY.HOURLY_STATUS && summary.statusDue(now) && st.meta.lastStatusHour !== hour;
   if (status) st.meta = { ...st.meta, lastStatusHour: hour };
+  logRun(st, events, now, st.signal);
   // What the learner learned (both coins share one model; the lead coin writes it).
   if (learnModel && LEAD) { fs.mkdirSync(ROOT, { recursive: true }); fs.writeFileSync(path.join(ROOT, 'model.json'), JSON.stringify({ ...learnModel, updatedAt: now }, null, 2) + '\n'); }
   saveState(st, { fullRun: true });
@@ -432,6 +436,7 @@ async function syncOnExchange() {
   const settingsChanged = JSON.stringify(require('./settings').current(config)) !== JSON.stringify(st.account.settings)
     || JSON.stringify(config.SETTINGS_ERRORS) !== JSON.stringify(st.account.settingsErrors || []);
   if (!ranCommand && !settingsChanged && snapshot() === before) { console.log(`[${MODE}] sync: no changes`); return; }
+  logRun(st, events, Date.now(), null);
   // A stop-out since the last full run changes what the dashboard says it's waiting for.
   if (st.signal) st.signal.wait = exchange.entryBlock(st, st.signal, Date.now(), { halt: /^(1|true|yes)$/i.test(process.env.TRADEBOT_HALT || '') });
   saveState(st);
