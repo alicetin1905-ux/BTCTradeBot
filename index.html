@@ -284,7 +284,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     $('tRun').textContent = last ? ago(last) : '—';
     var stale = last && Date.now() - last > 130 * 60000;
     $('tRun').className = 'v' + (stale ? ' dn' : '');
-    $('tRunS').textContent = stale ? 'the Mac may be off or asleep' : 'hourly at :02 · sync every 5 min';
+    $('tRunS').textContent = stale ? 'the Mac may be off or asleep' : 'full run at :02 and :32 · sync every 5 min';
   }
 
   function renderPosition() {
@@ -453,7 +453,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       (s ? (s.trend === 1 ? '<span class="pill long">UPTREND</span>' : s.trend === -1 ? '<span class="pill short">DOWNTREND</span>' : '<span class="pill flat">NO TREND</span>') : '') +
       '<span class="lt-px">' + (price ? esc(px(price)) : '—') + '</span>' +
       (l ? '<span class="lt-chg ' + cls(l.chg) + '">' + esc(pct(l.chg)) + ' 24h</span>' : '') + '</div>';
-    if (!s) return '<section class="card">' + head + '<div class="empty">Waiting for the first run.</div></section>';
+    if (!s) return '<section class="card">' + head + '<div class="empty">Indicators, the entry bar and the learner appear after the first full run (at :02 or :32, or start one on the Mac: bash scripts/btc-run.sh).</div></section>';
     var body = '';
     if (p) {
       // Live P&L: the bar runs from the stop (left) through the entry (middle) to +3 R (right).
