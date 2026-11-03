@@ -29,7 +29,7 @@ async function binance(symbol, interval, startT) {
 }
 
 async function okx(coin, interval, startT) {
-  const bar = interval === '4h' ? '4Hutc' : '1Dutc';
+  const bar = interval === '4h' ? '4H' : '1Dutc'; // OKX's 4H candles already start at 00/04/08… UTC
   const out = [];
   let after = '';
   for (let n = 0; n < 30; n++) {

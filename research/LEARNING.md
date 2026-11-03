@@ -146,6 +146,28 @@ HYPE has only 6 weeks of Binance spot history, so it couldn't be tested. All tes
 
 So the bot stays on BTC and ETH. Commands: `node research/walkforward.js COINS=BTC,ETH,AVAX MAX_OPEN=3 [TRADE=BTC,ETH]`.
 
+## 6. The ATLAS page's own score: no help (2026-11-03)
+
+`src/atlasPage.js` is the ATLAS page's `analyse()`, copied verbatim. On 4H candles with price and volume only, it
+gives the page's score at every setup's entry; funding, OI, order book and tape have no history.
+`node research/atlas_score.js` tests it walk-forward: same setups, exits and costs, 1% risk, BTC + ETH, max 2 open.
+
+| Variant | 2021-26 PF | 2021-23 PF | 2024-26 PF | 2021-26 $2,000 → |
+|---|---|---|---|---|
+| **Learner (live)** | **1.73** | 1.65 | **1.77** | **$9,766** |
+| Learner + ATLAS score as an extra input | 1.73 | 1.64 | 1.77 | $9,676 |
+| Learner, only when ATLAS agrees (≥ 0) | 1.70 | 1.68 | 1.71 | $9,579 |
+| Learner, only when ATLAS ≥ +25 our way | 1.63 | 1.67 | 1.59 | $8,380 |
+| No learner: setups when ATLAS ≥ +25 | 1.40 | 1.60 | 1.29 | $6,531 |
+| No learner, no filter | 1.45 | 1.61 | 1.36 | $7,497 |
+
+**Result:**
+- The learner already sees the ATLAS indicators one by one, so their sum adds nothing.
+- Using the score as a gate throws away good trades.
+- In place of the learner it is worse than no filter at all.
+
+The dashboard shows the page's live 4H score for information only.
+
 ## Honest limits
 
 - **Winners and losers:** about 70% of trades lose, and the winners pay for them. Runs of 8-10 losses happen.
