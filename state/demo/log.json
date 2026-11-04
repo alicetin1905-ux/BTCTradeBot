@@ -42,5 +42,16 @@
     "risk": 21.094459999999998,
     "setup": "pullback",
     "expR": 0.201
+  },
+  {
+    "at": 1793750524329,
+    "kind": "scan",
+    "candleT": 1793736000000,
+    "close": 77453.86,
+    "trend": -1,
+    "setup": "pullback",
+    "side": -1,
+    "expR": 0.188,
+    "decision": "a position is open"
   }
 ]
