@@ -86,5 +86,12 @@
     "side": 0,
     "expR": null,
     "decision": "a position is open"
+  },
+  {
+    "at": 1793803502232,
+    "kind": "exit",
+    "pnl": -22.50341889,
+    "price": 79088.1,
+    "reason": "stop"
   }
 ]

@@ -76,7 +76,7 @@
   "closeT": 1793793600000,
   "source": "binance",
   "at": 1793802722769,
-  "wait": "a position is open",
+  "wait": "no pullback or breakout setup on the last 4H close",
   "strategy": "learning",
   "chart": [
     [
