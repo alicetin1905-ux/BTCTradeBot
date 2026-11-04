@@ -130,6 +130,8 @@ function saveState(st, { fullRun = false } = {}) {
 }
 
 const { logRun } = require('./botlog');
+// model.json (+ the weights' history and the self-check alerts), written by the lead coin
+const writeModel = (m, now) => require('./modelfile').write(path.join(ROOT, 'model.json'), m, now);
 
 /* ---------------- one run ---------------- */
 
@@ -353,7 +355,8 @@ const sigParams = () => ({ channelN: config.CHANNEL_N, exitN: config.EXIT_N, atr
 async function buildSignal(candles, now) {
   if (config.STRATEGY === 'trend-pullback') return require('./pullback').series(candles);
   if (config.STRATEGY === 'learning') {
-    const r = require('./learner').series(learnData, COIN, { ...config.LEARN, STOP_ATR: config.STOP_ATR, TRAIL_ATR: config.TRAIL_ATR });
+    // the lead coin (it writes model.json) also runs the learner's self-check
+    const r = require('./learner').series(learnData, COIN, { ...config.LEARN, STOP_ATR: config.STOP_ATR, TRAIL_ATR: config.TRAIL_ATR }, { check: LEAD });
     learnModel = r.model;
     return r.series;
   }
@@ -410,13 +413,14 @@ async function run() {
   if (status) st.meta = { ...st.meta, lastStatusHour: hour };
   logRun(st, events, now, st.signal);
   // What the learner learned (both coins share one model; the lead coin writes it).
-  if (learnModel && LEAD) { fs.mkdirSync(ROOT, { recursive: true }); fs.writeFileSync(path.join(ROOT, 'model.json'), JSON.stringify({ ...learnModel, updatedAt: now }, null, 2) + '\n'); }
+  const learnPush = learnModel && LEAD ? writeModel(learnModel, now) : [];
   saveState(st, { fullRun: true });
   printSummary(events, st);
   await notify.send(events, st);
   if (daily) await notify.push([daily]);
   else if (status) await notify.push([summary.status(st)]);
   if (weekly) await notify.push([weekly]);
+  if (learnPush.length) await notify.push(learnPush);
 }
 
 // Quick reconcile between hourly runs: books fills and notices a stop-out.

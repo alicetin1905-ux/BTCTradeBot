@@ -102,9 +102,39 @@ function train(all, now, o) {
   return { ...model, n: done.length };
 }
 
+// Self-check: did the learner's choices hold up on the last N setups that finished? Each one is judged out-of-sample,
+// with the model as it was when that setup formed (trained only on what had finished before it), exactly as the live
+// bot would have. Compared: the average result of the setups it would take vs the ones it would skip.
+//   status 'ok'     the taken ones did at least as well as the skipped ones
+//          'watch'  they did worse
+//          'alert'  clearly worse (by 0.2 R or more) AND losing on average (-0.3 R or worse)
+// Over 150 setups (~2.5 months) the walk-forward history 2020-26 was 'alert' 7% of the time, mostly in weak spells
+// such as 2022; shorter windows are mostly noise (most setups lose a little, a few win big).
+const SELF_N = 150;
+function selfCheck(all, now, o, n = SELF_N) {
+  const finished = all.filter(q => !q.open && q.t1 <= now).sort((a, b) => a.t1 - b.t1).slice(-n);
+  if (finished.length < n) return null;
+  const cache = new Map();
+  for (const q of finished) {
+    const at = q.t0 + TF;
+    if (!cache.has(at)) cache.set(at, train(all, at, o));
+    const m = cache.get(at);
+    q._pred = m ? M.predict(m, q.x) : null;
+  }
+  const taken = finished.filter(q => q._pred != null && q._pred >= o.minR), skipped = finished.filter(q => q._pred != null && q._pred < o.minR);
+  const avg = a => (a.length ? a.reduce((s, q) => s + q.R, 0) / a.length : 0);
+  const ta = avg(taken), sa = avg(skipped), gap = ta - sa;
+  const status = gap < -0.2 && ta < -0.3 ? 'alert' : gap < 0 ? 'watch' : 'ok';
+  return {
+    n: finished.length, from: finished[0].t1, to: finished[finished.length - 1].t1, status,
+    taken: taken.length, takenAvgR: +ta.toFixed(3), skipped: skipped.length, skippedAvgR: +sa.toFixed(3), gap: +gap.toFixed(3),
+    takenWon: taken.filter(q => q.R > 0).length,
+  };
+}
+
 // The signal series for one coin (same shape as src/pullback.js, so src/exchange.js runs unchanged) plus what the
 // model learned. Only the last candle can enter; trailing uses close/atr of the candles after the entry.
-function series(data, coin, cfg = {}, { from = 500 } = {}) {
+function series(data, coin, cfg = {}, { from = 500, check = false } = {}) {
   const o = defaults(cfg);
   const { byCoin, all } = candidates(data, o);
   const me = byCoin[coin];
@@ -147,8 +177,9 @@ function series(data, coin, cfg = {}, { from = 500 } = {}) {
       const avg = a => (a.length ? +(a.reduce((s, q) => s + q.R, 0) / a.length).toFixed(2) : null);
       return { candidates: recent.length, wouldTake: pick.length, avgRTaken: avg(pick), avgRSkipped: avg(rest) };
     })(),
+    selfCheck: check ? selfCheck(all, now, o) : undefined,
   };
   return { series: out, model: summary };
 }
 
-module.exports = { series, candidates, train, setupAt, follow, FEATURES, SETUPS, defaults };
+module.exports = { series, candidates, train, selfCheck, setupAt, follow, FEATURES, SETUPS, defaults, SELF_N };

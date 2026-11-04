@@ -189,6 +189,18 @@ dl.kv dd{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-n
 @keyframes livepulse{0%,100%{opacity:1}50%{opacity:.25}}
 @media (prefers-reduced-motion: reduce){.live-tag i{animation:none}}
 @media(max-width:859px){.pairs .livepnl b{font-size:17px}.pairs .livepnl span{font-size:10px}.pairs .livepnl{gap:5px}}
+.led.lr{background:var(--blue);box-shadow:0 0 10px var(--blue),0 0 2px var(--blue)}
+.card.hit-lr{box-shadow:0 0 0 1px rgba(77,159,255,.6),0 0 22px rgba(77,159,255,.2)}
+.learnline{font-size:11px;color:var(--dim);margin-top:4px;display:flex;gap:6px;align-items:center;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.learnline b{color:var(--blue);font-weight:600}
+.chk{border-radius:10px;padding:9px 11px;margin:2px 0 12px;font-size:12.5px;line-height:1.5;border:1px solid var(--line2)}
+.chk.ok{border-color:rgba(53,255,176,.35);background:rgba(53,255,176,.05)}
+.chk.watch{border-color:rgba(255,200,87,.4);background:rgba(255,200,87,.06)}
+.chk.alert{border-color:rgba(255,77,106,.5);background:rgba(255,77,106,.08)}
+.chk b{font-family:var(--mono)}
+.wchart{height:150px;margin:6px 0 4px}
+.wchart svg{display:block;width:100%;height:100%;overflow:visible}
+@media(max-width:859px){.pairs .learnline{font-size:9.5px}}
 .meter{height:6px;background:var(--line);border-radius:3px;overflow:hidden;margin:4px 0 2px}
 .meter i{display:block;height:100%;background:var(--nt);border-radius:3px}
 .scorebar{position:relative;height:10px;margin:12px 0 2px;border-radius:5px;background:linear-gradient(90deg,rgba(255,77,106,.35),var(--line) 50%,rgba(53,255,176,.35))}
@@ -481,19 +493,50 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     cycle_sin: ['Halving cycle (sin)', 'Halving'], cycle_cos: ['Halving cycle (cos)', 'Halving'],
     setup_pullback: ['Setup: pullback', 'Setup'], setup_breakout: ['Setup: breakout', 'Setup'], coin_btc: ['Coin: BTC', 'Setup'], side_long: ['Direction: long', 'Setup'],
   };
+  // "learned" line for the bot tiles: after each 4H close the learner retrains on the setups that finished since.
+  function learnLineHtml() {
+    var m = S.model; if (!m || !m.trainedOn) return '';
+    var n = m.newSetups, chk = m.selfCheck;
+    var dot = chk ? (chk.status === 'alert' ? '<span class="dn">●</span>' : chk.status === 'watch' ? '<span class="nt">●</span>' : '<span class="up">●</span>') : '';
+    return '<div class="learnline"><b>◆ learned</b><span>' + (n != null ? '+' + n + ' setups' : m.trainedOn.toLocaleString('en-US') + ' setups') + (m.learnedAt ? ' · ' + esc(when(m.learnedAt).split(' ').pop()) : '') + '</span>' + (dot ? '<span>· check ' + dot + '</span>' : '') + '</div>';
+  }
+  // the self-check box and the weights' history for the bot page
+  function selfCheckHtml(c) {
+    if (!c) return '<div class="chk">Self-check: waiting for 150 finished setups.</div>';
+    var word = c.status === 'alert' ? 'Attention' : c.status === 'watch' ? 'Watch' : 'OK';
+    var r = function (x) { return (x >= 0 ? '+' : '−') + Math.abs(x).toFixed(2) + ' R'; };
+    return '<div class="chk ' + c.status + '"><b>Self-check: ' + word + '</b> — the last ' + c.n + ' finished setups (' + esc(when(c.from).split(' ').slice(0, 2).join(' ')) + ' → ' + esc(when(c.to).split(' ').slice(0, 2).join(' ')) + '), each judged with the model as it was at the time:<br>' +
+      'the learner would take <b>' + c.taken + '</b> (avg <b class="' + cls(c.takenAvgR) + '">' + r(c.takenAvgR) + '</b>, ' + c.takenWon + ' won) and skip <b>' + c.skipped + '</b> (avg <b class="' + cls(c.skippedAvgR) + '">' + r(c.skippedAvgR) + '</b>).<br>' +
+      '<span class="faint">OK = its picks did at least as well as what it skipped · Watch = worse · Attention = clearly worse and losing (in the 2020-26 test 7% of the time). It changes nothing by itself — you decide.</span></div>';
+  }
+  function weightChartHtml(m) {
+    var h = (m.history || []).filter(function (x) { return x.w; });
+    if (h.length < 2) return '<div class="note">The weights\' history fills with every 4H close (' + h.length + ' so far).</div>';
+    var last = h[h.length - 1].w, keys = Object.keys(last).sort(function (a, b) { return Math.abs(last[b]) - Math.abs(last[a]); }).slice(0, 6);
+    var cols = ['#f7931a', '#4d9fff', '#b98bff', '#35ffb0', '#ffc857', '#ff4d6a'];
+    var lo = Infinity, hi = -Infinity; h.forEach(function (x) { keys.forEach(function (k) { lo = Math.min(lo, x.w[k]); hi = Math.max(hi, x.w[k]); }); });
+    var pad = (hi - lo) * 0.1 || 0.01; lo -= pad; hi += pad;
+    var W = 600, H = 150, X = function (i) { return i / (h.length - 1) * W; }, Y = function (v) { return (hi - v) / (hi - lo) * H; };
+    var svg = '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none"><line x1="0" x2="' + W + '" y1="' + Y(0) + '" y2="' + Y(0) + '" stroke="var(--line2)" stroke-dasharray="3 4"/>' +
+      keys.map(function (k, j) { return '<path d="' + h.map(function (x, i) { return (i ? 'L' : 'M') + X(i).toFixed(1) + ' ' + Y(x.w[k]).toFixed(1); }).join('') + '" fill="none" stroke="' + cols[j] + '" stroke-width="1.6" vector-effect="non-scaling-stroke"/>'; }).join('') + '</svg>';
+    return '<div class="note" style="margin-top:6px">How the 6 biggest weights moved over the last ' + h.length + ' 4H closes (' + esc(when(h[0].at).split(' ').slice(0, 2).join(' ')) + ' → now):</div><div class="wchart">' + svg + '</div>' +
+      '<div class="legend">' + keys.map(function (k, j) { return '<span><i style="background:' + cols[j] + '"></i>' + esc((FEATURE[k] || [k])[0]) + '</span>'; }).join('') + '</div>';
+  }
   function renderLearn() {
     var m = S.model, el = $('learn');
     if (!m || !m.weights) { el.innerHTML = '<div class="empty">Shown after the first run.</div>'; return; }
     $('learnTag').textContent = 'trained on ' + m.trainedOn.toLocaleString('en-US') + ' finished setups · ' + ago(m.updatedAt || m.at);
     var w = Object.keys(m.weights).map(function (k) { return [k, m.weights[k]]; }).sort(function (a, b) { return Math.abs(b[1]) - Math.abs(a[1]); });
     var max = Math.max.apply(null, w.map(function (x) { return Math.abs(x[1]); })) || 1;
-    var html = '<div class="note" style="margin-top:0">How much each input pushes the expected result of a trade <b>in its own direction</b> (green = helps, red = hurts), largest first:</div><dl class="kv">' +
+    var html = selfCheckHtml(m.selfCheck) + (m.newSetups != null ? '<div class="note" style="margin:0 0 8px">Last 4H close (' + esc(when(m.learnedAt)) + '): retrained on <b>' + m.trainedOn.toLocaleString('en-US') + '</b> finished setups, <b>' + m.newSetups + '</b> new.</div>' : '') +
+      '<div class="note" style="margin-top:0">How much each input pushes the expected result of a trade <b>in its own direction</b> (green = helps, red = hurts), largest first:</div><dl class="kv">' +
       w.slice(0, 10).map(function (x) {
         var f = FEATURE[x[0]] || [x[0], ''];
         return '<dt>' + esc(f[0]) + ' <span class="faint">' + esc(f[1]) + '</span></dt><dd><span class="' + cls(x[1]) + '">' + (x[1] >= 0 ? '+' : '−') + Math.abs(x[1]).toFixed(3) + '</span> ' +
           '<span style="display:inline-block;height:6px;border-radius:3px;vertical-align:middle;background:' + (x[1] >= 0 ? 'var(--up)' : 'var(--dn)') + ';width:' + Math.round(Math.abs(x[1]) / max * 80) + 'px"></span></dd>';
       }).join('') + '</dl>';
     var y = m.lastYear;
+    html += weightChartHtml(m);
     if (y && y.candidates) html += '<div class="note">Last 12 months: ' + y.candidates + ' setups; the current model would take ' + y.wouldTake + ' (avg ' + (y.avgRTaken >= 0 ? '+' : '') + y.avgRTaken + ' R) and skip the rest (avg ' + (y.avgRSkipped >= 0 ? '+' : '') + y.avgRSkipped + ' R). In-sample — the honest test is research/LEARNING.md.</div>';
     el.innerHTML = html;
   }
@@ -656,6 +699,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
           '<span class="' + cls(u) + '">' + (pc >= 0 ? '+' : '−') + Math.abs(pc).toFixed(2) + '% · ' + (R >= 0 ? '+' : '−') + Math.abs(R).toFixed(2) + ' R</span></div>' +
           '<div class="lt-status dim" style="margin:0">entry ' + esc(px(p.entry)) + ' · now ' + esc(px(price || p.markPrice)) + ' · stop ' + esc(px(p.stop)) + (p.trailed ? ' (trailed)' : '') + '</div>';
       })() : '<div class="lt-status dim" style="margin:0">realized · ' + (trades.length ? trades.length + ' trades, ' + w + ' won' : 'no trades yet') + '</div>') +
+      learnLineHtml() +
       '<div class="bchart" data-coin="' + c + '" data-n="96"></div>' +
       logListHtml(d.log, c, 3) + '<div class="more" style="margin-top:6px;text-align:right">log &amp; trades →</div></a>';
   }
@@ -810,7 +854,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
 
   function flashLed(id, dir) {
     var el = $(id); if (!el) return;
-    el.className = 'led ' + (dir > 0 ? 'up' : 'dn');
+    el.className = 'led ' + (dir === 2 ? 'lr' : dir > 0 ? 'up' : 'dn');
     clearTimeout(el._t); el._t = setTimeout(function () { el.className = 'led'; }, 900);
   }
   // A pulse of light from source k to coin c: green bullish, red bearish.
@@ -823,11 +867,11 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     var arrive = function () {
       flashLed(toLed, dir);
       var t = $(toCard); if (!t) return;
-      t.classList.remove('hit-up', 'hit-dn'); void t.offsetWidth; t.classList.add(dir > 0 ? 'hit-up' : 'hit-dn');
-      clearTimeout(t._t); t._t = setTimeout(function () { t.classList.remove('hit-up', 'hit-dn'); }, 700);
+      t.classList.remove('hit-up', 'hit-dn', 'hit-lr'); void t.offsetWidth; t.classList.add(dir === 2 ? 'hit-lr' : dir > 0 ? 'hit-up' : 'hit-dn');
+      clearTimeout(t._t); t._t = setTimeout(function () { t.classList.remove('hit-up', 'hit-dn', 'hit-lr'); }, 700);
     };
     if (!path || !svg || reduceMotion || document.hidden) { arrive(); return; }
-    var col = dir > 0 ? 'var(--up)' : 'var(--dn)';
+    var col = dir === 2 ? 'var(--blue)' : dir > 0 ? 'var(--up)' : 'var(--dn)';
     var g = node('g', {}, svg);
     // the pulse measures its own copy of the wire, so a redraw of the wires mid-flight doesn't stop it
     var trail = node('path', { d: path.getAttribute('d'), fill: 'none', stroke: col, 'stroke-width': 1.6, 'stroke-linecap': 'round', opacity: 0.9 }, g);
@@ -1400,7 +1444,12 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
   }
   async function refreshState() {
     S.account = await load('account');
+    var prevLearned = S.model && S.model.learnedAt;
     S.model = await load('model');
+    if (prevLearned && S.model && S.model.learnedAt && S.model.learnedAt !== prevLearned) {
+      // the learner retrained after a 4H close: a blue pulse from each coin to its bot
+      setTimeout(function () { COINS2.forEach(function (c, i) { setTimeout(function () { pulseWire('coin-' + c, 'led-bot-' + c, 'botcard-' + c, 'led-botcard-' + c, 2); }, i * 400); }); }, 1500);
+    }
     var coins = coinList();
     var r = await Promise.all(coins.map(function (c) { return Promise.all(['position', 'trades', 'signal', 'log'].map(function (n) { return load(n, c); })); }));
     S.byCoin = {}; S.trades = [];

@@ -139,3 +139,40 @@ test('bot log: one scan line per 4H close, plus entries, stop moves, exits and e
   for (let i = 0; i < LOG_MAX + 50; i++) logRun(st, [{ type: 'error', reason: 'e' + i }], 9, null);
   assert.strictEqual(st.log.length, LOG_MAX);
 });
+
+test('model file: learning recorded once per 4H close, weights history kept, self-check alert pushed once', () => {
+  const MF = require('../src/modelfile');
+  const os = require('os'), path = require('path');
+  const file = path.join(fs.mkdtempSync(path.join(os.tmpdir(), 'mf-')), 'model.json');
+  const m = (at, n, status) => ({ at, trainedOn: n, weights: { rsi: n / 1e4 }, selfCheck: status && { status, n: 150, takenAvgR: -0.5, skippedAvgR: 0.1 } });
+  assert.deepStrictEqual(MF.write(file, m(1, 100, 'ok'), 10), []);
+  let j = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.strictEqual(j.newSetups, null); assert.strictEqual(j.history.length, 1);
+  // the :32 run on the same candle: nothing new learned, history unchanged
+  MF.write(file, m(1, 100, 'ok'), 20);
+  j = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.strictEqual(j.history.length, 1); assert.strictEqual(j.learnedAt, 10);
+  // next close: 8 new setups, alert turns on → one push
+  const p1 = MF.write(file, m(2, 108, 'alert'), 30);
+  j = JSON.parse(fs.readFileSync(file, 'utf8'));
+  assert.strictEqual(j.newSetups, 8); assert.strictEqual(j.learnedAt, 30); assert.strictEqual(j.history.length, 2);
+  assert.strictEqual(p1.length, 1); assert.match(p1[0].title, /attention/);
+  assert.deepStrictEqual(MF.write(file, m(3, 110, 'alert'), 40), []);      // still alert: no repeat
+  assert.match(MF.write(file, m(4, 112, 'watch'), 50)[0].title, /back to normal/);
+  for (let i = 5; i < MF.HISTORY + 20; i++) MF.write(file, m(i, 112 + i, 'ok'), 60 + i);
+  assert.strictEqual(JSON.parse(fs.readFileSync(file, 'utf8')).history.length, MF.HISTORY);
+});
+
+test('learner self-check: out-of-sample, taken vs skipped over the last finished setups', () => {
+  const d = data(4000);
+  const o = L.defaults({});
+  const { all } = L.candidates(d, o);
+  const now = d.BTC.candles[d.BTC.candles.length - 1].t + TF;
+  const c = L.selfCheck(all, now, o, 60);
+  assert.ok(c && c.n === 60 && c.taken + c.skipped === 60);
+  assert.ok(['ok', 'watch', 'alert'].includes(c.status));
+  assert.strictEqual(L.selfCheck(all, now, o, 1e6), null); // not enough finished setups yet
+  // the walk-forward rule: a setup's prediction never uses its own result
+  const r = L.series(d, 'BTC', {}, { check: true });
+  assert.ok(r.model.selfCheck && r.model.selfCheck.n === L.SELF_N || r.model.selfCheck === null);
+});
