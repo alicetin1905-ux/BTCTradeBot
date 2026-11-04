@@ -76,7 +76,7 @@
   "closeT": 1793764800000,
   "source": "binance",
   "at": 1793777521353,
-  "wait": "a position is open",
+  "wait": "already entered on this 4H candle",
   "strategy": "learning",
   "chart": [
     [
