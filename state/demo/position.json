@@ -9,10 +9,10 @@
   "initialStop": 79062.8,
   "takeProfit": null,
   "fixed": false,
-  "ext": 77453.86,
+  "ext": 76496.04,
   "trailed": false,
   "entryCandleT": 1793721600000,
-  "lastExitCheckT": 1793736000000,
+  "lastExitCheckT": 1793750400000,
   "openedAt": 1793736124392,
   "orders": {
     "entry": "4067928798355124225"
@@ -30,7 +30,7 @@
   "trend": -1,
   "setup": "pullback",
   "expR": 0.20136176113609372,
-  "markPrice": 76193,
-  "unrealisedPnl": 17.93482000000004,
+  "markPrice": 76417.5,
+  "unrealisedPnl": 14.88162000000004,
   "exchangeStop": 79062.8
 }
