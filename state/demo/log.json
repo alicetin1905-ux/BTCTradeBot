@@ -93,5 +93,16 @@
     "pnl": -22.50341889,
     "price": 79088.1,
     "reason": "stop"
+  },
+  {
+    "at": 1793808124202,
+    "kind": "scan",
+    "candleT": 1793793600000,
+    "close": 80296.01,
+    "trend": -1,
+    "setup": null,
+    "side": 0,
+    "expR": null,
+    "decision": "no pullback or breakout setup on the last 4H close"
   }
 ]
