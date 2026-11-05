@@ -137,5 +137,16 @@
     "side": 0,
     "expR": null,
     "decision": "no pullback or breakout setup on the last 4H close"
+  },
+  {
+    "at": 1793865721600,
+    "kind": "scan",
+    "candleT": 1793851200000,
+    "close": 2416.13,
+    "trend": 0,
+    "setup": null,
+    "side": 0,
+    "expR": null,
+    "decision": "no pullback or breakout setup on the last 4H close"
   }
 ]
