@@ -1,5 +1,5 @@
 {
-  "balance": 1927.851617945,
+  "balance": 1897.8006609450001,
   "startingBalance": 2000,
   "fundingSince": 1793715002577,
   "funding": {
@@ -7,7 +7,7 @@
   },
   "startedAt": 1793715002577,
   "fundingError": null,
-  "exchangeEquity": 1886.7902948620276,
+  "exchangeEquity": 1887.4062448620277,
   "settings": {
     "RISK_PCT": 1,
     "COIN_RISK_PCT": {},
@@ -33,7 +33,7 @@
     "MAX_OPEN_POSITIONS": 2,
     "STOP_ATR": 2,
     "TRAIL_ATR": 5,
-    "STOP_ON_REAL_PRICE": false,
+    "STOP_ON_REAL_PRICE": true,
     "EMERGENCY_STOP_X": 2,
     "LEARN_MIN_R": 0,
     "ENTRY_FRESH_MIN": 45,
@@ -65,7 +65,7 @@
     "MAX_OPEN_POSITIONS": 2,
     "STOP_ATR": 2,
     "TRAIL_ATR": 5,
-    "STOP_ON_REAL_PRICE": false,
+    "STOP_ON_REAL_PRICE": true,
     "EMERGENCY_STOP_X": 2,
     "LEARN_MIN_R": 0,
     "ENTRY_FRESH_MIN": 45,
@@ -83,7 +83,7 @@
     "ETH",
     "BTC"
   ],
-  "updatedAt": 1794240002757,
-  "lastRunAt": 1794238324633,
+  "updatedAt": 1794240128385,
+  "lastRunAt": 1794240128385,
   "instrument": "BTC-USD_UM_XPERP-310328"
 }

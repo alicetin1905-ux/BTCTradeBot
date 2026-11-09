@@ -22,5 +22,18 @@
     "openedAt": 1794182521830,
     "closedAt": 1794190827087,
     "initialStop": 2190.79
+  },
+  {
+    "symbol": "ETHUSDT",
+    "bias": -1,
+    "entry": 2120.3915523465703,
+    "exit": 2220.71,
+    "qty": 0,
+    "pnl": -30.756833,
+    "settlement": true,
+    "reason": "stop — liquidated by OKX, rest of the margin lost",
+    "openedAt": 1794182521830,
+    "closedAt": 1794190827087,
+    "initialStop": 2190.79
   }
 ]
