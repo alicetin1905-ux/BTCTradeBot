@@ -1,1 +1,36 @@
-null
+{
+  "symbol": "BTCUSDT",
+  "exchange": "okx:BTC-USD_UM_XPERP-310328",
+  "bias": -1,
+  "entry": 74600.84251968504,
+  "qty": 0.0127,
+  "qtyTotal": 0.0127,
+  "stop": 76173.4,
+  "initialStop": 76173.4,
+  "takeProfit": null,
+  "fixed": false,
+  "ext": 74851.44,
+  "trailed": false,
+  "entryCandleT": 1794168000000,
+  "lastExitCheckT": 1794168000000,
+  "openedAt": 1794182525503,
+  "orders": {
+    "entry": "4082907572800712705"
+  },
+  "tickSize": 0.1,
+  "notional": 947.4307,
+  "margin": 94.74307,
+  "riskAmt": 19.97147999999987,
+  "atrAtEntry": 766.3059477282264,
+  "breakout": null,
+  "score": null,
+  "flipFrom": null,
+  "jump": false,
+  "pullback": false,
+  "trend": -1,
+  "setup": "breakout",
+  "expR": 0.03790220389712251,
+  "markPrice": 74644.1,
+  "unrealisedPnl": -0.5493700000000157,
+  "exchangeStop": 76173.4
+}
