@@ -159,8 +159,9 @@ const config = module.exports = {
     STARTING_BALANCE: 2000, // USDT — the bot's allocation; it trades like a 2000 USDT account
     RISK_PCT: 1,            // loss at the initial stop per trade, % of the balance (owner's choice 2026-11-03). Learning bot 2021-26: 1% = PF 1.73, $2,000 -> $9,766, worst drop 21%
     MAX_POSITION_X: 2,      // position value at most this many x the balance (caps size on tight stops)
-    LEVERAGE: 10,           // exchange leverage (cross margin); margin = position value / leverage.
-                            // Sizing is by risk, so leverage changes the margin tied up, not the loss at the stop.
+    LEVERAGE: 5,            // exchange leverage (isolated margin): margin = position value / leverage. 5x since 2026-11-09 (owner's choice):
+                            // at 10x isolated the demo liquidated only ~5% from the entry (ETH 2026-11-09); at 5x ~15%, so the stop and
+                            // the safety stop sit well inside it. Sizing is by risk, so this changes the margin tied up, not the loss at the stop.
   },
 
   // Execution safety limits.

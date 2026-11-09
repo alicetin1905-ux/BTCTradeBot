@@ -14,6 +14,7 @@ const config = require('../config');
 config.STRATEGY = 'breakout';
 config.DIRECTION = 'long';
 config.PORTFOLIO.RISK_PCT = 2;
+config.PORTFOLIO.LEVERAGE = 10; // the margin / fixed-mode tests below were written for 10x (live: 5x since 2026-11-09)
 config.TRADE_MODE = 'atr'; // these tests are about the ATR rules; fixed mode has its own tests at the end
 const FIXED_DEFAULTS = { ...config.FIXED };
 config.FIXED = { MARGIN: 500, SL_USDT: 100, TP_USDT: 200 }; // pinned: the fixed-mode tests below use this size

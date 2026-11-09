@@ -2,7 +2,7 @@
 
 (The repository and the dashboard address keep the old name `BTCTradeBot`.)
 
-A trading bot for **BTC and ETH** on the **OKX demo account** (EEA site): 2000 USDC, 10x leverage, isolated margin.
+A trading bot for **BTC and ETH** on the **OKX demo account** (EEA site): 2000 USDC, 5x leverage, isolated margin (10x until 2026-11-09).
 It started on 2026-11-03.
 
 ## What it does
@@ -72,7 +72,7 @@ It needs Node 18+ and no dependencies.
   `cache/` (not committed) and topped up every run.
 - **Model:** what it learned goes to `state/demo/model.json`; the dashboard shows it under *What the bot learned*.
 
-## OKX EEA accounts: USD-settled futures, USDC margin, 10x
+## OKX EEA accounts: USD-settled futures, USDC margin, 5x
 
 On OKX's EEA site (`my.okx.com`) the demo account holds no USDT and can't
 trade perpetual swaps. Its futures are the USD-settled `BTC-USD_UM…` contracts.
@@ -81,7 +81,7 @@ workflow's default:
 
 - **The contract:** a perpetual-style future that runs to 2031, with funding
   like a perpetual. 1 contract = 1 BTC, sizes in steps of 0.0001 BTC.
-- **Margin in USDC** at **10x** leverage, **isolated** margin as in the OKX
+- **Margin in USDC** at **5x** leverage, **isolated** margin as in the OKX
   app (`OKX_MARGIN_MODE`; `cross` also works; max 10x). Sizing is
   still by risk: each trade loses 2% of the balance at its initial stop.
   Leverage only sets how much USDC is tied up as margin. The position is
