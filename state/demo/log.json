@@ -401,5 +401,16 @@
     "risk": 19.97147999999987,
     "setup": "breakout",
     "expR": 0.038
+  },
+  {
+    "at": 1794196923925,
+    "kind": "scan",
+    "candleT": 1794182400000,
+    "close": 74852.67,
+    "trend": -1,
+    "setup": null,
+    "side": 0,
+    "expR": null,
+    "decision": "a position is open"
   }
 ]
