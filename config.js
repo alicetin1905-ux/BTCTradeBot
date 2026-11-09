@@ -141,6 +141,13 @@ const config = module.exports = {
   STOP_ATR: 2,         // initial stop: entry -/+ 2 x ATR
   TRAIL_ATR: 5,        // after each 4H close: best close since entry -/+ 5 x ATR (never loosens). Learning bot, 1% risk, 2021-26 (stop 2):
                        // trail 4 -> PF 1.58, 4.5 -> 1.68, 5 -> 1.73, 5.5 -> 1.57, 6 -> 1.54 (research/LEARNING.md, 2026-11-03)
+  // Since 2026-11-09 the stop is judged on the REAL market price (Binance spot, the learner's own data): the OKX demo
+  // contracts sometimes print prices the market never saw (ETH 2026-11-09: stopped at 2,220 while the real high was
+  // 2,158). The bot checks the highest / lowest real price since the last check on every run and 5-minute sync and
+  // closes at market when the stop was reached. OKX keeps a safety stop EMERGENCY_STOP_X times the stop distance away,
+  // which only fires if the bot isn't running (Mac off) and the market really moves that far.
+  STOP_ON_REAL_PRICE: true,
+  EMERGENCY_STOP_X: 2,
   // At most this many positions open at once across all coins (null = no limit). BTC, ETH and HYPE move together.
   MAX_OPEN_POSITIONS: 2,
 

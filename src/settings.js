@@ -77,6 +77,8 @@ const FIELDS = {
   MAX_OPEN_POSITIONS: { at: ['MAX_OPEN_POSITIONS'], check: num(1, 10, { int: true, nullable: true }), label: 'At most this many positions open at once across the coins (null = no limit)' },
   STOP_ATR: { at: ['STOP_ATR'], check: num(0.5, 6), label: 'Initial stop (x ATR)' },
   TRAIL_ATR: { at: ['TRAIL_ATR'], check: num(0.5, 8), label: 'Trailing stop (x ATR from the best close)' },
+  STOP_ON_REAL_PRICE: { at: ['STOP_ON_REAL_PRICE'], check: oneOf(true, false), label: 'Stop judged on the real market price (OKX keeps only a safety stop)' },
+  EMERGENCY_STOP_X: { at: ['EMERGENCY_STOP_X'], check: num(1, 4), label: 'OKX safety stop (x the stop distance)' },
   LEARN_MIN_R: { at: ['LEARN', 'MIN_R'], check: num(-1, 3), label: 'Learner: take a setup only when it expects at least this many R (0 = any expected profit)' },
   ENTRY_FRESH_MIN: { at: ['ENTRY_FRESH_MIN'], check: num(5, 240, { int: true, nullable: true }), label: 'Enter only within this many minutes of a 4H close (null = any time)' },
   MARKET_DATA: { at: ['MARKET_DATA'], check: oneOf('bybit', 'okx', null), label: 'Candles from (null = the exchange it trades on, or "bybit" / "okx"; the other is the fallback)' },

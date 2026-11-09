@@ -57,6 +57,8 @@ function reasonFor(pos, orderId, exit) {
   if (orderId && pos.orders && orderId === pos.orders.close) return pos.closeReason || 'closed at market';
   // Fixed mode: the exit price says which of the two orders fired.
   if (pos.fixed && pos.takeProfit && exit != null) return Math.abs(exit - pos.takeProfit) < Math.abs(exit - pos.stop) ? 'take profit' : 'stop loss';
+  // Stop on the real price: a close the bot didn't send was the exchange's safety stop.
+  if (pos.emergencyGap > 0 && config.STOP_ON_REAL_PRICE) return 'OKX safety stop';
   return pos.trailed ? 'trailing stop' : 'stop';
 }
 
@@ -107,14 +109,16 @@ function adoptPending(st, live, events, now) {
     return;
   }
   if (live.bias !== p.bias) return;
-  const entry = live.avgPrice, stop = live.stopLoss || p.stopLoss, tp = live.takeProfit || p.takeProfit;
+  // with the stop on the real price the exchange holds the safety stop; the position's stop is the one the bot watches
+  const entry = live.avgPrice, stop = p.exStop ? p.stopLoss : (live.stopLoss || p.stopLoss), tp = live.takeProfit || p.takeProfit;
   st.position = {
     symbol: SYMBOL, exchange: config.MARKET_ID || config.EXCHANGE, bias: p.bias, entry, qty: live.size, qtyTotal: live.size,
     stop, initialStop: stop, takeProfit: tp, fixed: !!p.fixed, ext: p.close || entry, trailed: false,
     entryCandleT: p.candleT, lastExitCheckT: p.candleT, openedAt: p.at, orders: { entry: p.orderId }, tickSize: p.tickSize,
     notional: live.size * entry, margin: (live.size * entry) / P.LEVERAGE, riskAmt: live.size * Math.abs(entry - stop),
     atrAtEntry: p.atr, breakout: null, score: p.score ?? null, flipFrom: p.flipFrom ?? null, jump: !!p.jump,
-    markPrice: live.markPrice || entry, unrealisedPnl: live.unrealisedPnl || 0, exchangeStop: live.stopLoss || stop, adopted: true,
+    markPrice: live.markPrice || entry, unrealisedPnl: live.unrealisedPnl || 0, exchangeStop: live.stopLoss || p.exStop || stop, adopted: true,
+    emergencyGap: p.exStop ? Math.abs(p.stopLoss - p.exStop) : 0, lastSoftCheckT: now,
   };
   delete st.meta.pendingEntry;
   events.push({ type: 'info', reason: `${config.COIN} ${p.bias === 1 ? 'long' : 'short'} ${live.size} @ ${px(entry)} found on the exchange and taken over (stop ${px(stop)}${tp ? `, take-profit ${px(tp)}` : ''})` });
@@ -188,21 +192,71 @@ async function manage({ client, st, live, sig, events, now }) {
   const tick = pos.tickSize || 0.1;
   const next = stopRound(t.stop, tick, pos.bias);
   if ((next - pos.stop) * pos.bias < tick * 0.5) return false; // doesn't tighten
-  const mark = live.markPrice;
+  // With the stop on the real price, "already passed" is judged on the real price too, not the demo's mark.
+  const mark = soft(pos) && pos.realPrice ? pos.realPrice : live.markPrice;
   if (mark && (mark - next) * pos.bias <= 0) {
     // Price is already through the new stop level: it would trigger at once.
     await closeAtMarket(client, st, pos, live, `trailing stop ${px(next)} already passed`, events, now);
     return true;
   }
+  // On the exchange: the stop itself, or (stop on the real price) the safety stop that keeps its distance behind it.
+  const exNext = soft(pos) ? stopRound(next - pos.bias * pos.emergencyGap, tick, pos.bias) : next;
   try {
-    await client.setStopLoss(SYMBOL, next);
-    events.push({ type: 'info', reason: `stop trailed ${px(pos.stop)} → ${px(next)}` });
+    if (!soft(pos) || ((exNext - (pos.exchangeStop ?? -pos.bias * Infinity)) * pos.bias) >= tick * 0.5) {
+      await client.setStopLoss(SYMBOL, exNext);
+      pos.exchangeStop = exNext;
+    }
+    events.push({ type: 'info', reason: `stop trailed ${px(pos.stop)} → ${px(next)}` + (soft(pos) ? ` (OKX safety stop ${px(exNext)})` : '') });
     pos.stop = next;
     pos.trailed = true;
   } catch (err) {
     events.push({ type: 'error', reason: `couldn't trail the stop to ${px(next)} (${err.message}) — retrying next run` });
   }
   return false;
+}
+
+// ---- the stop on the real price (config.STOP_ON_REAL_PRICE) ----
+// The position's stop (pos.stop, trailed as always) is watched by the bot on the real market (src/realprice.js) on
+// every run and sync; the exchange keeps a safety stop EMERGENCY_STOP_X times as far away, so a demo price spike
+// doesn't close the trade but the position is still protected while the bot isn't running.
+const soft = (pos) => !!(config.STOP_ON_REAL_PRICE && pos && !pos.fixed && pos.emergencyGap > 0);
+const realPrice = { source: require('./realprice') };
+function setRealPrice(src) { realPrice.source = src; } // tests
+
+// A position opened before the switch (or adopted): give it the safety stop, so the bot watches its stop.
+async function toSoftStop({ client, st, events }) {
+  const pos = st.position;
+  if (!config.STOP_ON_REAL_PRICE || !pos || pos.fixed || pos.emergencyGap > 0) return;
+  const tick = pos.tickSize || 0.1;
+  const gap = Math.abs(pos.entry - (pos.initialStop ?? pos.stop)) * Math.max(0, config.EMERGENCY_STOP_X - 1);
+  if (!(gap > 0)) return;
+  const ex = stopRound(pos.stop - pos.bias * gap, tick, pos.bias);
+  try {
+    await client.setStopLoss(SYMBOL, ex);
+    pos.emergencyGap = gap;
+    pos.exchangeStop = ex;
+    events.push({ type: 'info', reason: `stop ${px(pos.stop)} now watched on the real price; OKX keeps a safety stop at ${px(ex)}` });
+  } catch (err) {
+    events.push({ type: 'error', reason: `couldn't set the OKX safety stop ${px(ex)} (${err.message}) — the exchange stop stays at ${px(pos.exchangeStop ?? pos.stop)}` });
+  }
+}
+
+// Closes the position when the real market has reached its stop since the last check. Returns true if it closed.
+async function checkSoftStop({ client, st, live, events, now }) {
+  const pos = st.position;
+  if (!soft(pos) || !live) return false;
+  const since = Math.max(pos.lastSoftCheckT || pos.openedAt, now - DAY_MS);
+  let x;
+  try { x = await realPrice.source.extremesSince(config.COIN, since, now); } catch (err) {
+    events.push({ type: 'info', reason: `real price not read (${err.message}) — the OKX safety stop ${px(pos.exchangeStop)} still protects` });
+    return false;
+  }
+  pos.lastSoftCheckT = now;
+  pos.realPrice = x.last;
+  const touched = pos.bias === 1 ? x.low : x.high;
+  if ((touched - pos.stop) * pos.bias > 0) return false;
+  await closeAtMarket(client, st, pos, live, `${pos.trailed ? 'trailing stop' : 'stop'} ${px(pos.stop)} reached on the real price (${pos.bias === 1 ? 'low' : 'high'} ${px(touched)})`, events, now);
+  return true;
 }
 
 function dailyLossHit(st, now) {
@@ -271,9 +325,12 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
   const stopLoss = stopRound(mark * (1 - bias * stopDist), inst.tickSize, bias);
   const takeProfit = fixed ? +(Math.round(mark * (1 + bias * tpDist) / inst.tickSize) * inst.tickSize).toFixed(dp(inst.tickSize)) : null;
   st.meta = { ...st.meta, lastEntryCandle: s.t }; // one attempt per signal candle, even if the order fails
+  // Stop on the real price: the order carries only the wide safety stop; the bot watches stopLoss itself.
+  const softStop = config.STOP_ON_REAL_PRICE && !fixed && !client.spot && config.EMERGENCY_STOP_X > 1;
+  const exStop = softStop ? stopRound(mark * (1 - bias * stopDist * config.EMERGENCY_STOP_X), inst.tickSize, bias) : stopLoss;
 
   await client.setLeverage(SYMBOL, P.LEVERAGE);
-  const entryId = await client.openMarket({ symbol: SYMBOL, bias, qty, stopLoss, takeProfit });
+  const entryId = await client.openMarket({ symbol: SYMBOL, bias, qty, stopLoss: exStop, takeProfit });
   // The exchange's position list can lag the fill by a moment: without this
   // retry the bot would lose track of its own trade (stop on the exchange,
   // but no trailing or exit).
@@ -286,7 +343,7 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
     // OKX can show the position later than the readback (BTC 2026-10-07: filled, but missing for 5 s, then never tracked).
     // Remembered here; adoptPending() takes it over on a later run, or books its P&L if it already closed.
     st.meta.pendingEntry = {
-      orderId: entryId, bias, stopLoss, takeProfit, fixed, at: now, candleT: s.t, close: s.close, atr: s.atr,
+      orderId: entryId, bias, stopLoss, exStop: softStop ? exStop : null, takeProfit, fixed, at: now, candleT: s.t, close: s.close, atr: s.atr,
       tickSize: inst.tickSize, score: s.score ?? null, flipFrom: s.flipFrom ?? null, jump: !!s.jump, pullback: !!s.pullback, trend: s.trend ?? null, setup: s.setup ?? null, expR: s.expR ?? null,
     };
     events.push({ type: 'error', reason: `entry order ${entryId} sent but no position showed up after 5 s — taken over on a later run if it fills` });
@@ -300,10 +357,11 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
     entryCandleT: s.t, lastExitCheckT: s.t, openedAt: now, orders: { entry: entryId }, tickSize: inst.tickSize,
     notional: pos.size * entry, margin: (pos.size * entry) / P.LEVERAGE, riskAmt: pos.size * Math.abs(entry - stopLoss),
     atrAtEntry: s.atr, breakout: bias === 1 ? s.upper : s.lower, score: s.score ?? null, flipFrom: s.flipFrom ?? null, jump: !!s.jump, pullback: !!s.pullback, trend: s.trend ?? null, setup: s.setup ?? null, expR: s.expR ?? null,
-    markPrice: pos.markPrice || entry, unrealisedPnl: pos.unrealisedPnl || 0, exchangeStop: pos.stopLoss || stopLoss,
+    markPrice: pos.markPrice || entry, unrealisedPnl: pos.unrealisedPnl || 0, exchangeStop: pos.stopLoss || exStop,
+    emergencyGap: softStop ? Math.abs(stopLoss - exStop) : 0, lastSoftCheckT: now,
   };
   events.push({
-    type: 'enter', bias, entry, stop: stopLoss, takeProfit, fixed, qty: pos.size, notional: pos.size * entry,
+    type: 'enter', bias, entry, stop: stopLoss, safetyStop: softStop ? exStop : null, takeProfit, fixed, qty: pos.size, notional: pos.size * entry,
     riskAmt: st.position.riskAmt, breakout: st.position.breakout, score: s.score ?? null, flipFrom: s.flipFrom ?? null, jump: !!s.jump, pullback: !!s.pullback, trend: s.trend ?? null, setup: s.setup ?? null, expR: s.expR ?? null, close: s.close,
   });
 }
@@ -342,6 +400,12 @@ async function runExchange({ client, st, sig = null, events, halt = false, now =
   adoptPending(st, live, events, now);
   await reconcile({ client, st, live, events, now });
   await recordFunding(client, st, events, now);
+  // the stop on the real price: checked on every run and sync, before any trailing
+  await toSoftStop({ client, st, events });
+  if (await checkSoftStop({ client, st, live, events, now })) {
+    wallet = await client.getWallet();
+    live = (await client.getPositions())[SYMBOL] || null;
+  }
   if (sig) {
     if (st.position) {
       const closed = await manage({ client, st, live, sig, events, now });
@@ -379,4 +443,4 @@ const px = (x) => require('./format').price(x, 1);
 
 function setReadbackMs(ms) { ENTRY_READBACK_MS = ms; } // tests
 
-module.exports = { setReadbackMs, runExchange, closeAll, sizingBase, notionalFor, entryBlock, stopRound, SYMBOL };
+module.exports = { setReadbackMs, setRealPrice, runExchange, closeAll, sizingBase, notionalFor, entryBlock, stopRound, SYMBOL };

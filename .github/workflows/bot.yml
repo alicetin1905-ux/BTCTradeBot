@@ -26,7 +26,7 @@ on:
       action:
         description: 'run = full run, sync = fills only, check = test OKX connection and keys (no trading), testtrade = open + close the smallest position (real demo order)'
         type: choice
-        options: [check, run, sync, testtrade, probe]
+        options: [check, run, sync, testtrade, probe, bills]
         default: check
       instrument:
         description: 'testtrade / check only: another OKX instrument to try (e.g. BTC-USDC); empty = the coin''s own'

@@ -23,6 +23,11 @@ if [ "$MODE" = "check" ]; then
 fi
 . scripts/lib-coins.sh
 
+if [ "$MODE" = "bills" ]; then
+  # Read-only: the OKX account's USDC bills vs the bot's own balance (scripts/okx-bills.js).
+  node scripts/okx-bills.js
+  exit $?
+fi
 if [ "$MODE" = "probe" ]; then
   # Diagnostic: which orders does OKX accept on one instrument (workflow input "instrument").
   INSTRUMENT="${TESTTRADE_INSTRUMENT:-$OKX_INSTRUMENT}" node scripts/okx-probe.js
