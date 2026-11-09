@@ -457,5 +457,16 @@
     "at": 1794240121613,
     "kind": "error",
     "text": "OKX settled the 2026-11-09T02:20 position at -59.15 (fees -0.60, funding 0.00, liquidated): -30.76 booked"
+  },
+  {
+    "at": 1794254521841,
+    "kind": "scan",
+    "candleT": 1794240000000,
+    "close": 2128.85,
+    "trend": -1,
+    "setup": null,
+    "side": 0,
+    "expR": null,
+    "decision": "no pullback or breakout setup on the last 4H close"
   }
 ]
