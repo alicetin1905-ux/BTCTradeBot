@@ -254,6 +254,7 @@ function createSwapClient(opts) {
         out[symbol] = {
           symbol, bias, size: +(Math.abs(pos) * i.ctVal).toFixed(8),
           avgPrice: num(p.avgPx), markPrice: num(p.markPx), unrealisedPnl: num(p.upl), stopLoss: 0,
+          liqPrice: num(p.liqPx) || null, // where OKX liquidates (isolated margin): the safety stop must stay inside it
         };
       }
       // The stop lives in a separate algo order: read it for the bot's coin(s).
@@ -263,6 +264,16 @@ function createSwapClient(opts) {
         if (sl) { out[symbol].stopLoss = num(sl.slTriggerPx); out[symbol].takeProfit = num(sl.tpTriggerPx) || null; }
       }
       return out;
+    },
+
+    // OKX's record of each closed position: realized P&L including fees, funding and a liquidation's lost margin.
+    async getPositionsHistory(startTime) {
+      const rows = await request('GET', '/api/v5/account/positions-history', { instType: TYPE, limit: '100' });
+      return rows.filter(p => ours(p.instId) && num(p.uTime) >= startTime).map(p => ({
+        id: `${p.posId}:${p.uTime}`, symbol: symOf(p.instId), openedAt: num(p.cTime), closedAt: num(p.uTime),
+        realized: num(p.realizedPnl), pnl: num(p.pnl), fee: num(p.fee), funding: num(p.fundingFee), type: String(p.type),
+        exit: num(p.closeAvgPx),
+      }));
     },
 
     async getInstrument(symbol) {

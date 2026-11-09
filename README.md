@@ -33,7 +33,11 @@ bot took it or not. Older results count half after 4 years. The bot only trades 
 - At most 2 positions (one per coin), each at most 2× the balance.
 - Daily loss limit 20%.
 
-The stop sits on OKX and triggers on the index price, so it works while the Mac is off.
+The stop is judged on the **real** market price (Binance spot, the learner's own data): on every run and 5-minute sync
+the bot checks the highest / lowest price since the last check and closes at market when the stop was reached. The OKX
+demo contracts sometimes print prices the real market never saw, so OKX only holds a **safety stop** (2× the stop
+distance, always inside the liquidation price) for when the Mac is off. After each closed position the bot books
+OKX's own realized P&L (fees, funding, a liquidation) so its balance follows the account.
 
 ## The test (`node research/walkforward.js`, details in `research/LEARNING.md`)
 

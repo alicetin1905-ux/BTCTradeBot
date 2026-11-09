@@ -146,7 +146,10 @@ const config = module.exports = {
   // 2,158). The bot checks the highest / lowest real price since the last check on every run and 5-minute sync and
   // closes at market when the stop was reached. OKX keeps a safety stop EMERGENCY_STOP_X times the stop distance away,
   // which only fires if the bot isn't running (Mac off) and the market really moves that far.
-  STOP_ON_REAL_PRICE: false, // OFF until the safety stop is kept inside the liquidation price (10x isolated liquidates ~5% away)
+  // The safety stop is always kept inside the position's liquidation price (10x isolated on the demo liquidates only
+  // ~5% away: ETH 2026-11-09 was liquidated by a demo spike and lost its whole margin); with no room, or no
+  // liquidation price from OKX, the normal stop stays on the exchange (src/exchange.js safetyStopFor).
+  STOP_ON_REAL_PRICE: true,
   EMERGENCY_STOP_X: 2,
   // At most this many positions open at once across all coins (null = no limit). BTC, ETH and HYPE move together.
   MAX_OPEN_POSITIONS: 2,

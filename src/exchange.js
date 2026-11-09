@@ -110,15 +110,14 @@ function adoptPending(st, live, events, now) {
   }
   if (live.bias !== p.bias) return;
   // with the stop on the real price the exchange holds the safety stop; the position's stop is the one the bot watches
-  const entry = live.avgPrice, stop = p.exStop ? p.stopLoss : (live.stopLoss || p.stopLoss), tp = live.takeProfit || p.takeProfit;
+  const entry = live.avgPrice, stop = live.stopLoss || p.stopLoss, tp = live.takeProfit || p.takeProfit;
   st.position = {
     symbol: SYMBOL, exchange: config.MARKET_ID || config.EXCHANGE, bias: p.bias, entry, qty: live.size, qtyTotal: live.size,
     stop, initialStop: stop, takeProfit: tp, fixed: !!p.fixed, ext: p.close || entry, trailed: false,
     entryCandleT: p.candleT, lastExitCheckT: p.candleT, openedAt: p.at, orders: { entry: p.orderId }, tickSize: p.tickSize,
     notional: live.size * entry, margin: (live.size * entry) / P.LEVERAGE, riskAmt: live.size * Math.abs(entry - stop),
     atrAtEntry: p.atr, breakout: null, score: p.score ?? null, flipFrom: p.flipFrom ?? null, jump: !!p.jump,
-    markPrice: live.markPrice || entry, unrealisedPnl: live.unrealisedPnl || 0, exchangeStop: live.stopLoss || p.exStop || stop, adopted: true,
-    emergencyGap: p.exStop ? Math.abs(p.stopLoss - p.exStop) : 0, lastSoftCheckT: now,
+    markPrice: live.markPrice || entry, unrealisedPnl: live.unrealisedPnl || 0, exchangeStop: live.stopLoss || stop, adopted: true, lastSoftCheckT: now,
   };
   delete st.meta.pendingEntry;
   events.push({ type: 'info', reason: `${config.COIN} ${p.bias === 1 ? 'long' : 'short'} ${live.size} @ ${px(entry)} found on the exchange and taken over (stop ${px(stop)}${tp ? `, take-profit ${px(tp)}` : ''})` });
@@ -223,14 +222,31 @@ const soft = (pos) => !!(config.STOP_ON_REAL_PRICE && pos && !pos.fixed && pos.e
 const realPrice = { source: require('./realprice') };
 function setRealPrice(src) { realPrice.source = src; } // tests
 
-// A position opened before the switch (or adopted): give it the safety stop, so the bot watches its stop.
-async function toSoftStop({ client, st, events }) {
+// The safety stop for a position: EMERGENCY_STOP_X times the stop distance from the entry, but always inside the
+// liquidation price with a buffer of LIQ_BUFFER of the entry-to-liquidation distance (10x isolated on the OKX demo
+// liquidates only ~5% away: ETH 2026-11-09 was liquidated and lost its whole margin). No room, or no liquidation
+// price known: null — the normal stop stays on the exchange.
+const LIQ_BUFFER = 0.25;
+function safetyStopFor(pos, liq) {
+  if (!(liq > 0)) return null;
+  const tick = pos.tickSize || 0.1, b = pos.bias;
+  const dist = Math.abs(pos.entry - (pos.initialStop ?? pos.stop)) * config.EMERGENCY_STOP_X;
+  let ex = pos.entry - b * dist;
+  const bound = liq + b * LIQ_BUFFER * Math.abs(liq - pos.entry); // between the entry and the liquidation price
+  if ((ex - bound) * b < 0) ex = bound;                            // past the bound: pulled back inside it
+  ex = stopRound(ex, tick, b);
+  if ((pos.stop - ex) * b <= tick) return null;                    // not wider than the stop itself: keep the stop
+  return ex;
+}
+
+// A position without its safety stop yet (just opened, opened before the switch, or adopted): set it, so the bot
+// watches the position's stop on the real price. Needs the exchange's liquidation price (live.liqPrice).
+async function toSoftStop({ client, st, live, events }) {
   const pos = st.position;
-  if (!config.STOP_ON_REAL_PRICE || !pos || pos.fixed || pos.emergencyGap > 0) return;
-  const tick = pos.tickSize || 0.1;
-  const gap = Math.abs(pos.entry - (pos.initialStop ?? pos.stop)) * Math.max(0, config.EMERGENCY_STOP_X - 1);
-  if (!(gap > 0)) return;
-  const ex = stopRound(pos.stop - pos.bias * gap, tick, pos.bias);
+  if (!config.STOP_ON_REAL_PRICE || !pos || pos.fixed || pos.emergencyGap > 0 || !live || client.spot) return;
+  const ex = safetyStopFor(pos, live.liqPrice);
+  if (ex == null) return;
+  const gap = Math.abs(pos.stop - ex);
   try {
     await client.setStopLoss(SYMBOL, ex);
     pos.emergencyGap = gap;
@@ -325,9 +341,9 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
   const stopLoss = stopRound(mark * (1 - bias * stopDist), inst.tickSize, bias);
   const takeProfit = fixed ? +(Math.round(mark * (1 + bias * tpDist) / inst.tickSize) * inst.tickSize).toFixed(dp(inst.tickSize)) : null;
   st.meta = { ...st.meta, lastEntryCandle: s.t }; // one attempt per signal candle, even if the order fails
-  // Stop on the real price: the order carries only the wide safety stop; the bot watches stopLoss itself.
-  const softStop = config.STOP_ON_REAL_PRICE && !fixed && !client.spot && config.EMERGENCY_STOP_X > 1;
-  const exStop = softStop ? stopRound(mark * (1 - bias * stopDist * config.EMERGENCY_STOP_X), inst.tickSize, bias) : stopLoss;
+  // The order carries the normal stop; with the stop on the real price it is widened to the safety stop right after
+  // the fill, once the exchange shows the position's liquidation price (toSoftStop).
+  const exStop = stopLoss;
 
   await client.setLeverage(SYMBOL, P.LEVERAGE);
   const entryId = await client.openMarket({ symbol: SYMBOL, bias, qty, stopLoss: exStop, takeProfit });
@@ -343,7 +359,7 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
     // OKX can show the position later than the readback (BTC 2026-10-07: filled, but missing for 5 s, then never tracked).
     // Remembered here; adoptPending() takes it over on a later run, or books its P&L if it already closed.
     st.meta.pendingEntry = {
-      orderId: entryId, bias, stopLoss, exStop: softStop ? exStop : null, takeProfit, fixed, at: now, candleT: s.t, close: s.close, atr: s.atr,
+      orderId: entryId, bias, stopLoss, takeProfit, fixed, at: now, candleT: s.t, close: s.close, atr: s.atr,
       tickSize: inst.tickSize, score: s.score ?? null, flipFrom: s.flipFrom ?? null, jump: !!s.jump, pullback: !!s.pullback, trend: s.trend ?? null, setup: s.setup ?? null, expR: s.expR ?? null,
     };
     events.push({ type: 'error', reason: `entry order ${entryId} sent but no position showed up after 5 s — taken over on a later run if it fills` });
@@ -357,11 +373,10 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
     entryCandleT: s.t, lastExitCheckT: s.t, openedAt: now, orders: { entry: entryId }, tickSize: inst.tickSize,
     notional: pos.size * entry, margin: (pos.size * entry) / P.LEVERAGE, riskAmt: pos.size * Math.abs(entry - stopLoss),
     atrAtEntry: s.atr, breakout: bias === 1 ? s.upper : s.lower, score: s.score ?? null, flipFrom: s.flipFrom ?? null, jump: !!s.jump, pullback: !!s.pullback, trend: s.trend ?? null, setup: s.setup ?? null, expR: s.expR ?? null,
-    markPrice: pos.markPrice || entry, unrealisedPnl: pos.unrealisedPnl || 0, exchangeStop: pos.stopLoss || exStop,
-    emergencyGap: softStop ? Math.abs(stopLoss - exStop) : 0, lastSoftCheckT: now,
+    markPrice: pos.markPrice || entry, unrealisedPnl: pos.unrealisedPnl || 0, exchangeStop: pos.stopLoss || exStop, lastSoftCheckT: now,
   };
   events.push({
-    type: 'enter', bias, entry, stop: stopLoss, safetyStop: softStop ? exStop : null, takeProfit, fixed, qty: pos.size, notional: pos.size * entry,
+    type: 'enter', bias, entry, stop: stopLoss, takeProfit, fixed, qty: pos.size, notional: pos.size * entry,
     riskAmt: st.position.riskAmt, breakout: st.position.breakout, score: s.score ?? null, flipFrom: s.flipFrom ?? null, jump: !!s.jump, pullback: !!s.pullback, trend: s.trend ?? null, setup: s.setup ?? null, expR: s.expR ?? null, close: s.close,
   });
 }
@@ -392,6 +407,39 @@ async function recordFunding(client, st, events, now) {
   }
 }
 
+// After a position closed, OKX's positions history has its final realized P&L: fees, funding and — after a
+// liquidation — the whole isolated margin lost (ETH 2026-11-09: the fills said -28.39, OKX took -59.15). The bot's
+// own booking (from the fills) is compared with it once per position and the difference booked as part of that trade,
+// so the bot's balance follows the account. Positions closed in the last few minutes wait a run (late fills).
+const SETTLE_WAIT_MS = 10 * 60000;
+async function settleWithExchange(client, st, events, now) {
+  if (!client.getPositionsHistory || !st.account.startedAt) return;
+  let rows;
+  try { rows = await client.getPositionsHistory(st.account.startedAt); } catch (err) { return; }
+  const seen = new Set(st.seenOrderIds);
+  for (const r of rows.sort((a, b) => a.closedAt - b.closedAt)) {
+    const key = 'settle:' + r.id;
+    if (r.symbol !== SYMBOL || seen.has(key) || now - r.closedAt < SETTLE_WAIT_MS || r.closedAt < st.account.startedAt) continue;
+    // the bot's trades of this position: opened within a few minutes of OKX's open time
+    const mine = st.trades.filter(t => Math.abs((t.openedAt || 0) - r.openedAt) < 5 * 60000);
+    if (!mine.length) continue; // not one of the bot's (or not booked yet): leave it
+    seen.add(key);
+    st.seenOrderIds.push(key);
+    const booked = mine.reduce((s, t) => s + t.pnl, 0), diff = +(r.realized - booked).toFixed(6);
+    if (Math.abs(diff) < 0.01) continue;
+    const liquidated = r.type === '3' || r.type === '4';
+    const last = mine[mine.length - 1];
+    st.trades.push({
+      symbol: SYMBOL, bias: last.bias, entry: last.entry, exit: last.exit, qty: 0, pnl: diff, settlement: true,
+      reason: liquidated ? `${last.reason} — liquidated by OKX, rest of the margin lost` : last.reason,
+      openedAt: last.openedAt, closedAt: last.closedAt, initialStop: last.initialStop,
+    });
+    st.account.balance += diff;
+    events.push({ type: liquidated ? 'error' : 'info', reason: `OKX settled the ${new Date(r.closedAt).toISOString().slice(0, 16)} position at ${r.realized.toFixed(2)} (fees ${r.fee.toFixed(2)}, funding ${r.funding.toFixed(2)}${liquidated ? ', liquidated' : ''}): ${diff >= 0 ? '+' : ''}${diff.toFixed(2)} booked` });
+  }
+  if (st.seenOrderIds.length > 1000) st.seenOrderIds = st.seenOrderIds.slice(-1000);
+}
+
 // sig: signal.series() of the closed 4H candles (full runs), or null (sync:
 // reconcile only — never opens, exits or trails).
 async function runExchange({ client, st, sig = null, events, halt = false, now = Date.now() }) {
@@ -400,8 +448,9 @@ async function runExchange({ client, st, sig = null, events, halt = false, now =
   adoptPending(st, live, events, now);
   await reconcile({ client, st, live, events, now });
   await recordFunding(client, st, events, now);
+  await settleWithExchange(client, st, events, now);
   // the stop on the real price: checked on every run and sync, before any trailing
-  await toSoftStop({ client, st, events });
+  await toSoftStop({ client, st, live, events });
   if (await checkSoftStop({ client, st, live, events, now })) {
     wallet = await client.getWallet();
     live = (await client.getPositions())[SYMBOL] || null;
@@ -414,7 +463,11 @@ async function runExchange({ client, st, sig = null, events, halt = false, now =
         live = (await client.getPositions())[SYMBOL] || null;
       }
     }
-    if (!st.position) await openEntry({ client, st, live, wallet, s: sig[sig.length - 1], events, halt, now });
+    if (!st.position) {
+      await openEntry({ client, st, live, wallet, s: sig[sig.length - 1], events, halt, now });
+      // a new position: its safety stop as soon as the exchange shows the liquidation price
+      if (st.position && config.STOP_ON_REAL_PRICE) await toSoftStop({ client, st, live: (await client.getPositions())[SYMBOL] || null, events });
+    }
   }
   st.account.exchangeEquity = wallet.equity;
 }

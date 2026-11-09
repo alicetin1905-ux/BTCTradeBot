@@ -48,7 +48,7 @@ function fakeBybit({ equity = 10000, mark = 100000 } = {}) {
     },
     async getPositions() {
       const out = JSON.parse(JSON.stringify(ex.positions));
-      for (const p of Object.values(out)) p.markPrice = ex.marks[p.symbol];
+      for (const p of Object.values(out)) { p.markPrice = ex.marks[p.symbol]; if (ex.liq && ex.liq[p.symbol]) p.liqPrice = ex.liq[p.symbol]; }
       return out;
     },
     async getInstrument() { return INST; },
@@ -546,7 +546,7 @@ test('OKX: positions keyed like Bybit, size in BTC, stop read from the stop-loss
     algos: [{ ordType: 'conditional', algoId: 'a1', instId: 'BTC-USDT-SWAP', slTriggerPx: '102000' }],
   });
   const p = await okxClient(f).getPositions();
-  assert.deepEqual(p.BTCUSDT, { symbol: 'BTCUSDT', bias: -1, size: 0.03, avgPrice: 100000, markPrice: 99000, unrealisedPnl: 30, stopLoss: 102000, takeProfit: null });
+  assert.deepEqual(p.BTCUSDT, { symbol: 'BTCUSDT', bias: -1, size: 0.03, avgPrice: 100000, markPrice: 99000, unrealisedPnl: 30, stopLoss: 102000, takeProfit: null, liqPrice: null });
   assert.equal(p.SOLUSDT.bias, 1);
 });
 
@@ -732,7 +732,7 @@ test('OKX XPERP future: 1 BTC contracts, USDC margin, 10x, FUTURES endpoints, it
   assert.deepEqual(await c.getWallet(), { equity: 1999.94, available: 1999.94 });
   assert.deepEqual(await c.getInstrument('BTCUSDT'), { qtyStep: 0.0001, minOrderQty: 0.0001, minNotional: 0, tickSize: 0.1 });
   const p = await c.getPositions();
-  assert.deepEqual(p.BTCUSDT, { symbol: 'BTCUSDT', bias: 1, size: 0.0234, avgPrice: 100000, markPrice: 101000, unrealisedPnl: 23.4, stopLoss: 98000, takeProfit: null });
+  assert.deepEqual(p.BTCUSDT, { symbol: 'BTCUSDT', bias: 1, size: 0.0234, avgPrice: 100000, markPrice: 101000, unrealisedPnl: 23.4, stopLoss: 98000, takeProfit: null, liqPrice: null });
   await c.setLeverage('BTCUSDT', 10);
   await c.openMarket({ symbol: 'BTCUSDT', bias: 1, qty: 0.0234, stopLoss: 98000 });
   assert.deepEqual(f.S.calls.find(x => x.path === '/api/v5/account/set-leverage').body, { instId: XP, lever: '10', mgnMode: 'cross' });
@@ -1223,45 +1223,68 @@ function realPriceSeq(rows) { // each check returns the next { high, low, last }
   let i = 0;
   return { calls: [], async extremesSince(coin, since, now) { this.calls.push([coin, since, now]); const r = rows[Math.min(i++, rows.length - 1)]; if (r instanceof Error) throw r; return { ...r, source: 'test' }; } };
 }
-
-test('real-price stop: OKX gets only a safety stop 2x away; a demo spike past the stop does nothing; the real price closes it', async () => {
+async function withRealStop(rows, fn) {
   config.STOP_ON_REAL_PRICE = true; config.EMERGENCY_STOP_X = 2;
-  const rp = realPriceSeq([{ high: 100500, low: 99500, last: 100200 }, { high: 100600, low: 98100, last: 98400 }, { high: 98500, low: 97900, last: 98000 }]);
+  const rp = realPriceSeq(rows);
   exchange.setRealPrice(rp);
-  try {
+  try { await fn(rp); } finally { config.STOP_ON_REAL_PRICE = false; exchange.setRealPrice(require('../src/realprice')); }
+}
+
+test('real-price stop: the order carries the stop, then OKX gets a safety stop 2x away; a demo spike does nothing; the real price closes it', async () => {
+  await withRealStop([{ high: 100500, low: 99500, last: 100200 }, { high: 100600, low: 98100, last: 98400 }, { high: 98500, low: 97900, last: 98000 }], async (rp) => {
     const { ex, client } = fakeBybit();
+    ex.liq = { BTCUSDT: 91000 }; // 9% below: room for the full 2x safety stop
     const st = freshState();
     await enterLong(client, st);
-    // stop 2 ATR = 98,000 is the position's stop; the order carried the safety stop 2 x 2 ATR = 96,000
+    assert.equal(ex.calls.find(c => c[0] === 'openMarket')[4], 98000);       // the order: the normal stop
+    assert.deepEqual(ex.calls.filter(c => c[0] === 'setStopLoss').pop(), ['setStopLoss', 'BTCUSDT', 96000]); // then the safety stop
     assert.equal(st.position.stop, 98000);
-    assert.equal(ex.calls.find(c => c[0] === 'openMarket')[4], 96000);
     assert.equal(st.position.exchangeStop, 96000);
     // the demo mark spikes below the stop: nothing happens while the real price stays above it
     ex.marks.BTCUSDT = 97500;
     let events = [];
     await exchange.runExchange({ client, st, events, now: after(T0) + 5 * 60000 });
-    assert.ok(st.position, 'still open');
-    // the real low reaches 98,100 — above the stop, still open
+    assert.ok(st.position);
     events = [];
     await exchange.runExchange({ client, st, events, now: after(T0) + 10 * 60000 });
-    assert.ok(st.position);
-    // the real low 97,900 is through the stop: closed at market, logged as a real-price stop
+    assert.ok(st.position, 'real low 98,100 is above the stop');
     ex.marks.BTCUSDT = 97950;
     events = [];
     await exchange.runExchange({ client, st, events, now: after(T0) + 15 * 60000 });
     assert.equal(st.position, null);
-    assert.ok(ex.calls.some(c => c[0] === 'closeMarket'));
     assert.match(events.map(e => e.reason).join('\n'), /stop 98,000(\.0)? reached on the real price \(low 97,900/);
-    // each check reads from the previous one on
-    assert.equal(rp.calls[1][1], after(T0) + 5 * 60000);
-  } finally { config.STOP_ON_REAL_PRICE = false; exchange.setRealPrice(require('../src/realprice')); }
+    assert.equal(rp.calls[1][1], after(T0) + 5 * 60000); // each check reads on from the previous one
+  });
 });
 
-test('real-price stop: the safety stop trails behind the stop; no real price = the safety stop still protects; an open position is switched over', async () => {
-  config.STOP_ON_REAL_PRICE = true; config.EMERGENCY_STOP_X = 2;
-  exchange.setRealPrice(realPriceSeq([{ high: 104200, low: 100000, last: 104000 }, new Error('offline')]));
-  try {
+test('real-price stop: the safety stop stays inside the liquidation price; no liquidation price = the normal stop stays on OKX', async () => {
+  await withRealStop([{ high: 100300, low: 99800, last: 100100 }], async () => {
+    // liquidation 5% away (10x isolated on the demo): the 2x safety stop (96,000) would lie past 96,250 → pulled in to 96,250
+    let { ex, client } = fakeBybit();
+    ex.liq = { BTCUSDT: 95000 };
+    let st = freshState();
+    await enterLong(client, st);
+    assert.equal(st.position.exchangeStop, 96250);
+    assert.equal(st.position.emergencyGap, 1750);
+    // liquidation price unknown: nothing widened, the stop on OKX is the normal one
+    ({ ex, client } = fakeBybit());
+    st = freshState();
+    await enterLong(client, st);
+    assert.equal(ex.positions.BTCUSDT.stopLoss, 98000);
+    assert.ok(!(st.position.emergencyGap > 0));
+    // liquidation closer than the stop allows: no safety stop either
+    ({ ex, client } = fakeBybit());
+    ex.liq = { BTCUSDT: 97800 };
+    st = freshState();
+    await enterLong(client, st);
+    assert.equal(ex.positions.BTCUSDT.stopLoss, 98000);
+  });
+});
+
+test('real-price stop: the safety stop trails behind the stop; no real price = the safety stop still protects; OKX safety stop booked as such; an open position switches over', async () => {
+  await withRealStop([{ high: 104200, low: 100000, last: 104000 }, new Error('offline')], async () => {
     const { ex, client } = fakeBybit();
+    ex.liq = { BTCUSDT: 91000 };
     const st = freshState();
     await enterLong(client, st);
     // trail: best close 104,000 - 3 ATR = 101,000 → safety stop keeps its 2,000 distance: 99,000
@@ -1270,7 +1293,6 @@ test('real-price stop: the safety stop trails behind the stop; no real price = t
     await exchange.runExchange({ client, st, sig: [S(T0, 100000), S(T0 + TF, 104000)], events, now: after(T0 + TF) });
     assert.equal(st.position.stop, 101000);
     assert.equal(st.position.exchangeStop, 99000);
-    assert.deepEqual(ex.calls.filter(c => c[0] === 'setStopLoss').pop(), ['setStopLoss', 'BTCUSDT', 99000]);
     // real price unreadable: nothing closes, a note says the safety stop protects
     events = [];
     await exchange.runExchange({ client, st, events, now: after(T0 + TF) + 5 * 60000 });
@@ -1281,18 +1303,42 @@ test('real-price stop: the safety stop trails behind the stop; no real price = t
     events = [];
     await exchange.runExchange({ client, st, events, now: after(T0 + TF) + 10 * 60000 });
     assert.equal(st.trades.at(-1).reason, 'OKX safety stop');
-
-    // a position opened before the switch (stop on the exchange) gets its safety stop on the next run
-    config.STOP_ON_REAL_PRICE = false;
-    const b = fakeBybit(); const st2 = freshState();
-    await enterLong(b.client, st2);
-    assert.equal(b.ex.positions.BTCUSDT.stopLoss, 98000);
-    config.STOP_ON_REAL_PRICE = true;
-    exchange.setRealPrice(realPriceSeq([{ high: 100300, low: 99800, last: 100100 }]));
-    events = [];
+  });
+  // a position opened before the switch gets its safety stop on the next run
+  config.STOP_ON_REAL_PRICE = false;
+  const b = fakeBybit(); b.ex.liq = { BTCUSDT: 91000 };
+  const st2 = freshState();
+  await enterLong(b.client, st2);
+  assert.equal(b.ex.positions.BTCUSDT.stopLoss, 98000);
+  await withRealStop([{ high: 100300, low: 99800, last: 100100 }], async () => {
+    const events = [];
     await exchange.runExchange({ client: b.client, st: st2, events, now: after(T0) + 5 * 60000 });
     assert.equal(st2.position.stop, 98000);
     assert.equal(b.ex.positions.BTCUSDT.stopLoss, 96000);
     assert.match(events.map(e => e.reason).join('\n'), /now watched on the real price; OKX keeps a safety stop at 96,000/);
-  } finally { config.STOP_ON_REAL_PRICE = false; exchange.setRealPrice(require('../src/realprice')); }
+  });
+});
+
+test('settlement: OKX\'s realized P&L per position (fees, funding, a liquidation\'s lost margin) is booked once, after a wait', async () => {
+  const { ex, client } = fakeBybit();
+  const st = freshState();
+  st.account.startedAt = T0 - 86400000;
+  await enterLong(client, st);
+  const openedAt = st.position.openedAt;
+  ex.hitStop('BTCUSDT', after(T0) + 3600000);
+  await exchange.runExchange({ client, st, events: [], now: after(T0) + 3600000 + 60000 });
+  const booked = st.trades.reduce((s, t) => s + t.pnl, 0), balance = st.account.balance;
+  // OKX: liquidated, the whole margin lost
+  client.getPositionsHistory = async () => [{ id: 'p1:9', symbol: 'BTCUSDT', openedAt: openedAt + 800, closedAt: after(T0) + 3600000, realized: booked - 30.5, pnl: booked, fee: -0.6, funding: 0, type: '3', exit: 97000 }];
+  // too soon after the close: waits
+  await exchange.runExchange({ client, st, events: [], now: after(T0) + 3600000 + 5 * 60000 });
+  assert.equal(st.account.balance, balance);
+  const events = [];
+  await exchange.runExchange({ client, st, events, now: after(T0) + 3600000 + 15 * 60000 });
+  assert.ok(Math.abs(st.account.balance - (balance - 30.5)) < 1e-6);
+  assert.match(st.trades.at(-1).reason, /liquidated by OKX/);
+  assert.match(events.map(e => e.reason).join('\n'), /OKX settled .* -30\.50 booked/);
+  // only once
+  await exchange.runExchange({ client, st, events: [], now: after(T0) + 3600000 + 25 * 60000 });
+  assert.ok(Math.abs(st.account.balance - (balance - 30.5)) < 1e-6);
 });
