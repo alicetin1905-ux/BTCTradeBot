@@ -75,7 +75,7 @@
   "minR": 0,
   "closeT": 1794312000000,
   "source": "binance",
-  "at": 1794319321787,
+  "at": 1794321121917,
   "wait": "no pullback or breakout setup on the last 4H close",
   "strategy": "learning",
   "chart": [
