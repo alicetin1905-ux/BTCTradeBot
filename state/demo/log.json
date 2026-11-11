@@ -522,5 +522,16 @@
     "side": 0,
     "expR": null,
     "decision": "a position is open"
+  },
+  {
+    "at": 1794355325486,
+    "kind": "scan",
+    "candleT": 1794340800000,
+    "close": 73796.06,
+    "trend": -1,
+    "setup": null,
+    "side": 0,
+    "expR": null,
+    "decision": "a position is open"
   }
 ]
