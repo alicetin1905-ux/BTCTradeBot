@@ -75,7 +75,7 @@
   "minR": 0,
   "closeT": 1794369600000,
   "source": "binance",
-  "at": 1794376924449,
+  "at": 1794378724029,
   "wait": "a position is open",
   "strategy": "learning",
   "chart": [
