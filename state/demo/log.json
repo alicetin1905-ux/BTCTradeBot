@@ -696,5 +696,10 @@
     "at": 1794542524268,
     "kind": "trail",
     "text": "stop trailed 75,415.6 → 74,242.1 (OKX safety stop 75,327.2)"
+  },
+  {
+    "at": 1794544324941,
+    "kind": "trail",
+    "text": "stop trailed 74,242.1 → 72,920.6 (OKX safety stop 74,005.7)"
   }
 ]
