@@ -28,7 +28,7 @@ bot took it or not. Older results count half after 4 years. The bot only trades 
 (`LEARN.MIN_R` 0). So every finished setup is something it learns from.
 
 **Money rules:**
-- 2% of the balance at risk per trade (1% until 2026-11-13).
+- 2.5% of the balance at risk per trade (1% until 2026-11-13).
 - Initial stop 2×ATR, trailed 5×ATR behind the best close; no take-profit.
 - At most 2 positions (one per coin), each at most 2× the balance.
 - Daily loss limit 20%.
@@ -49,7 +49,8 @@ Walk-forward test: the model only learns from what happened before each decision
 | Setups alone (2% risk, trail 4) | 516 | 30% | 1.31 | $15,444 | 36% |
 | With the learner (2% risk, trail 4) | 419 | 32% | 1.48 | $22,490 | 37% |
 | Learner, 1% risk, trail 5 (until 2026-11-13) | 356 | 31% | 1.76 | $10,155 | 21% |
-| **Live settings: learner, 2% risk, trail 5** | 356 | 31% | **1.69** | **$32,566** | **37%** |
+| Learner, 2% risk, trail 5 | 356 | 31% | 1.69 | $32,566 | 37% |
+| **Live settings: learner, 2.5% risk, trail 5** | 356 | 31% | **1.65** | **$49,765** | **44%** |
 
 With the live settings every year was positive: +34, +7, +55, +35, +28 and +28 R (2021 - 2026). With features shuffled at random, the learner gives no
 improvement, so the learning is real.
