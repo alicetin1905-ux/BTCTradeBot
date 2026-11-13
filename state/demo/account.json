@@ -7,9 +7,9 @@
   },
   "startedAt": 1793715002577,
   "fundingError": null,
-  "exchangeEquity": 1986.4470434076068,
+  "exchangeEquity": 1985.6299334076066,
   "settings": {
-    "RISK_PCT": 1,
+    "RISK_PCT": 2,
     "COIN_RISK_PCT": {},
     "TRADE_MODE": "atr",
     "COIN_FIXED": {},
@@ -41,7 +41,7 @@
     "STATUS_EVERY_H": 4
   },
   "settingsDefaults": {
-    "RISK_PCT": 1,
+    "RISK_PCT": 2,
     "COIN_RISK_PCT": {},
     "TRADE_MODE": "atr",
     "COIN_FIXED": {},
@@ -83,7 +83,7 @@
     "ETH",
     "BTC"
   ],
-  "updatedAt": 1794567904934,
+  "updatedAt": 1794568205728,
   "lastRunAt": 1794567726193,
   "instrument": "BTC-USD_UM_XPERP-310328"
 }
