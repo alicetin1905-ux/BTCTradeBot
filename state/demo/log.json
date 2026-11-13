@@ -675,5 +675,10 @@
     "side": 0,
     "expR": null,
     "decision": "a position is open"
+  },
+  {
+    "at": 1794529923426,
+    "kind": "trail",
+    "text": "stop trailed 75,642.4 → 75,415.6 (OKX safety stop 76,500.7)"
   }
 ]
