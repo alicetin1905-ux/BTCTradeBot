@@ -157,7 +157,7 @@ const config = module.exports = {
   // Money rules.
   PORTFOLIO: {
     STARTING_BALANCE: 2000, // USDT — the bot's allocation; it trades like a 2000 USDT account
-    RISK_PCT: 1,            // loss at the initial stop per trade, % of the balance (owner's choice 2026-11-03). Learning bot 2021-26: 1% = PF 1.73, $2,000 -> $9,766, worst drop 21%
+    RISK_PCT: 2,            // loss at the initial stop per trade, % of the balance. 2% since 2026-11-13 (owner's choice, was 1%). Learning bot 2021-26: 1% = PF 1.76, $2,000 -> $10,155, worst drop 21%; 2% = PF 1.69, $2,000 -> $32,566, worst drop 37%
     MAX_POSITION_X: 2,      // position value at most this many x the balance (caps size on tight stops)
     LEVERAGE: 5,            // exchange leverage (isolated margin): margin = position value / leverage. 5x since 2026-11-09 (owner's choice):
                             // at 10x isolated the demo liquidated only ~5% from the entry (ETH 2026-11-09); at 5x ~15%, so the stop and
