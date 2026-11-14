@@ -19,11 +19,12 @@ function messagesFor(events, st) {
   const out = [];
   for (const ev of events) {
     if (ev.type === 'enter') {
+      const second = ev.part === 2 ? ' (2nd position, same side)' : '';
       const dir = ev.bias === 1 ? 'LONG' : 'SHORT';
       out.push({
-        title: `${config.COIN} ${dir} opened @ ${px(ev.entry)}`,
+        title: `${config.COIN} ${dir} opened @ ${px(ev.entry)}${second}`,
         message: (ev.setup
-          ? `${ev.setup === 'pullback' ? `Trend pullback (${ev.bias === 1 ? 'uptrend, back above EMA20' : 'downtrend, back below EMA20'})` : `Breakout of the 20-candle ${ev.bias === 1 ? 'high' : 'low'} with the trend`}; the learner expects ${ev.expR == null ? '?' : (ev.expR >= 0 ? '+' : '') + ev.expR.toFixed(2) + ' R'} (4H close ${px(ev.close)})\n`
+          ? `${ev.setup === 'pullback' ? `Trend pullback (${ev.bias === 1 ? 'uptrend, back above EMA20' : 'downtrend, back below EMA20'})` : ev.setup === 'emacross' ? `EMA20 crossed ${ev.bias === 1 ? 'above' : 'below'} EMA50 with the trend` : `Breakout of the 20-candle ${ev.bias === 1 ? 'high' : 'low'} with the trend`}; the learner expects ${ev.expR == null ? '?' : (ev.expR >= 0 ? '+' : '') + ev.expR.toFixed(2) + ' R'} (4H close ${px(ev.close)})\n`
           : ev.pullback
           ? `Trend pullback: ${ev.bias === 1 ? 'uptrend' : 'downtrend'} (EMA50 ${ev.bias === 1 ? 'above' : 'below'} EMA200), the 4H candle touched EMA20 and closed back ${ev.bias === 1 ? 'above' : 'below'} it (4H close ${px(ev.close)})\n`
           : ev.breakout != null

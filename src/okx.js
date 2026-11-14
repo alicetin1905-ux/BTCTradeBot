@@ -339,6 +339,25 @@ function createSwapClient(opts) {
       }
     },
 
+    // One stop for the WHOLE position (closeFraction 1), at stopLoss: a stop attached to the entry order covers only
+    // that order's size, so after a second part is added it is replaced by a whole-position one (placed first, the
+    // old one cancelled after). Already whole-position: amended in place.
+    async ensureWholeStop(symbol, stopLoss) {
+      const live = (await this.getPositions())[symbol];
+      if (!live) throw new Error(`no ${symbol} position on OKX`);
+      const mark = await this.getMarkPrice(symbol);
+      if ((mark - stopLoss) * live.bias <= 0) throw new Error(`stop ${stopLoss} is on the wrong side of the mark price ${mark}`);
+      const current = await stopOrders(symbol);
+      const partial = current.filter(o => String(o.closeFraction) !== '1');
+      if (current.length && !partial.length) return this.setStopLoss(symbol, stopLoss);
+      try { await placeStop(symbol, live.bias, stopLoss); } catch (e) {
+        if (String(e.code) === '51088') return this.setStopLoss(symbol, stopLoss); // a whole-position stop exists after all
+        throw e;
+      }
+      const old = current; // everything that was there before the new whole-position stop
+      if (old.length) await request('POST', '/api/v5/trade/cancel-algos', old.map(o => ({ algoId: o.algoId, instId: o.instId })));
+    },
+
     // More of the same side onto an open position: a plain market order (the position's own
     // stop / take-profit algo covers the whole position, so nothing is attached here).
     async addToPosition({ symbol, bias, qty }) {

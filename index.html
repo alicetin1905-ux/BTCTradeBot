@@ -296,10 +296,10 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
 
 <footer>
   Demo funds on the OKX demo account — a rehearsal of the strategy, not investment advice.
-  The learning bot (BTC and ETH, each with its own position and stop, sharing one balance, at most 2 open at once): on every 4H close it looks for a
-  trend pullback (with the EMA50/EMA200 trend, a dip to EMA20 that closes back) or a 20-candle breakout with the trend. A model trained on every earlier
+  The learning bot (BTC and ETH, up to 2 positions per coin on the same side, each with its own stop, sharing one balance, at most 4 open at once): on every 4H close it looks for a
+  trend pullback (with the EMA50/EMA200 trend, a dip to EMA20 that closes back), a 20-candle breakout or an EMA20/EMA50 cross with the trend. A model trained on every earlier
   setup and how it ended — features from the ATLAS indicators and the BTC-Halving 200-week average and cycle — estimates the expected result, and the bot
-  only trades setups it expects to win. It retrains on every new finished setup. 1% risk, initial stop 2×ATR, trailed 5×ATR behind the best close, no take-profit.
+  only trades setups it expects to win. It retrains on every new finished setup. 1.5% risk per position, initial stop 2×ATR, trailed 5×ATR behind the best close, no take-profit.
   Walk-forward test: <a href="https://github.com/alicetin1905-ux/BTCTradeBot/blob/main/research/LEARNING.md" target="_blank" rel="noopener">research/LEARNING.md</a>.
   State refreshes every minute from the repo; the live price every 10 s.
 </footer>
@@ -379,6 +379,24 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     return Object.keys(g).map(function (k) { return g[k]; }).sort(function (a, b) { return a.closedAt - b.closedAt; });
   }
 
+  // Two positions on one coin (same side, one net position on OKX): shown as one, with its parts listed.
+  // entry = the size-weighted average; stop = the price at which the parts' stops together give the same result.
+  function combineParts(p1, p2) {
+    if (!p1 || !p2) return p1 || p2 || null;
+    var q = p1.qty + p2.qty, e = (p1.entry * p1.qty + p2.entry * p2.qty) / q;
+    var atStops = (p1.stop - p1.entry) * p1.bias * p1.qty + (p2.stop - p2.entry) * p2.bias * p2.qty;
+    var o = {}; for (var k in p1) o[k] = p1[k];
+    o.parts = [p1, p2]; o.qty = +q.toFixed(8); o.entry = e; o.stop = e + p1.bias * atStops / q;
+    o.notional = (p1.notional || p1.qty * p1.entry) + (p2.notional || p2.qty * p2.entry); o.margin = (p1.margin || 0) + (p2.margin || 0);
+    o.riskAmt = (p1.riskAmt || 0) + (p2.riskAmt || 0); o.trailed = !!(p1.trailed || p2.trailed);
+    o.unrealisedPnl = (p1.unrealisedPnl || 0) + (p2.unrealisedPnl || 0);
+    return o;
+  }
+  function partsText(p) {
+    if (!p || !p.parts) return '';
+    return p.parts.map(function (x, i) { return '#' + (i + 1) + ' ' + x.qty + ' @ ' + px(x.entry) + ' stop ' + px(x.stop) + (x.trailed ? ' (trailed)' : '') + (x.setup ? ' · ' + x.setup : ''); }).join('  ·  ');
+  }
+
   function livePnl(p, coin) {
     var l = S.liveBy[coin || S.coin];
     if (l && l.px) return (l.px - p.entry) * p.bias * p.qty;
@@ -438,9 +456,9 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       '<dt>Size</dt><dd>' + esc(p.qty) + ' ' + esc(coin) + ' · ' + esc(usd(p.qty * p.entry)) + '</dd>' +
       '<dt>Entry</dt><dd>' + esc(px(p.entry)) + '</dd>' +
       '<dt>Price now</dt><dd>' + esc(px(mark)) + '</dd>' +
-      '<dt>Stop ' + (p.trailed ? '(trailed)' : '(initial)') + '</dt><dd class="' + (locked >= 0 ? 'up' : 'dn') + '">' + esc(px(p.stop)) + '</dd>' +
+      (p.parts ? '<dt>Positions</dt><dd>' + esc(partsText(p)) + '</dd>' : '<dt>Stop ' + (p.trailed ? '(trailed)' : '(initial)') + '</dt><dd class="' + (locked >= 0 ? 'up' : 'dn') + '">' + esc(px(p.stop)) + '</dd>') +
       (p.takeProfit ? '<dt>Take profit</dt><dd class="up">' + esc(px(p.takeProfit)) + '</dd><dt>Gain at the target</dt><dd class="up">' + esc(signed((p.takeProfit - p.entry) * p.bias * p.qty)) + '</dd>' : '') +
-      '<dt>Distance to stop</dt><dd>' + (toStop == null ? '—' : esc(toStop.toFixed(2)) + '%') + '</dd>' +
+      (p.parts ? '' : '<dt>Distance to stop</dt><dd>' + (toStop == null ? '—' : esc(toStop.toFixed(2)) + '%') + '</dd>') +
       '<dt>At the stop</dt><dd class="' + cls(locked) + '">' + esc(signed(locked)) + (locked >= 0 ? ' locked in' : '') + '</dd>' +
       '<dt>Risk when opened</dt><dd>' + esc(usd(p.riskAmt)) + '</dd>' +
       (p.funding ? '<dt>Funding so far</dt><dd class="' + cls(p.funding) + '">' + esc(signed(p.funding)) + '</dd>' : '') +
@@ -627,9 +645,10 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
         '<span class="lt-big ' + cls(pnl) + '">' + esc(signed(pnl)) + '</span><span class="lt-chg ' + cls(pnl) + '">' + esc(pc((price / p.entry - 1) * p.bias)) + ' · ' + esc(rr(R)) + '</span></div>' +
         '<div class="lt-bar"><i style="left:' + a + '%;width:' + Math.max(0.5, b - a) + '%;background:' + (R >= 0 ? 'var(--up)' : 'var(--dn)') + '"></i>' +
         '<b style="left:' + X(0) + '%"></b><b style="left:' + X(stopR) + '%;background:var(--dn)"></b></div>' +
-        '<div class="lt-scale"><span>stop ' + esc(px(p.stop)) + ' (' + esc(rr(stopR)) + ')</span><span>entry ' + esc(px(p.entry)) + '</span><span>' + esc(rr(hi)) + '</span></div>' +
+        '<div class="lt-scale"><span>' + (p.parts ? 'at the stops' : 'stop ' + esc(px(p.stop))) + ' (' + esc(rr(stopR)) + ')</span><span>' + (p.parts ? 'avg entry ' : 'entry ') + esc(px(p.entry)) + '</span><span>' + esc(rr(hi)) + '</span></div>' +
         '<div class="lt-status dim">' + esc(p.qty) + ' ' + esc(coin) + ' · $' + Math.round(p.notional || p.qty * p.entry).toLocaleString('en-US') + ' · margin $' + Math.round(p.margin || 0) +
-        ' · risk $' + Math.round(risk) + (p.trailed ? ' · stop trailed' : '') + (p.setup ? ' · ' + esc(p.setup) + ' setup' : '') + '</div>';
+        ' · risk $' + Math.round(risk) + (p.parts ? '' : (p.trailed ? ' · stop trailed' : '') + (p.setup ? ' · ' + esc(p.setup) + ' setup' : '')) + '</div>' +
+        (p.parts ? '<div class="lt-status dim">2 positions: ' + esc(partsText(p)) + '</div>' : '');
     } else {
       var r = readiness(s, price);
       if (r && r.best) {
@@ -665,7 +684,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     var side = function (d) { return d === 1 ? 'long' : d === -1 ? 'short' : ''; };
     if (e.kind === 'scan') {
       var what = e.setup ? side(e.side) + ' ' + e.setup + ' setup, learner ' + (e.expR == null ? '?' : (e.expR >= 0 ? '+' : '−') + Math.abs(e.expR).toFixed(2) + ' R') : 'no setup';
-      var dec = e.decision || '', why = dec === 'entered' ? 'entered' : /skipped/.test(dec) ? 'skipped' : /min ago/.test(dec) ? 'missed (bot ran late)' : /position is open/.test(dec) ? 'position already open'
+      var dec = e.decision || '', why = dec === 'entered' ? 'entered' : /skipped/.test(dec) ? 'skipped' : /min ago/.test(dec) ? 'missed (bot ran late)' : /position is open|positions are open/.test(dec) ? 'position already open' : /next to it/.test(dec) ? 'opposite to the open position'
         : /positions already open/.test(dec) ? 'max positions open' : /daily loss/.test(dec) ? 'daily loss limit' : /halted/.test(dec) ? 'trading halted' : dec;
       return { dir: 0, icon: '◦', text: '4H close ' + px(e.close) + ' · ' + (e.trend === 1 ? 'uptrend' : e.trend === -1 ? 'downtrend' : 'no trend') + ' · ' + what + (e.setup && why ? ' → ' + why : '') };
     }
@@ -690,14 +709,16 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     var price = S.liveBy[c] && S.liveBy[c].px, u = p ? (price ? (price - p.entry) * p.bias * p.qty : livePnl(p, c)) : 0;
     return '<a class="card botcard ' + (c === 'BTC' ? 'o2' : 'o4') + '" id="botcard-' + c + '" href="#' + c.toLowerCase() + '-bot">' +
       '<div class="lt-head" style="margin-bottom:6px"><span class="led" id="led-botcard-' + c + '"></span><span class="lt-coin">' + esc(c) + ' BOT</span>' +
-      '<span class="pill ' + (stale ? 'short' : p ? (p.bias === 1 ? 'long' : 'short') : 'flat') + '">' + (stale ? 'NO RECENT RUN' : p ? (p.bias === 1 ? 'IN A LONG' : 'IN A SHORT') : 'WATCHING') + '</span>' +
+      '<span class="pill ' + (stale ? 'short' : p ? (p.bias === 1 ? 'long' : 'short') : 'flat') + '">' + (stale ? 'NO RECENT RUN' : p ? (p.parts ? (p.bias === 1 ? '2 LONGS' : '2 SHORTS') : (p.bias === 1 ? 'IN A LONG' : 'IN A SHORT')) : 'WATCHING') + '</span>' +
       (p ? '' : '<span class="lt-px" style="font-size:16px">' + esc(signed(real)) + '</span>') + '</div>' +
       // an open trade: its live P&L, recomputed from the live price every few seconds
       (p ? (function () {
         var risk = p.riskAmt || Math.abs(p.entry - p.initialStop) * p.qty, R = risk ? u / risk : 0, pc = price ? (price / p.entry - 1) * p.bias * 100 : 0;
         return '<div class="livepnl"><span class="live-tag"><i></i>LIVE</span><b class="' + cls(u) + '">' + esc(signed(u)) + '</b>' +
           '<span class="' + cls(u) + '">' + (pc >= 0 ? '+' : '−') + Math.abs(pc).toFixed(2) + '% · ' + (R >= 0 ? '+' : '−') + Math.abs(R).toFixed(2) + ' R</span></div>' +
-          '<div class="lt-status dim" style="margin:0">entry ' + esc(px(p.entry)) + ' · now ' + esc(px(price || p.markPrice)) + ' · stop ' + esc(px(p.stop)) + (p.trailed ? ' (trailed)' : '') + (p.emergencyGap > 0 && p.exchangeStop ? ' · OKX safety ' + esc(px(p.exchangeStop)) : '') + '</div>';
+          (p.parts
+            ? '<div class="lt-status dim" style="margin:0">' + esc(partsText(p)) + ' · now ' + esc(px(price || p.markPrice)) + (p.exchangeStop ? ' · OKX safety ' + esc(px(p.exchangeStop)) : '') + '</div>'
+            : '<div class="lt-status dim" style="margin:0">entry ' + esc(px(p.entry)) + ' · now ' + esc(px(price || p.markPrice)) + ' · stop ' + esc(px(p.stop)) + (p.trailed ? ' (trailed)' : '') + (p.emergencyGap > 0 && p.exchangeStop ? ' · OKX safety ' + esc(px(p.exchangeStop)) : '') + '</div>');
       })() : '<div class="lt-status dim" style="margin:0">realized · ' + (trades.length ? trades.length + ' trades, ' + w + ' won' : 'no trades yet') + '</div>') +
       learnLineHtml() +
       '<div class="bchart" data-coin="' + c + '" data-n="96"></div>' +
@@ -728,7 +749,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
     var scans = (d.log || []).filter(function (e) { return e.kind === 'scan'; }), setups = scans.filter(function (e) { return e.setup; });
     var rows = [
       ['Status', p ? (p.bias === 1 ? 'long' : 'short') + (p.openedAt ? ' since ' + when(p.openedAt) : '') : 'flat — watching every 4H close'],
-      p ? ['Position', p.qty + ' ' + c + ' at ' + px(p.entry) + ' · stop ' + px(p.stop) + (p.trailed ? ' (trailed)' : '')] : null,
+      p ? (p.parts ? ['Positions (2, same side)', partsText(p)] : ['Position', p.qty + ' ' + c + ' at ' + px(p.entry) + ' · stop ' + px(p.stop) + (p.trailed ? ' (trailed)' : '')]) : null,
       p ? ['Open P&L', signed(u)] : null,
       ['Realized by this bot', signed(real) + ' · ' + trades.length + ' trades, ' + w + ' won'],
       ['4H closes judged', scans.length + ' · ' + setups.length + ' with a setup · ' + scans.filter(function (e) { return e.decision === 'entered'; }).length + ' entered'],
@@ -756,7 +777,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       ['Leverage', (set.LEVERAGE || 10) + '× isolated'], ['Last full run', a.lastRunAt ? when(a.lastRunAt) + ' (' + ago(a.lastRunAt) + ')' : '—'], ['Last update', a.updatedAt ? ago(a.updatedAt) : '—'],
     ];
     return '<h2>Bot <span class="tag">' + esc(EXCHANGE_NAME[a.exchange] || '') + ' demo</span></h2><dl class="kv">' + rows.map(function (r) { return '<dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1]) + '</dd>'; }).join('') + '</dl>' +
-      '<div class="note">On every 4H close the bot looks for a trend pullback or a 20-candle breakout on BTC and ETH, asks the learner what it expects from it, and only trades setups it expects to win.</div>';
+      '<div class="note">On every 4H close the bot looks for a trend pullback, a 20-candle breakout or an EMA20/50 cross on BTC and ETH, asks the learner what it expects from it, and only trades setups it expects to win. Up to 2 positions per coin (same side), 4 in all.</div>';
   }
 
   function coinTradesHtml(coin) {
@@ -1451,10 +1472,10 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       setTimeout(function () { COINS2.forEach(function (c, i) { setTimeout(function () { pulseWire('coin-' + c, 'led-bot-' + c, 'botcard-' + c, 'led-botcard-' + c, 2); }, i * 400); }); }, 1500);
     }
     var coins = coinList();
-    var r = await Promise.all(coins.map(function (c) { return Promise.all(['position', 'trades', 'signal', 'log'].map(function (n) { return load(n, c); })); }));
+    var r = await Promise.all(coins.map(function (c) { return Promise.all(['position', 'trades', 'signal', 'log', 'position2'].map(function (n) { return load(n, c); })); }));
     S.byCoin = {}; S.trades = [];
     coins.forEach(function (c, i) {
-      S.byCoin[c] = { position: r[i][0], trades: r[i][1] || [], signal: r[i][2], log: r[i][3] || [] };
+      S.byCoin[c] = { position: combineParts(r[i][0], r[i][4]), trades: r[i][1] || [], signal: r[i][2], log: r[i][3] || [] };
       (r[i][1] || []).forEach(function (t) { var x = {}; for (var k in t) x[k] = t[k]; x.coin = c; S.trades.push(x); });
     });
     if (!S.byCoin[S.coin]) S.coin = coins[0];

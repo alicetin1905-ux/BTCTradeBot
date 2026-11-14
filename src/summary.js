@@ -38,9 +38,10 @@ function positionLine(p, coin = config.COIN) {
 }
 
 // Every coin's { coin, position, signal, trades }: this process's, then the peers'.
+// position2: a second position on that coin (MAX_POSITIONS_PER_COIN), shown on its own line.
 function coinsOf(st) {
-  return [{ coin: config.COIN, position: st.position, signal: st.signal, trades: st.trades }]
-    .concat(Object.entries(st.peers || {}).map(([coin, p]) => ({ coin, position: p.position, signal: p.signal, trades: p.trades || [] })))
+  return [{ coin: config.COIN, position: st.position, position2: st.position2 || null, signal: st.signal, trades: st.trades }]
+    .concat(Object.entries(st.peers || {}).map(([coin, p]) => ({ coin, position: p.position, position2: p.position2 || null, signal: p.signal, trades: p.trades || [] })))
     .sort((a, b) => (a.coin === 'BTC' ? -1 : b.coin === 'BTC' ? 1 : a.coin.localeCompare(b.coin)));
 }
 
@@ -57,7 +58,7 @@ function build(st, now) {
     `Balance $${a.balance.toFixed(2)} (${money(since)} since ${last.date ? 'yesterday' : 'start'}; started $${a.startingBalance.toFixed(0)})`,
     `Last 24h realized: ${money(day)}`,
     pos.length ? `All trades: ${wins}W / ${losses}L (${Math.round((wins / pos.length) * 100)}% win)` : 'No closed trades yet',
-    ...coins.map(c => (c.position ? positionLine(c.position, c.coin) : `${c.coin} flat`)),
+    ...[].concat(...coins.map(c => (c.position ? [positionLine(c.position, c.coin)].concat(c.position2 ? [positionLine(c.position2, c.coin + ' #2')] : []) : [`${c.coin} flat`]))),
   ];
   return { title: `BTC-ETH-BOT daily ·${money(since)}`, message: lines.join('\n'), tags: ['bar_chart'] };
 }
@@ -94,7 +95,7 @@ function weekly(st, now) {
   lines.unshift(t.n ? `This week: ${t.n} trade${t.n > 1 ? 's' : ''} · ${t.w}W / ${t.l}L (${Math.round((t.w / t.n) * 100)}% win) · ${money(t.pnl)}` : 'This week: no closed trades');
   lines.push(`Balance $${a.balance.toFixed(2)} (${money(a.balance - a.startingBalance)} since the start, $${a.startingBalance.toFixed(0)})`);
   lines.push(all.n ? `Since the start: ${all.n} trades · ${all.w}W / ${all.l}L (${Math.round((all.w / all.n) * 100)}% win)` : 'Since the start: no closed trades');
-  for (const c of coins) if (c.position) lines.push(positionLine(c.position, c.coin));
+  for (const c of coins) { if (c.position) lines.push(positionLine(c.position, c.coin)); if (c.position2) lines.push(positionLine(c.position2, c.coin + ' #2')); }
   return { title: `BTC-ETH-BOT weekly ·${money(t.pnl)}`, message: lines.join('\n'), tags: ['calendar'] };
 }
 
@@ -119,12 +120,12 @@ function statusDue(now = Date.now()) {
 function status(st) {
   const a = st.account;
   const coins = coinsOf(st);
-  const open = coins.reduce((sum, c) => sum + (c.position ? c.position.unrealisedPnl || 0 : 0), 0);
+  const open = coins.reduce((sum, c) => sum + (c.position ? c.position.unrealisedPnl || 0 : 0) + (c.position2 ? c.position2.unrealisedPnl || 0 : 0), 0);
   const equity = a.balance + open;
   const pct = ((equity / a.startingBalance - 1) * 100).toFixed(1);
   const lines = [];
-  for (const { coin, position: p, signal: s } of coins) {
-    if (p) lines.push(positionLine(p, coin));
+  for (const { coin, position: p, position2: p2, signal: s } of coins) {
+    if (p) { lines.push(positionLine(p, coin)); if (p2) lines.push(positionLine(p2, coin + ' #2')); }
     else if (s && s.learning) lines.push(`${coin} flat · 4H close ${px(s.close)} · ${s.trend === 1 ? 'uptrend' : s.trend === -1 ? 'downtrend' : 'no trend'}${s.setup ? ` · last setup ${s.setup}, expected ${(+s.expR).toFixed(2)} R` : ''}`);
     else if (s && s.pullback) lines.push(`${coin} flat · 4H close ${px(s.close)} · ${s.trend === 1 ? 'uptrend' : s.trend === -1 ? 'downtrend' : 'no trend'}`);
     else if (s && s.upper == null) lines.push(`${coin} flat · 4H close ${px(s.close)} · ATLAS ${s.score > 0 ? '+' : ''}${s.score}`);
@@ -133,7 +134,7 @@ function status(st) {
   }
   const X = config.FLIP_SCORE, h = config.FLIP_WINDOW * 4;
   if (config.STRATEGY === 'learning') {
-    lines.push('Learning bot: pullback and breakout setups with the 4H trend, taken when the learner expects a profit; stop 2 ATR, trailing ' + config.TRAIL_ATR + ' ATR');
+    lines.push('Learning bot: pullback, breakout and EMA-cross setups with the 4H trend, taken when the learner expects a profit; up to 2 positions per coin; stop 2 ATR, trailing ' + config.TRAIL_ATR + ' ATR');
   } else if (config.STRATEGY === 'trend-pullback') {
     lines.push('Enters with the 4H trend when a candle dips to EMA20 and closes back; stop 2 ATR, trailing ' + config.TRAIL_ATR + ' ATR');
   } else if (coins.some(c => c.signal && c.signal.upper == null)) {

@@ -67,7 +67,7 @@ const dirOf = (coin) => (coin === 'BTC' ? ROOT : path.join(ROOT, coin.toLowerCas
 const DIR = dirOf(COIN);
 // One balance for all coins (account, daily summary); everything else is per coin.
 const SHARED = ['account', 'summary'];
-const OWN = ['position', 'trades', 'closing', 'signal', 'seenOrderIds', 'commandsDone', 'meta', 'log'];
+const OWN = ['position', 'position2', 'trades', 'closing', 'signal', 'seenOrderIds', 'commandsDone', 'meta', 'log'];
 const FILES = [...SHARED, ...OWN];
 if (Object.keys(config.SETTINGS_APPLIED).length) console.log('settings.json:', JSON.stringify(config.SETTINGS_APPLIED));
 for (const e of config.SETTINGS_ERRORS) console.log('settings.json ignored —', e);
@@ -93,7 +93,7 @@ function loadPeers() {
   for (const c of COINS) {
     if (c === COIN) continue;
     const d = dirOf(c);
-    out[c] = { position: readJson('position', null, d), trades: readJson('trades', [], d), signal: readJson('signal', null, d) };
+    out[c] = { position: readJson('position', null, d), position2: readJson('position2', null, d), trades: readJson('trades', [], d), signal: readJson('signal', null, d) };
   }
   return out;
 }
@@ -103,6 +103,7 @@ function loadState() {
     peers: loadPeers(),
     account: readJson('account', null) || freshAccount(),
     position: readJson('position', null),
+    position2: readJson('position2', null),     // a second position on this coin (MAX_POSITIONS_PER_COIN), same side
     trades: readJson('trades', []),
     closing: readJson('closing', []),           // closed positions awaiting their final P&L record
     signal: readJson('signal', null),           // last 4H read, for the dashboard
@@ -322,7 +323,7 @@ async function runCommands(client, st, events) {
       }
       if (c.action === 'reset') {
         st.account = freshAccount();
-        st.position = null; st.closing = []; st.summary = null; st.meta = {};
+        st.position = null; st.position2 = null; st.closing = []; st.summary = null; st.meta = {};
         if (c.clearHistory) st.trades = [];
         await notify.push([{
           title: `${COIN} reset (balance back to ${P.STARTING_BALANCE} USDT)`,
@@ -431,7 +432,7 @@ async function syncOnExchange() {
   checkExchange(st);
   // Live mark/P&L fields change constantly; only real changes (fills,
   // closes, stop moves) trigger a save and upload.
-  const snapshot = () => JSON.stringify([st.position, st.trades, st.closing, st.account.balance],
+  const snapshot = () => JSON.stringify([st.position, st.position2, st.trades, st.closing, st.account.balance],
     (k, v) => (k === 'markPrice' || k === 'unrealisedPnl' ? undefined : v));
   const before = snapshot();
   const events = [];
@@ -464,6 +465,7 @@ function reset() {
   const st = loadState();
   st.account = freshAccount();
   st.position = null;
+  st.position2 = null;
   st.closing = [];
   st.meta = {};
   saveState(st); // trade history is kept
@@ -492,7 +494,8 @@ function printSummary(events, st) {
   else if (s) console.log(`\n4H close ${px(s.close)} · breakout above ${px(s.upper)}${config.DIRECTION === 'both' ? ` / below ${px(s.lower)}` : ''} · ATR ${px(s.atr)}${s.wait ? ' · ' + s.wait : ''}`);
   const p = st.position;
   console.log(`balance $${fmt(st.account.balance)} (started $${fmt(st.account.startingBalance)})` +
-    (p ? ` · ${p.bias === 1 ? 'long' : 'short'} ${p.qty} ${COIN} @ ${px(p.entry)}, stop ${px(p.stop)}` : ' · flat'));
+    (p ? ` · ${p.bias === 1 ? 'long' : 'short'} ${p.qty} ${COIN} @ ${px(p.entry)}, stop ${px(p.stop)}` : ' · flat') +
+    (st.position2 ? ` · second part ${st.position2.qty} @ ${px(st.position2.entry)}, stop ${px(st.position2.stop)}` : ''));
 }
 function fmt(x) { return (Math.round(x * 100) / 100).toLocaleString('en-US'); }
 function px(x) { return require('./format').price(x, 1); }

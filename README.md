@@ -7,11 +7,12 @@ It started on 2026-11-03.
 
 ## What it does
 
-On every 4H close (00/04/08/12/16/20 UTC) it looks for two trend setups:
+On every 4H close (00/04/08/12/16/20 UTC) it looks for three trend setups:
 
 - **pullback:** the trend is up (EMA50 above EMA200, close above EMA200); a candle dips to EMA20 and closes back
   above it. Shorts are the mirror image.
 - **breakout:** with the trend, the close breaks the high (low) of the previous 20 candles.
+- **EMA cross** (since 2026-11-14): with the trend, EMA20 crosses EMA50 to the trend's side.
 
 Every setup since 2017 is followed with the bot's own exits, so each has a result in **R**: the profit in units of
 the loss at the initial stop. A **ridge regression** (`src/learner.js`) learns from those results what makes a
@@ -28,10 +29,14 @@ bot took it or not. Older results count half after 4 years. The bot only trades 
 (`LEARN.MIN_R` 0). So every finished setup is something it learns from.
 
 **Money rules:**
-- 2.5% of the balance at risk per trade (1% until 2026-11-13), always. A risk guard that halves it while the learner's
-  self-check says 'watch' or 'alert' exists (`LEARN.GUARD_MULT` 0.5) but is off (1) by the owner's choice.
+- 1.5% of the balance at risk per position (since 2026-11-14; 2.5% before, 1% until 2026-11-13). A risk guard that halves it
+  while the learner's self-check says 'watch' or 'alert' exists (`LEARN.GUARD_MULT` 0.5) but is off (1) by the owner's choice.
 - Initial stop 2×ATR, trailed 5×ATR behind the best close; no take-profit.
-- At most 2 positions (one per coin), each at most 2× the balance.
+- **Up to 2 positions per coin**, 4 in all, each at most 2× the balance (since 2026-11-14; one per coin before). A second
+  setup on a coin that already has a position is taken too, on the same side only: OKX nets them into one position.
+  The bot keeps each part's own entry, size and stop (each watched on the real price, closed on its own), and OKX holds
+  one safety stop for the whole: the widest of the parts' safety levels, inside the liquidation price. Walk-forward
+  2021-26: about twice the trades at the same quality (research/LEARNING.md section 13).
 - Daily loss limit 20%.
 
 The stop is judged on the **real** market price (Binance spot, the learner's own data): on every run and 5-minute sync

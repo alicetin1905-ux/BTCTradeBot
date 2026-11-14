@@ -74,6 +74,7 @@ const config = module.exports = {
     LAMBDA: 3,             // ridge penalty
     WARMUP_TRADES: 40,     // finished setups needed before it trusts itself
     BREAKOUT_N: 20,        // breakout setup: close beyond the previous 20 candles' high / low
+    SETUPS: ['pullback', 'breakout', 'emacross'], // emacross (EMA20 crosses EMA50 with the trend) since 2026-11-14, with 2 positions per coin
     GUARD_MULT: 1,         // OFF since 2026-11-14 (owner: always the full RISK_PCT). Was 0.5. Risk per trade x this while the learner's self-check says 'watch' or 'alert' (its recent picks did
                            // worse than the setups it skipped). Walk-forward 2021-26 at 2.5%: worst drop 44% -> 36%, end balance -6%;
                            // the same cut on random trades doesn't do that (research/LEARNING.md section 8). 1 = off.
@@ -154,13 +155,20 @@ const config = module.exports = {
   // liquidation price from OKX, the normal stop stays on the exchange (src/exchange.js safetyStopFor).
   STOP_ON_REAL_PRICE: true,
   EMERGENCY_STOP_X: 2,
-  // At most this many positions open at once across all coins (null = no limit). BTC, ETH and HYPE move together.
-  MAX_OPEN_POSITIONS: 2,
+  // At most this many positions open at once across all coins (null = no limit), and per coin. Two per coin since
+  // 2026-11-14 (owner: more trades): a second setup on a coin with a position open is taken too, on the same side
+  // (OKX nets them into one position; the bot keeps each part's own entry, size and stop). Walk-forward 2021-26 with
+  // the EMA cross setup at 1.5% risk: 677 trades instead of 356, PF-R 1.86 both, $2,000 -> $67,461, worst drop 50%
+  // (research/LEARNING.md section 13). Needs STOP_ON_REAL_PRICE (each part's stop is watched by the bot).
+  MAX_OPEN_POSITIONS: 4,
+  MAX_POSITIONS_PER_COIN: 2,
 
   // Money rules.
   PORTFOLIO: {
     STARTING_BALANCE: 2000, // USDT — the bot's allocation; it trades like a 2000 USDT account
-    RISK_PCT: 2.5,          // loss at the initial stop per trade, % of the balance. 2.5% since 2026-11-13 (owner's choice; 1% until 2026-11-13, then briefly 2%). Learning bot 2021-26: 1% = PF 1.76, $2,000 -> $10,155, worst drop 21%; 2% = PF 1.69, -> $32,566, drop 37%; 2.5% = PF 1.65, -> $49,765, drop 44%
+    RISK_PCT: 1.5,          // loss at the initial stop per trade, % of the balance. 1.5% since 2026-11-14 with up to 2 positions per coin
+                            // (owner's choice; 2 positions on one coin usually point the same way, so less per trade). Before: 2.5% (2026-11-13), 1%.
+                            // One position per coin: Learning bot 2021-26: 1% = PF 1.76, $2,000 -> $10,155, worst drop 21%; 2% = PF 1.69, -> $32,566, drop 37%; 2.5% = PF 1.65, -> $49,765, drop 44%
     MAX_POSITION_X: 2,      // position value at most this many x the balance (caps size on tight stops)
     LEVERAGE: 5,            // exchange leverage (isolated margin): margin = position value / leverage. 5x since 2026-11-09 (owner's choice):
                             // at 10x isolated the demo liquidated only ~5% from the entry (ETH 2026-11-09); at 5x ~15%, so the stop and

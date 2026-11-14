@@ -22,6 +22,7 @@ config.CHANNEL_N = 20;
 config.EXIT_N = 20;
 config.TRAIL_ATR = 3; // the trailing tests below were written for 3 x ATR (live default: 4)
 config.MAX_OPEN_POSITIONS = null; // single-coin tests; the limit has its own test
+config.MAX_POSITIONS_PER_COIN = 1; // one position per coin; two per coin have their own tests at the end
 config.STOP_ON_REAL_PRICE = false; // the exchange-stop tests below; the real-price stop has its own tests
 const signal = require('../src/signal');
 const exchange = require('../src/exchange');
@@ -72,9 +73,16 @@ function fakeBybit({ equity = 10000, mark = 100000 } = {}) {
       const id = ex.id();
       const m = ex.marks[symbol];
       ex.closedPnl.push({ symbol, orderId: id, qty, exit: m, pnl: (m - p.avgPrice) * p.bias * qty, at: Date.now() });
-      delete ex.positions[symbol];
+      if (qty < p.size - 1e-9) p.size = +(p.size - qty).toFixed(8); else delete ex.positions[symbol];
       ex.calls.push(['closeMarket', symbol, qty]);
       return id;
+    },
+    async addToPosition({ symbol, bias, qty }) {
+      const p = ex.positions[symbol], m = ex.marks[symbol];
+      ex.calls.push(['addToPosition', symbol, bias, qty]);
+      p.avgPrice = (p.avgPrice * p.size + m * qty) / (p.size + qty);
+      p.size = +(p.size + qty).toFixed(8);
+      return ex.id();
     },
     async cancelAll(symbol) { ex.calls.push(['cancelAll', symbol]); },
     async getClosedPnl(symbol, since) { return ex.closedPnl.filter(r => r.symbol === symbol && r.at >= since); },
@@ -1354,4 +1362,117 @@ test('risk guard: while the learner check says watch/alert, the entry is sized w
   assert.equal(e.riskMult, 0.5);
   assert.equal(e.guard, 'watch');
   assert.equal(st.position.riskAmt, 20);
+});
+
+/* ---------------- two positions per coin ---------------- */
+
+async function withTwoPerCoin(rows, fn) {
+  config.MAX_POSITIONS_PER_COIN = 2;
+  try { await withRealStop(rows, fn); } finally { config.MAX_POSITIONS_PER_COIN = 1; }
+}
+const T1 = T0 + TF;
+
+test('two per coin: a second setup on the same side is added to the open position with its own entry, size and stop', async () => {
+  await withTwoPerCoin([{ high: 100300, low: 99800, last: 100100 }], async () => {
+    const { ex, client } = fakeBybit();
+    ex.liq = { BTCUSDT: 91000 };
+    const st = freshState();
+    await enterLong(client, st);
+    assert.ok(st.position && !st.position2);
+    ex.marks.BTCUSDT = 102000;
+    const events = [];
+    await exchange.runExchange({ client, st, sig: [S(T1, 102000, { enter: 1 })], events, now: after(T1) });
+    assert.deepEqual(ex.calls.find(c => c[0] === 'addToPosition'), ['addToPosition', 'BTCUSDT', 1, 0.02]);
+    const p2 = st.position2;
+    assert.ok(p2);
+    assert.equal(p2.entry, 102000);       // its own fill, worked out from the exchange's new average (101,000 over 0.04)
+    assert.equal(p2.qty, 0.02);
+    assert.equal(p2.stop, 100000);        // 2 ATR below its own entry
+    assert.equal(st.position.qty, 0.02);  // the first part keeps its own size
+    assert.equal(events.find(e => e.type === 'enter').part, 2);
+    // the exchange's one stop: the widest of the parts' safety levels (part 1 trailed to 99,000 → 97,000; part 2 → 98,000)
+    assert.equal(ex.positions.BTCUSDT.stopLoss, 97000);
+    // a third: blocked; a short next to the longs: blocked
+    assert.match(exchange.entryBlock(st, S(T1 + TF, 103000, { enter: 1 }), after(T1 + TF)), /2 BTC positions are open/);
+    const one = { ...st, position2: null };
+    config.DIRECTION = 'both';
+    try { assert.match(exchange.entryBlock(one, S(T1 + TF, 103000, { enter: -1 }), after(T1 + TF)), /a long is open — no short next to it/); } finally { config.DIRECTION = 'long'; }
+  });
+});
+
+test('two per coin: the real price closes only the part whose stop it reached; the whole stop then follows the part left', async () => {
+  await withTwoPerCoin([{ high: 100300, low: 99800, last: 100100 }, { high: 101000, low: 99500, last: 99800 }], async () => {
+    const { ex, client } = fakeBybit();
+    ex.liq = { BTCUSDT: 91000 };
+    const st = freshState();
+    await enterLong(client, st);
+    ex.marks.BTCUSDT = 102000;
+    await exchange.runExchange({ client, st, sig: [S(T1, 102000, { enter: 1 })], events: [], now: after(T1) });
+    assert.ok(st.position2);
+    ex.marks.BTCUSDT = 99800;
+    const events = [];
+    await exchange.runExchange({ client, st, events, now: after(T1) + 5 * 60000 }); // real low 99,500: below part 2's 100,000, above part 1's 99,000
+    assert.deepEqual(ex.calls.filter(c => c[0] === 'closeMarket').pop(), ['closeMarket', 'BTCUSDT', 0.02]);
+    assert.ok(st.position && !st.position2);
+    assert.equal(st.position.entry, 100000);
+    assert.equal(ex.positions.BTCUSDT.size, 0.02);
+    assert.match(events.map(e => e.reason).join('\n'), /stop 100,000(\.0)? reached on the real price .*\(part 2\)/);
+    assert.equal(st.trades.length, 1);
+    assert.equal(st.closing.length, 1);
+  });
+});
+
+test('two per coin: the whole position closed on the exchange books one trade per part, shared by size', async () => {
+  await withTwoPerCoin([{ high: 100300, low: 99800, last: 100100 }, { high: 102100, low: 101500, last: 102000 }], async () => {
+    const { ex, client } = fakeBybit();
+    ex.liq = { BTCUSDT: 91000 };
+    const st = freshState();
+    await enterLong(client, st);
+    ex.marks.BTCUSDT = 102000;
+    await exchange.runExchange({ client, st, sig: [S(T1, 102000, { enter: 1 })], events: [], now: after(T1) });
+    const stop = ex.positions.BTCUSDT.stopLoss, avg = ex.positions.BTCUSDT.avgPrice;
+    ex.hitStop('BTCUSDT', after(T1) + 60000); // OKX's safety stop fires (the bot wasn't running)
+    const events = [];
+    await exchange.runExchange({ client, st, events, now: after(T1) + 5 * 60000 });
+    assert.equal(st.position, null);
+    assert.equal(st.position2, null);
+    assert.equal(st.trades.length, 2);
+    const total = (stop - avg) * 0.04;
+    assert.ok(Math.abs(st.trades[0].pnl + st.trades[1].pnl - total) < 1e-6);
+    assert.ok(Math.abs(st.trades[0].pnl - total / 2) < 1e-6);
+    assert.deepEqual(st.trades.map(t => t.reason), ['OKX safety stop', 'OKX safety stop']);
+    assert.equal(st.account.balance, 2000 + total);
+  });
+});
+
+test('two per coin: off without the stop on the real price (the exchange holds one stop per position)', () => {
+  config.MAX_POSITIONS_PER_COIN = 2;
+  try {
+    assert.equal(exchange.perCoin(), 1); // STOP_ON_REAL_PRICE is false in these tests
+    config.STOP_ON_REAL_PRICE = true;
+    assert.equal(exchange.perCoin(), 2);
+  } finally { config.STOP_ON_REAL_PRICE = false; config.MAX_POSITIONS_PER_COIN = 1; }
+});
+
+test('two per coin: OKX settles the whole position once, over both parts; a partial-close record is left for the full one', async () => {
+  await withTwoPerCoin([{ high: 100300, low: 99800, last: 100100 }, { high: 102100, low: 101500, last: 102000 }], async () => {
+    const { ex, client } = fakeBybit();
+    ex.liq = { BTCUSDT: 91000 };
+    const st = freshState();
+    st.account.startedAt = T0 - 86400000;
+    await enterLong(client, st);
+    const openedAt = st.position.openedAt;
+    ex.marks.BTCUSDT = 102000;
+    await exchange.runExchange({ client, st, sig: [S(T1, 102000, { enter: 1 })], events: [], now: after(T1) });
+    const closeT = after(T1) + 3600000;
+    ex.hitStop('BTCUSDT', closeT);
+    await exchange.runExchange({ client, st, events: [], now: closeT + 60000 });
+    const booked = st.trades.reduce((s, t) => s + t.pnl, 0), balance = st.account.balance;
+    client.getPositionsHistory = async () => [
+      { id: 'p1:5', symbol: 'BTCUSDT', openedAt: openedAt + 500, closedAt: after(T1) + 600000, realized: -5, pnl: -5, fee: 0, funding: 0, type: '1', exit: 0 },
+      { id: 'p1:9', symbol: 'BTCUSDT', openedAt: openedAt + 500, closedAt: closeT, realized: booked - 1.2, pnl: booked, fee: -1.2, funding: 0, type: '2', exit: 97000 },
+    ];
+    await exchange.runExchange({ client, st, events: [], now: closeT + 15 * 60000 });
+    assert.ok(Math.abs(st.account.balance - (balance - 1.2)) < 1e-6); // the full close: both parts' trades counted, once
+  });
 });

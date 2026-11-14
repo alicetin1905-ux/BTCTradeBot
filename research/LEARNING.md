@@ -316,6 +316,8 @@ On 15m the costs (0.12% a trade) eat a stop that is about a tenth of the 4H one.
 - A lower bar or a shorter breakout gives a few more trades, but each extra trade is worse than the average one.
 - Live this needs two positions per coin on one OKX contract, which OKX nets into one. The bot would have to track the parts itself.
 
+**Live since 2026-11-14 (owner's choice): 2 per coin, 4 in all, with the EMA cross, 1.5% risk.** Same side only (one net position on OKX); restricting the test to the same side changes nothing (`SAME_SIDE=1`: identical result, the trend filter already keeps both parts on one side).
+
 ## Honest limits
 
 - **Winners and losers:** about 70% of trades lose, and the winners pay for them. Runs of 8-10 losses happen.

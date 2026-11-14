@@ -68,6 +68,8 @@ const TF = 144e5;
     // PER_COIN=n: up to n positions per coin at once (the live bot: 1)
     const mine = Object.keys(busy).filter(k => k.split('#')[0] === cd.coin);
     if (cd.t0 < FROM || cd.t0 >= UNTIL || mine.length >= PER_COIN || Object.keys(busy).length >= MAX_OPEN) continue;
+    // SAME_SIDE=1: a second position on a coin only in the same direction as the open one (one net position on OKX)
+    if (num('SAME_SIDE', 0) && mine.some(k => busy[k].side !== cd.side)) continue;
     const now = cd.t0 + TF, tAt = RETRAIN ? Math.floor(now / RETRAIN) * RETRAIN : now;
     if (!cache.has(tAt)) cache.set(tAt, lists.map(l => train(l, tAt)));
     const models = cache.get(tAt);
