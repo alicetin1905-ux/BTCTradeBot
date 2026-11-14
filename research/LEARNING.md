@@ -336,6 +336,30 @@ Weighting its own picks makes the model learn mostly from the setups it already 
 
 The live trades' real results (OKX fills, demo spikes, the 2026-11-09 liquidation) were not fed in either: they partly reflect the demo exchange, not the market, and there are only a handful.
 
+## 15. Better learning: inputs, target, penalty, a model per setup (2026-11-14)
+
+**Question (owner).** How can the learning improve? Live settings (2 per coin, EMA cross, 1.5%), `node research/improve.js PER_COIN=2 MAX_OPEN=4 ...`, 2021 - Nov 2026. Reference: 677 trades, PF-R 1.86, $2,000 → $67,461, worst drop 50%.
+
+| Change | PF-R | $2,000 → | Worst drop |
+|---|---|---|---|
+| + volatility regime (ATR % vs its 1-year median) | 1.90 | $77,565 | 51% |
+| + volume z-score | 1.78 | $50,317 | 50% |
+| + distance to the 20-candle high / low | 1.87 | $68,601 | 50% |
+| + relative strength vs the other coin | 1.87 | $70,104 | 50% |
+| + the other coin's trend inputs | 1.81 | $53,201 | 49% |
+| + daily trend (vs 50 / 200-day average) | 1.83 | $56,114 | 52% |
+| Learn R clipped at 3 / 10 / 20 (live 6) | 1.79 / 1.80 / 1.74 | $23,233 / $59,475 / $48,700 | 47 - 52% |
+| Learn log(R) | 1.87 | $16,056 | 44% |
+| Learn win / loss (chance), trade above 25% / 30% | 1.68 / 1.68 | $36,749 / $21,431 | 50 - 51% |
+| Ridge penalty 0.3 / 1 / 10 / 30 (live 3) | 1.87 / 1.89 / 1.80 / 1.72 | $70,658 / $74,362 / $54,584 / $41,199 | 49 - 50% |
+| A model per setup type (penalty 3 / 10) | 1.77 / 1.71 | $43,178 / $34,623 | 51 - 52% |
+
+The two best, checked further:
+- **Volatility regime:** from 2023 +8%, from 2025 +20% (drop 28% vs 34%), but with one position per coin −3%. Together with penalty 1: $69,470, less than either alone.
+- **Penalty 1:** +5 - 10% in every check (from 2023, from 2025, one per coin).
+
+Both gains are of the size that small rule changes alone cause in these tests (sections 9 and 13), and they don't add up. No change to the live learner. With about 6,700 noisy setups the learner is near what this data can teach: the inputs it has carry the signal, the rest is noise. What improves it from here is time: every finished setup is one more example.
+
 ## Honest limits
 
 - **Winners and losers:** about 70% of trades lose, and the winners pay for them. Runs of 8-10 losses happen.
