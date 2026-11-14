@@ -245,6 +245,26 @@ The richer models fit the past better but pick worse going forward: with ~6,700 
 
 1H setups behave differently: more noise, costs weigh 4x heavier against a stop a quarter as wide, and they win less. As extra examples they teach the 4H model the wrong lessons. As inputs they add no information the 4H indicators don't already carry. Traded, they cost money. The live bot stays on 4H.
 
+## 10. Daily candles? Not in the learning; maybe as a second bot (2026-11-14)
+
+**Question (owner).** And the daily candles? Same harness as section 9 (`node research/hourly.js TF=1d ...`, 2021 - Nov 2026, 2.5% risk).
+
+| Variant | Trades | PF-R | $2,000 → | Worst drop |
+|---|---|---|---|---|
+| **Live: 4H setups only** | 376 | 1.70 | $29,610 | 46% |
+| + the same setups on daily candles as extra examples (weight 0.5 / 1 / 2) | 373 - 380 | 1.61 - 1.65 | $18,943 - $23,099 | 47 - 51% |
+| + the daily indicators as extra inputs | 382 | 1.50 | $11,150 | 49% |
+| One bot trading 4H and daily setups (one slot per coin) | 256 | 1.69 | $13,302 | 48% |
+| Daily setups alone, with the learner | 54 | 2.10 | $3,879 | 17% |
+| Daily setups alone, without the learner | 72 | 2.02 | $4,400 | 22% |
+| **Two bots side by side**: the live 4H bot + a daily bot (own slot per coin, max 4 positions) | 430 | **1.75** | **$37,358** | 47% |
+
+- Learning from daily candles makes the 4H learner worse, as with 1H.
+- Daily setups themselves are good: PF about 2, about 10 trades a year, drop 17-22%. The learner adds nothing there (1,013 examples since 2017 is too few).
+- Run next to the 4H bot as a separate stream: +26% end balance, the same worst drop. From 2023: $22,033 vs $16,860. At 1% risk: $10,094 vs $8,274, drop 22% both.
+- But: 54 daily trades in six years, and most of the gain is 2024 (+24 R). A small sample.
+- Live it needs a second position per coin on the same OKX instrument, and the account nets those together. That is a real change to the order handling, not a setting. Not built.
+
 ## Honest limits
 
 - **Winners and losers:** about 70% of trades lose, and the winners pay for them. Runs of 8-10 losses happen.
