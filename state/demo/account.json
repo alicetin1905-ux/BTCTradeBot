@@ -7,9 +7,9 @@
   },
   "startedAt": 1793715002577,
   "fundingError": null,
-  "exchangeEquity": 2005.2934878674712,
+  "exchangeEquity": 2003.3678778674712,
   "settings": {
-    "RISK_PCT": 2.5,
+    "RISK_PCT": 1.5,
     "COIN_RISK_PCT": {},
     "TRADE_MODE": "atr",
     "COIN_FIXED": {},
@@ -30,7 +30,7 @@
     "DIRECTION": "both",
     "CHANNEL_N": 15,
     "EXIT_N": 15,
-    "MAX_OPEN_POSITIONS": 2,
+    "MAX_OPEN_POSITIONS": 4,
     "STOP_ATR": 2,
     "TRAIL_ATR": 5,
     "STOP_ON_REAL_PRICE": true,
@@ -41,7 +41,7 @@
     "STATUS_EVERY_H": 4
   },
   "settingsDefaults": {
-    "RISK_PCT": 2.5,
+    "RISK_PCT": 1.5,
     "COIN_RISK_PCT": {},
     "TRADE_MODE": "atr",
     "COIN_FIXED": {},
@@ -62,7 +62,7 @@
     "DIRECTION": "both",
     "CHANNEL_N": 15,
     "EXIT_N": 15,
-    "MAX_OPEN_POSITIONS": 2,
+    "MAX_OPEN_POSITIONS": 4,
     "STOP_ATR": 2,
     "TRAIL_ATR": 5,
     "STOP_ON_REAL_PRICE": true,
@@ -83,7 +83,7 @@
     "ETH",
     "BTC"
   ],
-  "updatedAt": 1794620405475,
+  "updatedAt": 1794620706133,
   "lastRunAt": 1794619927793,
   "instrument": "BTC-USD_UM_XPERP-310328"
 }
