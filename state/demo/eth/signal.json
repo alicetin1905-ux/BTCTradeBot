@@ -34,7 +34,8 @@
     "ret_1w": -1.479,
     "wma200_ratio": -0.281,
     "cycle_sin": -0.783,
-    "cycle_cos": -0.622
+    "cycle_cos": -0.622,
+    "atr_regime": 0.295
   },
   "ind": {
     "ema20": 2011.5995966859446,
@@ -64,16 +65,16 @@
   },
   "hypo": {
     "pullback": {
-      "long": 0.586,
-      "short": -0.107
+      "long": 0.224,
+      "short": -0.157
     },
     "breakout": {
-      "long": 0.606,
-      "short": -0.087
+      "long": 0.249,
+      "short": -0.133
     },
     "emacross": {
-      "long": 0.575,
-      "short": -0.118
+      "long": 0.213,
+      "short": -0.168
     }
   },
   "minR": 0,
@@ -81,7 +82,7 @@
   "guard": null,
   "closeT": 1794614400000,
   "source": "binance",
-  "at": 1794621721550,
+  "at": 1794623521662,
   "wait": "no setup on the last 4H close",
   "strategy": "learning",
   "chart": [
