@@ -168,6 +168,27 @@ gives the page's score at every setup's entry; funding, OI, order book and tape 
 
 The dashboard shows the page's live 4H score for information only.
 
+## 7. Can it learn more? Three ideas tested (2026-11-14)
+
+**Question (owner).** Does the bot learn enough from the market, or only from trades? Three ideas to make it learn more, each tested walk-forward with `node research/improve.js` (Binance spot 4H, BTC + ETH, 2021 - Nov 2026, 2.5% risk, at most 2 positions). PF-R is the profit factor in R, which compounding and position size don't distort.
+
+| Idea | Trades | PF-R | $2,000 → | Worst drop |
+|---|---|---|---|---|
+| **Live settings** (half-life 4 years, fixed 1x size, trail 5) | 356 | **1.86** | **$50,030** | 44% |
+| Faster memory: half-life 6 months / 1 year / 2 years | 311 - 350 | 1.56 - 1.69 | $11,096 - $22,167 | 45 - 48% |
+| Slower memory: half-life 8 years / equal weight | 368 / 383 | 1.81 / 1.73 | $44,471 / $35,503 | 44% |
+| Last 6 / 12 / 24 months count 2-4x more | 332 - 355 | 1.70 - 1.76 | $21,434 - $30,329 | 43 - 47% |
+| Size with the expected R: 0.75-1.25x / 0.5-1.5x / 0-2x | 356 | 1.86 | $44,000 / $37,645 / $24,262 | 45 - 49% |
+| Learn the exit: a model per trail, pick 5 or 7 ATR | 335 | 1.95 | $59,876 | 43% |
+| Control: pick 5 or 7 ATR **at random** (5 seeds) | 314 - 328 | 1.89 - 2.07 | $46,281 - $65,665 | 42 - 45% |
+| Half the position trails 5, half trails 7 | 290 | 2.07 | $55,006 | 40% |
+
+- **Memory:** faster adaptation is clearly worse, as in section 3: it chases noise. The 4-year half-life stays.
+- **Size:** the model's expected R ranks setups only weakly. Betting more on its favourites adds variance, not profit.
+- **Exit:** a mix of 5 and 7 ATR trailing beats 5 alone, but picking at random does as well as the models. So the models don't learn which setup deserves the wider trail; the gain is the mix itself. Fixed trails alone are noisy (5: PF 1.65, 6: 1.41, 7: 1.77, 8: 1.66 in $), so the mix's edge (+10% end balance, worst drop 40% vs 44%) is small against that noise.
+
+**Conclusion.** No change to the live bot. The learner already learns from every setup in the market (6,700+ since 2017, taken or not), and none of the three ideas made the learning itself better. A half-and-half trail (5 + 7 ATR) is the one candidate worth another look; it needs two stops per position on OKX.
+
 ## Honest limits
 
 - **Winners and losers:** about 70% of trades lose, and the winners pay for them. Runs of 8-10 losses happen.
