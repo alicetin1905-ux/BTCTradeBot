@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const CACHE = path.join(__dirname, '..', 'cache');
-const TF = { '1h': 36e5, '4h': 144e5, '1d': 864e5 };
+const TF = { '1h': 36e5, '2h': 72e5, '4h': 144e5, '8h': 288e5, '12h': 432e5, '1d': 864e5 };
 const START = Date.UTC(2017, 7, 17);
 let fetchFn = (...a) => fetch(...a);
 function setFetch(f) { fetchFn = f; }

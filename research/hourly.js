@@ -17,7 +17,7 @@ const arg = (k, d) => { const a = process.argv.find(x => x.startsWith(k + '='));
 const num = (k, d) => +arg(k, d);
 const MODE = arg('MODE', 'base'), FROM = Date.UTC(num('FROM', 2021), 0, 1), RISK = num('RISK', config.PORTFOLIO.RISK_PCT / 100);
 const RETRAIN = num('RETRAIN', 7) * 864e5, W1 = num('W', 0.5), MAXX = config.PORTFOLIO.MAX_POSITION_X, MAX_OPEN = 2;
-const H4 = 144e5, OTHER = arg('TF', '1h'), H1 = OTHER === '1d' ? 864e5 : 36e5;
+const H4 = 144e5, OTHER = arg('TF', '1h'), H1 = { '1h': 36e5, '2h': 72e5, '8h': 288e5, '12h': 432e5, '1d': 864e5 }[OTHER];
 
 (async () => {
   const o = L.defaults({ ...config.LEARN, STOP_ATR: config.STOP_ATR, TRAIL_ATR: config.TRAIL_ATR, MIN_R: num('MINR', config.LEARN.MIN_R) }); // MINR=-99: no learner

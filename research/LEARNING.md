@@ -265,6 +265,20 @@ The richer models fit the past better but pick worse going forward: with ~6,700 
 - But: 54 daily trades in six years, and most of the gain is 2024 (+24 R). A small sample.
 - Live it needs a second position per coin on the same OKX instrument, and the account nets those together. That is a real change to the order handling, not a setting. Not built.
 
+## 11. 2H, 8H and 12H candles? No (2026-11-14)
+
+Same harness as sections 9 - 10 (`node research/hourly.js TF=2h|8h|12h ...`, 2021 - Nov 2026, 2.5% risk). Reference, the live 4H bot: 376 trades, $2,000 → $29,610, worst drop 46%.
+
+| Variant | 2H | 8H | 12H |
+|---|---|---|---|
+| Extra examples for the 4H learner (weight 0.5 / 1) | $20,907 / $20,160 | $26,768 / $22,081 | $24,234 / $22,588 |
+| Their indicators as extra inputs | $19,458, drop 53% | $11,921, drop 54% | $26,838, drop 45% |
+| That timeframe alone, with the learner | $4,764, drop 67% | $5,424, drop 49% | $5,724, drop 35% |
+| One bot trading 4H and it (one slot per coin) | $11,825, drop 68% | $17,358, drop 45% | $15,740, drop 43% |
+| Two bots side by side (4H + it) | $9,189, drop 85% | $30,294, drop 71% | $42,997, drop 58% |
+
+Everything that changes the learner is worse than the 4H learner alone. Alone, 4H beats every other timeframe by far (1H $1,885, 2H $4,764, 8H $5,424, 12H $5,724, 1D $3,879). Side by side, 12H adds profit but makes the worst drop much deeper (58%). The daily bot (section 10: $37,358 at a 47% drop) remains the only addition that didn't worsen the drop. 4H stays the bot's timeframe.
+
 ## Honest limits
 
 - **Winners and losers:** about 70% of trades lose, and the winners pay for them. Runs of 8-10 losses happen.
