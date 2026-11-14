@@ -73,9 +73,11 @@
     }
   },
   "minR": 0,
+  "riskMult": 1,
+  "guard": null,
   "closeT": 1794614400000,
   "source": "binance",
-  "at": 1794616324476,
+  "at": 1794618125682,
   "wait": "a position is open",
   "strategy": "learning",
   "chart": [
