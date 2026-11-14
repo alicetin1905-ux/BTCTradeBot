@@ -5,7 +5,7 @@ const fs = require('fs');
 const path = require('path');
 
 const CACHE = path.join(__dirname, '..', 'cache');
-const TF = { '4h': 144e5, '1d': 864e5 };
+const TF = { '1h': 36e5, '4h': 144e5, '1d': 864e5 };
 const START = Date.UTC(2017, 7, 17);
 let fetchFn = (...a) => fetch(...a);
 function setFetch(f) { fetchFn = f; }
@@ -19,7 +19,7 @@ async function getJson(url) {
 async function binance(symbol, interval, startT) {
   const out = [];
   let start = startT;
-  for (let n = 0; n < 40; n++) {
+  for (let n = 0; n < 100; n++) { // 1h since 2017 is ~80 pages
     const j = await getJson(`https://data-api.binance.vision/api/v3/klines?symbol=${symbol}&interval=${interval}&startTime=${start}&limit=1000`);
     for (const k of j) out.push({ t: +k[0], o: +k[1], h: +k[2], l: +k[3], c: +k[4], v: +k[7], tbv: +k[10] });
     if (j.length < 1000) break;

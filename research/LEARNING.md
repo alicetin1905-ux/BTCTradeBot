@@ -231,6 +231,20 @@ With one position per coin, an extra setup mostly takes the slot a better one wo
 
 The richer models fit the past better but pick worse going forward: with ~6,700 noisy setups there is not enough signal for combinations.
 
+## 9. 1H candles in the learning? No (2026-11-14)
+
+**Question (owner).** Can the bot learn from 1H candles too? Tested with `node research/hourly.js` (Binance spot 1H since 2017, BTC + ETH, about 27,000 extra setups; 2021 - Nov 2026, 2.5% risk, retrained weekly). Every row runs in the same harness. That harness frees a position's slot at the close of the candle it was stopped in, so its reference differs from section 7. End balances in these tests react strongly to small rule changes; compare rows within one table.
+
+| Variant | Learns from | Trades | PF-R | $2,000 → | Worst drop |
+|---|---|---|---|---|---|
+| **Live: 4H setups only** | 6,714 | 376 | **1.70** | **$29,610** | 46% |
+| + the 4H setups also on 1H candles, as extra examples (weight 0.25 / 0.5 / 1) | 33,760 | 389 - 399 | 1.58 - 1.65 | $18,323 - $24,379 | 47 - 49% |
+| + the 1H indicators at the 4H close as extra inputs | 6,714 | 382 | 1.65 | $24,689 | 48% |
+| Learn from both and also trade the 1H setups | 33,760 | 970 - 992 | 1.27 - 1.29 | $8,118 - $9,383 | 61 - 63% |
+| 1H alone | 27,046 | 1,277 | 1.16 | $1,885 | 85% |
+
+1H setups behave differently: more noise, costs weigh 4x heavier against a stop a quarter as wide, and they win less. As extra examples they teach the 4H model the wrong lessons. As inputs they add no information the 4H indicators don't already carry. Traded, they cost money. The live bot stays on 4H.
+
 ## Honest limits
 
 - **Winners and losers:** about 70% of trades lose, and the winners pay for them. Runs of 8-10 losses happen.
