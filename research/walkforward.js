@@ -15,7 +15,8 @@ const SEPARATE = arg('SEPARATE', 0), MODELS = {}; // SEPARATE=1: a model per coi
 
 (async () => {
   const o = L.defaults({ ...config.LEARN, STOP_ATR: arg('STOP', config.STOP_ATR), TRAIL_ATR: arg('TRAIL', config.TRAIL_ATR), MIN_R: arg('MINR', config.LEARN.MIN_R),
-    BREAKOUT_N: arg('BN', config.LEARN.BREAKOUT_N), HALF_LIFE_BARS: arg('HL', config.LEARN.HALF_LIFE_BARS), LAMBDA: arg('L', config.LEARN.LAMBDA) });
+    BREAKOUT_N: arg('BN', config.LEARN.BREAKOUT_N), HALF_LIFE_BARS: arg('HL', config.LEARN.HALF_LIFE_BARS), LAMBDA: arg('L', config.LEARN.LAMBDA),
+    ...((process.argv.find(x => x.startsWith('SETUPS=')) || '').length > 7 ? { SETUPS: process.argv.find(x => x.startsWith('SETUPS=')).slice(7).split(',') } : {}) });
   const COINS = (process.argv.find(x => x.startsWith('COINS=')) || '').slice(6).split(',').filter(Boolean);
   const TRADE = (process.argv.find(x => x.startsWith('TRADE=')) || '').slice(6).split(',').filter(Boolean); // learn from all COINS, trade only these
   const data = await H.loadAll(COINS.length ? COINS : config.COINS);

@@ -752,7 +752,7 @@ footer{max-width:1080px;margin:0 auto;padding:4px 16px;font-size:12px;color:var(
       ['Equity (balance + open P&L)', usd(eq)], ['Balance', usd(a.balance)], ['Started with', usd(a.startingBalance) + (a.startedAt ? ' · ' + when(a.startedAt) : '')],
       ['OKX account equity', a.exchangeEquity != null ? usd(a.exchangeEquity) : '—'], ['Funding booked', a.funding && a.funding.total ? signed(a.funding.total) : '$0.00'],
       ['Coins', coinList().join(' + ') + (a.instruments ? ' · ' + Object.values(a.instruments).join(', ') : '')],
-      ['Risk per trade', (set.RISK_PCT || '?') + '% of the balance at the initial stop'], ['Stops', (set.STOP_ATR || 2) + '×ATR, trailing ' + (set.TRAIL_ATR || 5) + '×ATR on OKX (index price)'],
+      ['Risk per trade', (set.RISK_PCT || '?') + '% of the balance at the initial stop' + (S.signal && S.signal.riskMult < 1 ? ' · now ' + (+(set.RISK_PCT * S.signal.riskMult).toFixed(2)) + '% (learner check: ' + esc(S.signal.guard) + ')' : '')], ['Stops', (set.STOP_ATR || 2) + '×ATR, trailing ' + (set.TRAIL_ATR || 5) + '×ATR on OKX (index price)'],
       ['Leverage', (set.LEVERAGE || 10) + '× isolated'], ['Last full run', a.lastRunAt ? when(a.lastRunAt) + ' (' + ago(a.lastRunAt) + ')' : '—'], ['Last update', a.updatedAt ? ago(a.updatedAt) : '—'],
     ];
     return '<h2>Bot <span class="tag">' + esc(EXCHANGE_NAME[a.exchange] || '') + ' demo</span></h2><dl class="kv">' + rows.map(function (r) { return '<dt>' + esc(r[0]) + '</dt><dd>' + esc(r[1]) + '</dd>'; }).join('') + '</dl>' +

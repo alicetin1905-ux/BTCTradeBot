@@ -176,3 +176,17 @@ test('learner self-check: out-of-sample, taken vs skipped over the last finished
   const r = L.series(d, 'BTC', {}, { check: true });
   assert.ok(r.model.selfCheck && r.model.selfCheck.n === L.SELF_N || r.model.selfCheck === null);
 });
+
+test('risk guard: watch/alert give the multiplier, ok or no check or mult 1 give none', () => {
+  assert.deepStrictEqual(L.riskGuard({ status: 'alert' }, 0.5), { status: 'alert', mult: 0.5 });
+  assert.deepStrictEqual(L.riskGuard({ status: 'watch' }, 0.5), { status: 'watch', mult: 0.5 });
+  assert.strictEqual(L.riskGuard({ status: 'ok' }, 0.5), null);
+  assert.strictEqual(L.riskGuard(null, 0.5), null);
+  assert.strictEqual(L.riskGuard({ status: 'alert' }, 1), null);
+  assert.strictEqual(L.riskGuard({ status: 'alert' }, undefined), null);
+  // the last candle of the series carries it
+  const r = L.series(data(4000), 'BTC', { GUARD_MULT: 0.5 }, { check: true });
+  const last = r.series[r.series.length - 1];
+  assert.ok(last.riskMult === 1 || last.riskMult === 0.5);
+  assert.strictEqual(last.riskMult === 0.5, ['watch', 'alert'].includes(r.model.selfCheck && r.model.selfCheck.status));
+});

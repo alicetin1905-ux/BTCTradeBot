@@ -30,7 +30,7 @@ function defaults(cfg = {}) {
   return {
     stopAtr: cfg.STOP_ATR ?? 2, trailAtr: cfg.TRAIL_ATR ?? 4, cost: cfg.COST ?? 0.0012,
     minR: cfg.MIN_R ?? 0, halfLife: cfg.HALF_LIFE_BARS ?? 8760, lambda: cfg.LAMBDA ?? 3, warm: cfg.WARMUP_TRADES ?? 40,
-    breakoutN: cfg.BREAKOUT_N ?? 20,
+    breakoutN: cfg.BREAKOUT_N ?? 20, setups: cfg.SETUPS ?? SETUPS, guardMult: cfg.GUARD_MULT ?? 1,
   };
 }
 
@@ -46,6 +46,18 @@ function setupAt(name, c, f, i, o) {
     if (t === 1 && c[i].l <= f.e20[i] && c[i].c > f.e20[i] && c[i - 1].c > f.e50[i - 1]) return 1;
     if (t === -1 && c[i].h >= f.e20[i] && c[i].c < f.e20[i] && c[i - 1].c < f.e50[i - 1]) return -1;
     return 0;
+  }
+  if (name === 'stflip') { // Supertrend (10, 3) turns to the trend's side on this candle
+    const d = f.X[i][2], dp = f.X[i - 1] ? f.X[i - 1][2] : d;
+    return d === t && dp === -t ? t : 0;
+  }
+  if (name === 'emacross') { // EMA20 crosses EMA50 to the trend's side
+    const now = Math.sign(f.e20[i] - f.e50[i]), prev = Math.sign(f.e20[i - 1] - f.e50[i - 1]);
+    return now === t && prev !== t ? t : 0;
+  }
+  if (name === 'rsireset') { // RSI(14) crosses back over 50 to the trend's side (a dip inside the trend ends)
+    const r = f.X[i][5], rp = f.X[i - 1] ? f.X[i - 1][5] : r;
+    return t === 1 ? (r > 0 && rp <= 0 ? 1 : 0) : (r < 0 && rp >= 0 ? -1 : 0);
   }
   let hi = -Infinity, lo = Infinity;
   for (let j = i - o.breakoutN; j < i; j++) { hi = Math.max(hi, c[j].h); lo = Math.min(lo, c[j].l); }
@@ -70,7 +82,7 @@ function follow(c, A, i, side, o) {
   return { exitI: c.length - 1, R: (side * (c[c.length - 1].c - entry) - o.cost * entry) / dist, open: true };
 }
 
-const vec = (f, i, side, setup, coin) => [...KEEP.map(k => f.X[i][k] * side), ...SETUPS.map(s => (s === setup ? 1 : 0)), coin === 'BTC' ? 1 : 0, side];
+const vec = (f, i, side, setup, coin, setups = SETUPS) => [...KEEP.map(k => f.X[i][k] * side), ...setups.map(s => (s === setup ? 1 : 0)), coin === 'BTC' ? 1 : 0, side];
 
 // data: { BTC: { candles, daily }, ETH: {...} } (closed 4H candles {t,o,h,l,c,v,tbv}, daily {t,c}).
 // Returns per coin the feature/indicator arrays and every candidate trade.
@@ -81,11 +93,11 @@ function candidates(data, o) {
     const list = [];
     for (let i = 220; i < c.length; i++) {
       if (!f.X[i]) continue;
-      for (const s of SETUPS) {
+      for (const s of o.setups) {
         const side = setupAt(s, c, f, i, o);
         if (!side) continue;
         const r = follow(c, f.atr, i, side, o);
-        const cd = { coin, setup: s, side, i, t0: c[i].t, t1: c[r.exitI].t, R: r.R, open: r.open, x: vec(f, i, side, s, coin) };
+        const cd = { coin, setup: s, side, i, t0: c[i].t, t1: c[r.exitI].t, R: r.R, open: r.open, x: vec(f, i, side, s, coin, o.setups) };
         list.push(cd); all.push(cd);
       }
     }
@@ -132,6 +144,12 @@ function selfCheck(all, now, o, n = SELF_N) {
   };
 }
 
+// Risk guard: while the self-check says 'watch' or 'alert', new trades risk `mult` x the normal amount (1 = off).
+function riskGuard(check, mult) {
+  if (!check || !(mult < 1) || !(mult >= 0)) return null;
+  return check.status === 'watch' || check.status === 'alert' ? { status: check.status, mult } : null;
+}
+
 // The signal series for one coin (same shape as src/pullback.js, so src/exchange.js runs unchanged) plus what the
 // model learned. Only the last candle can enter; trailing uses close/atr of the candles after the entry.
 function series(data, coin, cfg = {}, { from = 500, check = false } = {}) {
@@ -150,10 +168,10 @@ function series(data, coin, cfg = {}, { from = 500, check = false } = {}) {
       setup: null, setupSide: 0, expR: null, upper: null, lower: null, exitUpper: null, exitLower: null, score: null, flipFrom: null,
     };
     if (i === last) {
-      for (const s of SETUPS) {
+      for (const s of o.setups) {
         const side = setupAt(s, c, f, i, o);
         if (!side) continue;
-        const x = vec(f, i, side, s, coin);
+        const x = vec(f, i, side, s, coin, o.setups);
         const expR = model ? M.predict(model, x) : null;
         if (!e.setup) { e.setup = s; e.setupSide = side; e.expR = expR; }
         if (expR == null || expR >= o.minR) { e.setup = s; e.setupSide = side; e.expR = expR; e.enter = side; break; }
@@ -161,7 +179,7 @@ function series(data, coin, cfg = {}, { from = 500, check = false } = {}) {
       e.features = Object.fromEntries(FEATURES.map((n, k) => [n, +f.X[i][KEEP[k]].toFixed(3)]));
       // For the dashboard: the raw indicators, and what the learner would expect from each setup if it formed now.
       e.ind = f.raw(i);
-      if (model) e.hypo = Object.fromEntries(SETUPS.map(s => [s, { long: +M.predict(model, vec(f, i, 1, s, coin)).toFixed(3), short: +M.predict(model, vec(f, i, -1, s, coin)).toFixed(3) }]));
+      if (model) e.hypo = Object.fromEntries(o.setups.map(s => [s, { long: +M.predict(model, vec(f, i, 1, s, coin, o.setups)).toFixed(3), short: +M.predict(model, vec(f, i, -1, s, coin, o.setups)).toFixed(3) }]));
       e.minR = o.minR;
     }
     out.push(e);
@@ -170,7 +188,7 @@ function series(data, coin, cfg = {}, { from = 500, check = false } = {}) {
   const recent = all.filter(q => !q.open && q.t1 > now - 365 * 864e5);
   const summary = model && {
     trainedOn: model.n, at: now, minR: o.minR, halfLifeDays: Math.round(o.halfLife * TF / 864e5),
-    weights: Object.fromEntries([...FEATURES, ...SETUPS.map(s => 'setup_' + s), 'coin_btc', 'side_long'].map((n, k) => [n, +model.w[k].toFixed(4)])),
+    weights: Object.fromEntries([...FEATURES, ...o.setups.map(s => 'setup_' + s), 'coin_btc', 'side_long'].map((n, k) => [n, +model.w[k].toFixed(4)])),
     bias: +model.b.toFixed(4),
     lastYear: (() => {
       const pick = recent.filter(q => M.predict(model, q.x) >= o.minR), rest = recent.filter(q => M.predict(model, q.x) < o.minR);
@@ -179,7 +197,10 @@ function series(data, coin, cfg = {}, { from = 500, check = false } = {}) {
     })(),
     selfCheck: check ? selfCheck(all, now, o) : undefined,
   };
+  // the risk guard rides on the last candle (src/exchange.js sizes the entry with it; the dashboard shows it)
+  const g = riskGuard(summary && summary.selfCheck, o.guardMult), lastE = out[out.length - 1];
+  if (lastE) { lastE.riskMult = g ? g.mult : 1; lastE.guard = g ? g.status : null; }
   return { series: out, model: summary };
 }
 
-module.exports = { series, candidates, train, selfCheck, setupAt, follow, FEATURES, SETUPS, defaults, SELF_N };
+module.exports = { series, candidates, train, selfCheck, riskGuard, setupAt, follow, FEATURES, SETUPS, defaults, SELF_N };

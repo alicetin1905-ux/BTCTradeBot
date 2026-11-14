@@ -28,7 +28,8 @@ bot took it or not. Older results count half after 4 years. The bot only trades 
 (`LEARN.MIN_R` 0). So every finished setup is something it learns from.
 
 **Money rules:**
-- 2.5% of the balance at risk per trade (1% until 2026-11-13).
+- 2.5% of the balance at risk per trade (1% until 2026-11-13). **Risk guard:** half that (1.25%) while the learner's
+  self-check says 'watch' or 'alert', i.e. its recent picks did worse than the setups it skipped (`LEARN.GUARD_MULT`).
 - Initial stop 2×ATR, trailed 5×ATR behind the best close; no take-profit.
 - At most 2 positions (one per coin), each at most 2× the balance.
 - Daily loss limit 20%.

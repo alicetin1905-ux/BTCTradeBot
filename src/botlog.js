@@ -15,7 +15,7 @@ function logRun(st, events, now, s) {
     });
   }
   for (const e of events) {
-    if (e.type === 'enter') add({ kind: 'enter', side: e.bias, price: e.entry, stop: e.stop, qty: e.qty, risk: e.riskAmt, setup: e.setup || null, expR: e.expR == null ? null : +(+e.expR).toFixed(3) });
+    if (e.type === 'enter') add({ kind: 'enter', side: e.bias, price: e.entry, stop: e.stop, qty: e.qty, risk: e.riskAmt, riskMult: e.riskMult ?? 1, setup: e.setup || null, expR: e.expR == null ? null : +(+e.expR).toFixed(3) });
     else if (e.type === 'exit' && !/record pending/.test(e.reason)) add({ kind: 'exit', pnl: e.pnl, price: e.price || null, reason: e.reason });
     else if (e.type === 'info' && /^stop trailed/.test(e.reason)) add({ kind: 'trail', text: e.reason });
     else if (e.type === 'error') add({ kind: 'error', text: e.reason });

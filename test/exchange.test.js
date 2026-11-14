@@ -1343,3 +1343,15 @@ test('settlement: OKX\'s realized P&L per position (fees, funding, a liquidation
   await exchange.runExchange({ client, st, events: [], now: after(T0) + 3600000 + 25 * 60000 });
   assert.ok(Math.abs(st.account.balance - (balance - 30.5)) < 1e-6);
 });
+
+test('risk guard: while the learner check says watch/alert, the entry is sized with riskMult (2% x 0.5 = $20 at the stop)', async () => {
+  const { ex, client } = fakeBybit({ equity: 50000 });
+  const st = freshState();
+  const events = [];
+  await exchange.runExchange({ client, st, sig: [S(T0, 100000, { enter: 1, riskMult: 0.5, guard: 'watch' })], events, now: after(T0) });
+  assert.deepEqual(ex.calls.find(c => c[0] === 'openMarket'), ['openMarket', 'BTCUSDT', 1, 0.01, 98000]);
+  const e = events.find(x => x.type === 'enter');
+  assert.equal(e.riskMult, 0.5);
+  assert.equal(e.guard, 'watch');
+  assert.equal(st.position.riskAmt, 20);
+});

@@ -189,6 +189,48 @@ The dashboard shows the page's live 4H score for information only.
 
 **Conclusion.** No change to the live bot. The learner already learns from every setup in the market (6,700+ since 2017, taken or not), and none of the three ideas made the learning itself better. A half-and-half trail (5 + 7 ATR) is the one candidate worth another look; it needs two stops per position on OKX.
 
+## 8. Improve it: more setups, a risk guard, a smarter model (2026-11-14)
+
+The owner asked for all three. Same test as section 7 (`node research/improve.js`, 2021 - Nov 2026, 2.5% risk).
+Reference, the live settings: 356 trades, PF-R 1.86, $2,000 → $50,030, worst drop 44%.
+
+**More setups: no.** New setups are added next to pullback and breakout; the learner judges them all.
+
+| Setups | Trades | PF-R | $2,000 → | Worst drop |
+|---|---|---|---|---|
+| + Supertrend flip | 374 | 1.76 | $37,816 | 47% |
+| + EMA20 / EMA50 cross | 364 | 1.87 | $53,591 | 45% |
+| + RSI back over 50 in the trend | 415 | 1.73 | $45,252 | 44% |
+| + all three | 417 | 1.72 | $43,742 | 44% |
+
+With one position per coin, an extra setup mostly takes the slot a better one would have used. The EMA cross is +7%, which is within the noise of these tests; not worth it.
+
+**Risk guard: yes (live since 2026-11-14).** While the self-check (the last 150 finished setups, each judged out-of-sample) says the taken setups did worse than the skipped ones, new trades risk less.
+
+| Guard | $2,000 → | Worst drop | Return / drop |
+|---|---|---|---|
+| None (live before) | $50,030 | 44% | 7.3 |
+| 0.5x risk on 'alert' only | $48,067 | 44% | 7.3 |
+| **0.5x risk on 'watch' or 'alert'** (live) | **$47,190** | **36%** | **8.7** |
+| 0.25x risk on 'watch' or 'alert' | $43,342 | 32% | 9.5 |
+| 0.5x risk when 20% below the peak | $18,782 | 33% | 6.8 |
+| Control: 0.5x on 25% random trades (5 seeds) | $27,485 - $58,983 | 39 - 42% | 6.3 - 8.7 |
+
+- From 2023: worst drop 43% → 32%. From 2025: 35% → 27%. At 1% risk: 21% → 16%.
+- It costs 6% of the end balance and cuts the worst drop by a fifth. Random cuts don't lower the drop as much.
+- A drop-from-peak rule cuts too late and keeps risk low through the recovery.
+
+**A smarter model: no.** Ridge (live) against models that see combinations of inputs. All retrain monthly here, to compare at equal cost.
+
+| Model | Trades | PF-R | $2,000 → | Worst drop |
+|---|---|---|---|---|
+| **Ridge (live)** | 356 | 1.86 | **$50,669** | 44% |
+| Ridge + all pairwise products | 361 - 374 | 1.66 - 1.75 | $24,050 - $32,484 | 42 - 44% |
+| Boosted trees, depth 2 (src/gbm.js) | 315 | 1.92 | $41,137 | 42% |
+| Boosted trees, other sizes (depth 1-3, leaf 60-200) | 315 - 325 | 1.72 - 1.87 | $20,666 - $36,211 | 41 - 46% |
+
+The richer models fit the past better but pick worse going forward: with ~6,700 noisy setups there is not enough signal for combinations.
+
 ## Honest limits
 
 - **Winners and losers:** about 70% of trades lose, and the winners pay for them. Runs of 8-10 losses happen.

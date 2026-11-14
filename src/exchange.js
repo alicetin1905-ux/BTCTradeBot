@@ -46,11 +46,11 @@ function stopRound(x, tick, bias) {
 // configured 2000 USDT account.
 function sizingBase(st, wallet) { return Math.max(0, Math.min(st.account.balance, wallet.equity)); }
 
-// Position value for a new trade: loses RISK_PCT % of the base at a stop
+// Position value for a new trade: loses RISK_PCT % of the base (x mult: the learner's risk guard) at a stop
 // `stopDist` (fraction of the price) away, at most MAX_POSITION_X x the base.
-function notionalFor(base, stopDist) {
+function notionalFor(base, stopDist, mult = 1) {
   if (!(stopDist > 0) || !(base > 0)) return 0;
-  return Math.min((base * P.RISK_PCT / 100) / stopDist, base * P.MAX_POSITION_X);
+  return Math.min((base * P.RISK_PCT * mult / 100) / stopDist, base * P.MAX_POSITION_X);
 }
 
 function reasonFor(pos, orderId, exit) {
@@ -325,7 +325,8 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
   const F = config.FIXED;
   const stopDist = fixed ? F.SL_USDT / (F.MARGIN * P.LEVERAGE) : (config.STOP_ATR * s.atr) / s.close;
   const tpDist = fixed ? F.TP_USDT / (F.MARGIN * P.LEVERAGE) : null;
-  let notional = fixed ? F.MARGIN * P.LEVERAGE : notionalFor(base, stopDist);
+  const riskMult = fixed ? 1 : (s.riskMult >= 0 && s.riskMult < 1 ? s.riskMult : 1);
+  let notional = fixed ? F.MARGIN * P.LEVERAGE : notionalFor(base, stopDist, riskMult);
   const maxByMargin = wallet.available * 0.95 * P.LEVERAGE;
   if (notional > maxByMargin) {
     events.push({ type: 'info', reason: `size cut to what ${client.label || 'the exchange'}'s free margin allows ($${maxByMargin.toFixed(0)} of $${notional.toFixed(0)})` });
@@ -377,7 +378,7 @@ async function openEntry({ client, st, live, wallet, s, events, halt, now }) {
   };
   events.push({
     type: 'enter', bias, entry, stop: stopLoss, takeProfit, fixed, qty: pos.size, notional: pos.size * entry,
-    riskAmt: st.position.riskAmt, breakout: st.position.breakout, score: s.score ?? null, flipFrom: s.flipFrom ?? null, jump: !!s.jump, pullback: !!s.pullback, trend: s.trend ?? null, setup: s.setup ?? null, expR: s.expR ?? null, close: s.close,
+    riskAmt: st.position.riskAmt, breakout: st.position.breakout, score: s.score ?? null, flipFrom: s.flipFrom ?? null, jump: !!s.jump, pullback: !!s.pullback, trend: s.trend ?? null, setup: s.setup ?? null, expR: s.expR ?? null, close: s.close, riskMult, guard: riskMult < 1 ? s.guard || null : null,
   });
 }
 

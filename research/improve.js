@@ -9,9 +9,12 @@
 //   node research/improve.js MODE=exit TRAILS=3,4,5,7      a model per trailing distance; each setup gets the trail the
 //                                                          models expect most from (enter if that is >= MIN_R);
 //                                                          RANDOM=<seed> picks the trail at random instead (control)
+//   node research/improve.js MODE=guard GUARD=check GMULT=0.5 [WATCH=1]   less risk while the self-check says 'alert'
+//   node research/improve.js MODE=guard GUARD=dd DD=0.2 GMULT=0.5         less risk while 20%+ below the peak
+//   node research/improve.js MODEL=gbm RETRAIN=30 [SHUFFLE=seed]          boosted trees instead of ridge (see src/gbm.js)
 // Common: FROM=2021 RISK=0.025 MAXX=2 MAX_OPEN=2
 'use strict';
-const H = require('../src/history'), L = require('../src/learner'), M = require('../src/model');
+const H = require('../src/history'), L = require('../src/learner'), M = require('../src/model'), G = require('../src/gbm');
 const config = require('../config');
 const arg = (k, d) => { const a = process.argv.find(x => x.startsWith(k + '=')); return a ? a.split('=')[1] : d; };
 const num = (k, d) => +arg(k, d);
@@ -21,7 +24,7 @@ const RISK = num('RISK', config.PORTFOLIO.RISK_PCT / 100), MAXX = num('MAXX', co
 const TF = 144e5;
 
 (async () => {
-  const base = { ...config.LEARN, STOP_ATR: config.STOP_ATR, TRAIL_ATR: config.TRAIL_ATR, HALF_LIFE_BARS: num('HL', config.LEARN.HALF_LIFE_BARS) };
+  const base = { ...config.LEARN, STOP_ATR: config.STOP_ATR, TRAIL_ATR: config.TRAIL_ATR, HALF_LIFE_BARS: num('HL', config.LEARN.HALF_LIFE_BARS), ...(arg('SETUPS') ? { SETUPS: arg('SETUPS').split(',') } : {}) };
   const o = L.defaults(base);
   const data = await H.loadAll(config.COINS);
   const TRAILS = MODE === 'exit' ? arg('TRAILS', '3,4,5,7').split(',').map(Number) : [o.trailAtr];
@@ -35,32 +38,64 @@ const TF = 144e5;
   const RANDOM = num('RANDOM', 0); let seed = RANDOM; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const RECENT = num('RECENT', 0) * 864e5, RBOOST = num('RBOOST', 1);
 
+  // MODEL=ridge (live) | inter (ridge + every pairwise product of the features) | gbm (boosted trees, src/gbm.js)
+  // RETRAIN=days: retrain at most every N days (the live bot retrains every 4H; gbm is slow, so compare at equal N)
+  // SHUFFLE=seed: control test, every setup gets another setup's features (the model then learns from noise)
+  const MODEL = arg('MODEL', 'ridge'), RETRAIN = num('RETRAIN', 0) * 864e5;
+  const GB = { trees: num('TREES', 150), lr: num('LR', 0.05), depth: num('DEPTH', 2), minLeaf: num('LEAF', 60) };
+  const inter = x => { const o2 = x.slice(); for (let a = 0; a < x.length; a++) for (let b = a + 1; b < x.length; b++) o2.push(x[a] * x[b]); return o2; };
+  const xOf = q => (MODEL === 'inter' ? (q._xi || (q._xi = inter(q.x))) : q.x);
+  if (num('SHUFFLE', 0)) {
+    let sd = num('SHUFFLE', 0); const rr = () => ((sd = (sd * 16807) % 2147483647) / 2147483647);
+    for (const l of lists) { const xs = l.map(q => q.x); for (let i = xs.length - 1; i > 0; i--) { const j = Math.floor(rr() * (i + 1)); [xs[i], xs[j]] = [xs[j], xs[i]]; } l.forEach((q, i) => { q.x = xs[i]; }); }
+  }
   const train = (list, now) => {
     const done = list.filter(q => !q.open && q.t1 <= now);
     if (done.length < o.warm) return null;
     const w = done.map(q => Math.pow(0.5, (now - q.t1) / (o.halfLife * TF)) * (RECENT && now - q.t1 < RECENT ? RBOOST : 1));
-    return M.fit(done.map(q => q.x), done.map(q => Math.max(-1.5, Math.min(6, q.R))), w, o.lambda);
+    const y = done.map(q => Math.max(-1.5, Math.min(6, q.R)));
+    if (MODEL === 'gbm') return G.fit(done.map(q => q.x), y, w, GB);
+    return M.fit(done.map(xOf), y, w, MODEL === 'inter' ? num('IL', 30) : o.lambda);
   };
+  const P = (m, q) => (m.gbm ? G.predict(m, q.x) : M.predict(m, xOf(q)));
 
   let eq = config.PORTFOLIO.STARTING_BALANCE, peak = eq, mdd = 0;
-  const busy = {}, done = [], cache = new Map(), preds = [], trailUse = {};
+  const busy = {}, done = [], cache = new Map(), preds = [], trailUse = {}; let guarded = 0;
   const settle = (t) => { for (const k of Object.keys(busy)) if (busy[k].t1 <= t) { eq += busy[k].pnl; done.push(busy[k]); delete busy[k]; peak = Math.max(peak, eq); mdd = Math.max(mdd, 1 - eq / peak); } };
   for (const cd of lists[0]) {
     settle(cd.t0);
     if (cd.t0 < FROM || cd.t0 >= UNTIL || busy[cd.coin] || Object.keys(busy).length >= MAX_OPEN) continue;
-    const now = cd.t0 + TF;
-    if (!cache.has(now)) cache.set(now, lists.map(l => train(l, now)));
-    const models = cache.get(now);
+    const now = cd.t0 + TF, tAt = RETRAIN ? Math.floor(now / RETRAIN) * RETRAIN : now;
+    if (!cache.has(tAt)) cache.set(tAt, lists.map(l => train(l, tAt)));
+    const models = cache.get(tAt);
     if (models.some(m => !m)) continue;
     // the expected R per trailing distance; pick the best
     let bestK = 0, bestR = -Infinity;
-    TRAILS.forEach((tr, k) => { const r = M.predict(models[k], maps[k].get(key(cd)).x); if (r > bestR) { bestR = r; bestK = k; } });
-    if (MODE !== 'exit') { bestK = 0; bestR = M.predict(models[0], cd.x); }
+    TRAILS.forEach((tr, k) => { const r = P(models[k], maps[k].get(key(cd))); if (r > bestR) { bestR = r; bestK = k; } });
+    if (MODE !== 'exit') { bestK = 0; bestR = P(models[0], cd); }
     // RANDOM=seed: control test, the trail is picked at random (the entry decision stays the model's)
     if (MODE === 'exit' && RANDOM) bestK = Math.floor(rnd() * TRAILS.length);
     const past = preds.slice(); preds.push(bestR);
     if (bestR < o.minR) continue;
     let mult = 1;
+    if (MODE === 'guard') {
+      // GUARD=check: the self-check (last 150 finished setups, each judged out-of-sample) → GMULT x risk while 'alert'
+      //       (WATCH=1 also while 'watch'); GUARD=dd: GMULT x risk while the balance is DD or more below its peak
+      const g = arg('GUARD', 'check'), gm = num('GMULT', 0.5);
+      if (g === 'dd') { if (1 - eq / peak >= num('DD', 0.2)) mult = gm; }
+      else if (g === 'random') { if (rnd() < num('P', 0.25)) { mult = gm; guarded++; } } // control: the same cut on random trades (RANDOM=seed)
+      else {
+        const fin = lists[0].filter(q => !q.open && q.t1 <= now).sort((x, y) => x.t1 - y.t1).slice(-150);
+        if (fin.length === 150) {
+          for (const q of fin) if (q._p === undefined) { const at0 = q.t0 + TF, at = RETRAIN ? Math.floor(at0 / RETRAIN) * RETRAIN : at0; if (!cache.has(at)) cache.set(at, lists.map(l => train(l, at))); const m = cache.get(at)[0]; q._p = m ? P(m, q) : null; }
+          const tk = fin.filter(q => q._p != null && q._p >= o.minR), sk = fin.filter(q => q._p != null && q._p < o.minR);
+          const avg = xs => (xs.length ? xs.reduce((s2, q) => s2 + q.R, 0) / xs.length : 0);
+          const ta = avg(tk), gap = ta - avg(sk);
+          const st = gap < -0.2 && ta < -0.3 ? 'alert' : gap < 0 ? 'watch' : 'ok';
+          if (st === 'alert' || (st === 'watch' && num('WATCH', 0))) { mult = gm; guarded++; }
+        }
+      }
+    }
     if (MODE === 'size') {
       // rank of this expected R among the past ones that cleared MIN_R → LO..HI (average 1x)
       const ok = past.filter(p => p >= o.minR);
@@ -82,5 +117,5 @@ const TF = 144e5;
   for (const x of done) { const y = new Date(x.t1).getUTCFullYear(); years[y] = (years[y] || 0) + x.R * (x.mult || 1); }
   const label = process.argv.slice(2).join(' ') || 'MODE=base';
   console.log(`${label.padEnd(44)} ${String(done.length).padStart(3)} trades  ${Math.round(wins.length / done.length * 100)}% won  PF$ ${(gw / gl).toFixed(2)}  PF-R ${(gR / lR).toFixed(2)}  ${sumR.toFixed(0).padStart(4)} R  $2000 → ${String(Math.round(eq)).padStart(6)}  drop ${Math.round(mdd * 100)}%  ret/drop ${(Math.log(eq / 2000) / mdd).toFixed(1)}`
-    + `  years ${Object.entries(years).map(([y, r]) => y.slice(2) + ':' + r.toFixed(0)).join(' ')}` + (MODE === 'exit' ? `  trails ${JSON.stringify(trailUse)}` : ''));
+    + `  years ${Object.entries(years).map(([y, r]) => y.slice(2) + ':' + r.toFixed(0)).join(' ')}` + (MODE === 'exit' ? `  trails ${JSON.stringify(trailUse)}` : '') + (MODE === 'guard' ? `  guarded ${guarded}` : ''));
 })().catch(e => { console.error(e); process.exit(1); });

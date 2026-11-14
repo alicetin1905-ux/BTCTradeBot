@@ -355,8 +355,8 @@ const sigParams = () => ({ channelN: config.CHANNEL_N, exitN: config.EXIT_N, atr
 async function buildSignal(candles, now) {
   if (config.STRATEGY === 'trend-pullback') return require('./pullback').series(candles);
   if (config.STRATEGY === 'learning') {
-    // the lead coin (it writes model.json) also runs the learner's self-check
-    const r = require('./learner').series(learnData, COIN, { ...config.LEARN, STOP_ATR: config.STOP_ATR, TRAIL_ATR: config.TRAIL_ATR }, { check: LEAD });
+    // every coin runs the learner's self-check (the risk guard needs it); the lead coin writes model.json
+    const r = require('./learner').series(learnData, COIN, { ...config.LEARN, STOP_ATR: config.STOP_ATR, TRAIL_ATR: config.TRAIL_ATR }, { check: true });
     learnModel = r.model;
     return r.series;
   }
