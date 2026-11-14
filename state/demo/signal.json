@@ -77,7 +77,7 @@
   "guard": null,
   "closeT": 1794614400000,
   "source": "binance",
-  "at": 1794618125682,
+  "at": 1794619924806,
   "wait": "a position is open",
   "strategy": "learning",
   "chart": [
