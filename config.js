@@ -74,7 +74,7 @@ const config = module.exports = {
     LAMBDA: 3,             // ridge penalty
     WARMUP_TRADES: 40,     // finished setups needed before it trusts itself
     BREAKOUT_N: 20,        // breakout setup: close beyond the previous 20 candles' high / low
-    GUARD_MULT: 0.5,       // risk per trade x this while the learner's self-check says 'watch' or 'alert' (its recent picks did
+    GUARD_MULT: 1,         // OFF since 2026-11-14 (owner: always the full RISK_PCT). Was 0.5. Risk per trade x this while the learner's self-check says 'watch' or 'alert' (its recent picks did
                            // worse than the setups it skipped). Walk-forward 2021-26 at 2.5%: worst drop 44% -> 36%, end balance -6%;
                            // the same cut on random trades doesn't do that (research/LEARNING.md section 8). 1 = off.
   },

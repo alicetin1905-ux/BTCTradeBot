@@ -205,13 +205,13 @@ Reference, the live settings: 356 trades, PF-R 1.86, $2,000 → $50,030, worst d
 
 With one position per coin, an extra setup mostly takes the slot a better one would have used. The EMA cross is +7%, which is within the noise of these tests; not worth it.
 
-**Risk guard: yes (live since 2026-11-14).** While the self-check (the last 150 finished setups, each judged out-of-sample) says the taken setups did worse than the skipped ones, new trades risk less.
+**Risk guard: yes, but off.** It was live on 2026-11-14 for a few hours; the owner then chose the full 2.5% always (`LEARN.GUARD_MULT` 1). While the self-check (the last 150 finished setups, each judged out-of-sample) says the taken setups did worse than the skipped ones, new trades risk less.
 
 | Guard | $2,000 → | Worst drop | Return / drop |
 |---|---|---|---|
 | None (live before) | $50,030 | 44% | 7.3 |
 | 0.5x risk on 'alert' only | $48,067 | 44% | 7.3 |
-| **0.5x risk on 'watch' or 'alert'** (live) | **$47,190** | **36%** | **8.7** |
+| **0.5x risk on 'watch' or 'alert'** (built, off) | **$47,190** | **36%** | **8.7** |
 | 0.25x risk on 'watch' or 'alert' | $43,342 | 32% | 9.5 |
 | 0.5x risk when 20% below the peak | $18,782 | 33% | 6.8 |
 | Control: 0.5x on 25% random trades (5 seeds) | $27,485 - $58,983 | 39 - 42% | 6.3 - 8.7 |
