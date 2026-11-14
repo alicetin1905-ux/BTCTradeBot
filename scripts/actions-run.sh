@@ -4,6 +4,7 @@
 #   scripts/actions-run.sh sync    sync the position and fills only, then upload
 #   scripts/actions-run.sh check   read-only OKX check (reachability, keys, account mode)
 #   scripts/actions-run.sh testtrade   open + close the smallest position (scripts/okx-testtrade.js; COIN=ETH for another coin)
+#   scripts/actions-run.sh parts       two positions on one instrument: add, whole-position stop, partial close (scripts/okx-test-parts.js)
 # A run or sync goes through every coin in config.js COINS, one `node src/run.js`
 # process each (COIN=<coin>), BTC's instrument from OKX_INSTRUMENT, the others
 # from OKX_INSTRUMENT_<COIN> or <COIN>-USD_UM_XPERP-310328 (NEAR: the spot pair NEAR-USDC). One coin failing
@@ -31,6 +32,11 @@ fi
 if [ "$MODE" = "probe" ]; then
   # Diagnostic: which orders does OKX accept on one instrument (workflow input "instrument").
   INSTRUMENT="${TESTTRADE_INSTRUMENT:-$OKX_INSTRUMENT}" node scripts/okx-probe.js
+  exit $?
+fi
+if [ "$MODE" = "parts" ]; then
+  # Real-order test of two positions per coin on an instrument without a bot position (scripts/okx-test-parts.js).
+  node scripts/okx-test-parts.js
   exit $?
 fi
 if [ "$MODE" = "testtrade" ]; then
