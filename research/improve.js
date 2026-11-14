@@ -12,6 +12,7 @@
 //   node research/improve.js MODE=guard GUARD=check GMULT=0.5 [WATCH=1]   less risk while the self-check says 'alert'
 //   node research/improve.js MODE=guard GUARD=dd DD=0.2 GMULT=0.5         less risk while 20%+ below the peak
 //   node research/improve.js MODEL=gbm RETRAIN=30 [SHUFFLE=seed]          boosted trees instead of ridge (see src/gbm.js)
+//   PER_COIN=2 MAX_OPEN=4: up to 2 positions per coin at once (the live bot: 1 and 2)
 // Common: FROM=2021 RISK=0.025 MAXX=2 MAX_OPEN=2
 'use strict';
 const H = require('../src/history'), L = require('../src/learner'), M = require('../src/model'), G = require('../src/gbm');
@@ -20,11 +21,11 @@ const arg = (k, d) => { const a = process.argv.find(x => x.startsWith(k + '='));
 const num = (k, d) => +arg(k, d);
 const MODE = arg('MODE', 'base');
 const FROM = Date.UTC(num('FROM', 2021), 0, 1), UNTIL = Date.UTC(num('UNTIL', 2100), 0, 1);
-const RISK = num('RISK', config.PORTFOLIO.RISK_PCT / 100), MAXX = num('MAXX', config.PORTFOLIO.MAX_POSITION_X), MAX_OPEN = num('MAX_OPEN', 2);
+const PER_COIN = num('PER_COIN', 1), RISK = num('RISK', config.PORTFOLIO.RISK_PCT / 100), MAXX = num('MAXX', config.PORTFOLIO.MAX_POSITION_X), MAX_OPEN = num('MAX_OPEN', 2);
 const TF = 144e5;
 
 (async () => {
-  const base = { ...config.LEARN, STOP_ATR: config.STOP_ATR, TRAIL_ATR: config.TRAIL_ATR, HALF_LIFE_BARS: num('HL', config.LEARN.HALF_LIFE_BARS), ...(arg('SETUPS') ? { SETUPS: arg('SETUPS').split(',') } : {}) };
+  const base = { ...config.LEARN, STOP_ATR: config.STOP_ATR, TRAIL_ATR: config.TRAIL_ATR, HALF_LIFE_BARS: num('HL', config.LEARN.HALF_LIFE_BARS), MIN_R: num('MINR', config.LEARN.MIN_R), BREAKOUT_N: num('BN', config.LEARN.BREAKOUT_N), ...(arg('SETUPS') ? { SETUPS: arg('SETUPS').split(',') } : {}) };
   const o = L.defaults(base);
   const data = await H.loadAll(config.COINS);
   const TRAILS = MODE === 'exit' ? arg('TRAILS', '3,4,5,7').split(',').map(Number) : [o.trailAtr];
@@ -64,7 +65,9 @@ const TF = 144e5;
   const settle = (t) => { for (const k of Object.keys(busy)) if (busy[k].t1 <= t) { eq += busy[k].pnl; done.push(busy[k]); delete busy[k]; peak = Math.max(peak, eq); mdd = Math.max(mdd, 1 - eq / peak); } };
   for (const cd of lists[0]) {
     settle(cd.t0);
-    if (cd.t0 < FROM || cd.t0 >= UNTIL || busy[cd.coin] || Object.keys(busy).length >= MAX_OPEN) continue;
+    // PER_COIN=n: up to n positions per coin at once (the live bot: 1)
+    const mine = Object.keys(busy).filter(k => k.split('#')[0] === cd.coin);
+    if (cd.t0 < FROM || cd.t0 >= UNTIL || mine.length >= PER_COIN || Object.keys(busy).length >= MAX_OPEN) continue;
     const now = cd.t0 + TF, tAt = RETRAIN ? Math.floor(now / RETRAIN) * RETRAIN : now;
     if (!cache.has(tAt)) cache.set(tAt, lists.map(l => train(l, tAt)));
     const models = cache.get(tAt);
@@ -108,7 +111,8 @@ const TF = 144e5;
     const c = byCoin[cd.coin].c[cd.i], dist = o.stopAtr * byCoin[cd.coin].f.atr[cd.i];
     const qty = Math.min(eq * RISK * mult / dist, eq * MAXX / c.c);
     trailUse[TRAILS[bestK]] = (trailUse[TRAILS[bestK]] || 0) + 1;
-    busy[cd.coin] = { ...q, pnl: qty * dist * q.R, mult };
+    let slot = 0; while (busy[cd.coin + '#' + slot]) slot++;
+    busy[cd.coin + '#' + slot] = { ...q, pnl: qty * dist * q.R, mult };
   }
   settle(Infinity);
   const wins = done.filter(x => x.pnl > 0), gw = wins.reduce((s, x) => s + x.pnl, 0), gl = -done.filter(x => x.pnl <= 0).reduce((s, x) => s + x.pnl, 0);

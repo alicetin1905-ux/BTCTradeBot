@@ -293,6 +293,29 @@ Same harness (`node research/hourly.js TF=15m ...`; Binance spot 15m since 2017,
 
 On 15m the costs (0.12% a trade) eat a stop that is about a tenth of the 4H one. The learner turns -1,128 R into +63 R, so it learns something real, but not enough to beat the costs. Next to 4H it adds profit only with a 74% worst drop. 4H stays.
 
+## 13. More trades (2026-11-14)
+
+**Question (owner).** More trades. Same test as sections 7 - 8 (`node research/improve.js`, 2021 - Nov 2026). The live bot: 356 trades (about 60 a year), at most one position per coin, two in all.
+
+| Variant | Risk / trade | Trades | PF-R | $2,000 → | Worst drop |
+|---|---|---|---|---|---|
+| **Live** | 2.5% | 356 | 1.86 | $50,030 | 44% |
+| Lower bar: expected R ≥ -0.1 / -0.2 / any | 2.5% | 375 / 402 / 433 | 1.79 / 1.67 / 1.60 | $42,882 / $29,002 / $25,093 | 43 - 44% |
+| Breakout over 10 / 15 candles instead of 20 | 2.5% | 388 / 374 | 1.78 / 1.75 | $45,287 / $36,325 | 44 - 47% |
+| 2 positions per coin, 4 in all | 2.5% | 667 | 1.76 | $79,859 | 71% |
+| 2 per coin, 4 in all, + EMA cross setup | 2.5% | 677 | 1.86 | $165,263 | 68% |
+| 2 per coin, 4 in all | 1.5% | 667 | 1.76 | $40,495 | 52% |
+| **2 per coin, 4 in all, + EMA cross setup** | **1.25%** | **677** | **1.86** | **$46,123** | **43%** |
+| **2 per coin, 4 in all, + EMA cross setup** | **1.5%** | **677** | **1.86** | **$67,461** | **50%** |
+
+- The binding limit is one position per coin: most 4H closes with a setup are skipped because a position is open.
+- Two per coin doubles the trades at the same quality (PF-R 1.86), with the EMA cross as a third setup. The two positions on one coin usually point the same way, so the risk per trade has to come down: at 2.5% the worst drop is 68 - 71%.
+- 1.25% gives the live profile (drop 43%) with twice the trades; 1.5% gives more profit with a deeper drop (50%).
+- From 2023, at 1.5%: $30,012 vs $23,882 (drop 44% vs 43%). From 2025: $6,196 vs $6,015 (drop 34% vs 35%).
+- The EMA cross only helps once there are more slots (section 8 found nothing with one slot), so its share of the gain is less certain.
+- A lower bar or a shorter breakout gives a few more trades, but each extra trade is worse than the average one.
+- Live this needs two positions per coin on one OKX contract, which OKX nets into one. The bot would have to track the parts itself.
+
 ## Honest limits
 
 - **Winners and losers:** about 70% of trades lose, and the winners pay for them. Runs of 8-10 losses happen.
