@@ -190,3 +190,19 @@ test('risk guard: watch/alert give the multiplier, ok or no check or mult 1 give
   assert.ok(last.riskMult === 1 || last.riskMult === 0.5);
   assert.strictEqual(last.riskMult === 0.5, ['watch', 'alert'].includes(r.model.selfCheck && r.model.selfCheck.status));
 });
+
+test('volatility regime input: ATR % vs its 1-year median, no direction, only with VOL_REGIME', () => {
+  const d = data(4000);
+  const F = require('../src/features');
+  const f = F.build(d.BTC.candles, [], d.BTC.daily || []);
+  assert.strictEqual(f.regime.length, d.BTC.candles.length);
+  assert.ok(f.regime.every(v => v >= -2 && v <= 2));
+  const on = L.series(d, 'BTC', { VOL_REGIME: true }, {}), off = L.series(d, 'BTC', {}, {});
+  assert.ok('atr_regime' in on.model.weights);
+  assert.ok(!('atr_regime' in off.model.weights));
+  // the same setup long and short gets the same regime value (it is not multiplied by the side)
+  const o = L.defaults({ VOL_REGIME: true });
+  const { all } = L.candidates(d, o);
+  const q = all.find(x => !x.open && x.coin === 'BTC'), at = L.FEATURES.length;
+  assert.strictEqual(q.x[at], f.regime[q.i]);
+});

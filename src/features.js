@@ -131,7 +131,20 @@ function build(candles, funding = [], daily = []) {
       high20: hi, low20: lo, prevClose: close[i - 1], prevEma50: e50[i - 1],
     };
   };
-  return { X, atr: A, close, e20, e50, e200, raw };
+  // Volatility regime (no direction): ATR as % of the price vs its median over the last year (2,190 4H candles),
+  // as a log ratio, clipped to +/-2. A sorted window keeps it fast.
+  const regime = new Array(n).fill(0), win = [];
+  const ins = (v) => { let lo = 0, hi = win.length; while (lo < hi) { const m = (lo + hi) >> 1; if (win[m] < v) lo = m + 1; else hi = m; } win.splice(lo, 0, v); };
+  const del = (v) => { let lo = 0, hi = win.length; while (lo < hi) { const m = (lo + hi) >> 1; if (win[m] < v) lo = m + 1; else hi = m; } if (win[lo] === v) win.splice(lo, 1); };
+  const atrp = A.map((a, i) => (a ? a / close[i] : null));
+  for (let i = 0; i < n; i++) {
+    if (atrp[i] != null) ins(atrp[i]);
+    const out = i - 2190;
+    if (out >= 0 && atrp[out] != null) del(atrp[out]);
+    const med = win.length ? win[win.length >> 1] : null;
+    regime[i] = med && atrp[i] ? clip(Math.log(atrp[i] / med), 2) : 0;
+  }
+  return { X, atr: A, close, e20, e50, e200, raw, regime };
 }
 
 module.exports = { build, NAMES, ema, atr, rsi, cyclePhase };

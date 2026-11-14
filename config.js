@@ -71,7 +71,8 @@ const config = module.exports = {
   LEARN: {
     MIN_R: 0,              // take a setup only when the model expects at least this many R (R = the initial risk)
     HALF_LIFE_BARS: 8760,  // older setups count half after this many 4H candles (4 years): it adapts slowly
-    LAMBDA: 3,             // ridge penalty
+    LAMBDA: 1,             // ridge penalty (weaker damping): 1 since 2026-11-14 (owner's choice), was 3 (research/LEARNING.md section 15)
+    VOL_REGIME: true,      // input: the volatility regime (ATR % vs its 1-year median), since 2026-11-14 (owner's choice, section 15)
     WARMUP_TRADES: 40,     // finished setups needed before it trusts itself
     BREAKOUT_N: 20,        // breakout setup: close beyond the previous 20 candles' high / low
     SETUPS: ['pullback', 'breakout', 'emacross'], // emacross (EMA20 crosses EMA50 with the trend) since 2026-11-14, with 2 positions per coin

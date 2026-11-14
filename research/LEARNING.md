@@ -358,7 +358,9 @@ The two best, checked further:
 - **Volatility regime:** from 2023 +8%, from 2025 +20% (drop 28% vs 34%), but with one position per coin −3%. Together with penalty 1: $69,470, less than either alone.
 - **Penalty 1:** +5 - 10% in every check (from 2023, from 2025, one per coin).
 
-Both gains are of the size that small rule changes alone cause in these tests (sections 9 and 13), and they don't add up. No change to the live learner. With about 6,700 noisy setups the learner is near what this data can teach: the inputs it has carry the signal, the rest is noise. What improves it from here is time: every finished setup is one more example.
+Both gains are of the size that small rule changes alone cause in these tests (sections 9 and 13), and they don't add up. No change to the live learner.
+
+**Live since 2026-11-14 anyway (owner's choice): both.** `LEARN.VOL_REGIME` true, `LEARN.LAMBDA` 1. Together: $69,470 (PF-R 1.88, drop 51%) vs $67,461; from 2023 $28,283 vs $30,012; from 2025 $6,598 vs $6,196. In effect the same as before. With about 6,700 noisy setups the learner is near what this data can teach: the inputs it has carry the signal, the rest is noise. What improves it from here is time: every finished setup is one more example.
 
 ## Honest limits
 
