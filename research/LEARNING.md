@@ -318,6 +318,24 @@ On 15m the costs (0.12% a trade) eat a stop that is about a tenth of the 4H one.
 
 **Live since 2026-11-14 (owner's choice): 2 per coin, 4 in all, with the EMA cross, 1.5% risk.** Same side only (one net position on OKX); restricting the test to the same side changes nothing (`SAME_SIDE=1`: identical result, the trend filter already keeps both parts on one side).
 
+## 14. Learn more from its own trades? No (2026-11-14)
+
+**Question (owner).** Should the bot learn more from its own trades? The learner already trains on every finished setup, taken or not; its own trades count the same as the rest. Tested: the setups the bot itself took count W times more (`node research/improve.js OWNW=W`, 2021 - Nov 2026, live settings: 2 per coin, EMA cross, 1.5%).
+
+| Own trades count | Trades | PF-R | $2,000 → | Worst drop |
+|---|---|---|---|---|
+| **1x (live)** | 677 | **1.86** | **$67,461** | 50% |
+| 2x | 663 | 1.86 | $61,386 | 50% |
+| 5x | 657 | 1.64 | $21,761 | 49% |
+| 10x | 653 | 1.66 | $23,879 | 48% |
+| 25x | 622 | 1.74 | $30,453 | 48% |
+
+With one position per coin: 1x $19,155, 5x $15,351, 10x $14,090 (at 1.5%).
+
+Weighting its own picks makes the model learn mostly from the setups it already liked, so it stops correcting itself. Every setup is a lesson, taken or not; the market doesn't care whether the bot was in it.
+
+The live trades' real results (OKX fills, demo spikes, the 2026-11-09 liquidation) were not fed in either: they partly reflect the demo exchange, not the market, and there are only a handful.
+
 ## Honest limits
 
 - **Winners and losers:** about 70% of trades lose, and the winners pay for them. Runs of 8-10 losses happen.

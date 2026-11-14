@@ -13,6 +13,7 @@
 //   node research/improve.js MODE=guard GUARD=dd DD=0.2 GMULT=0.5         less risk while 20%+ below the peak
 //   node research/improve.js MODEL=gbm RETRAIN=30 [SHUFFLE=seed]          boosted trees instead of ridge (see src/gbm.js)
 //   PER_COIN=2 MAX_OPEN=4: up to 2 positions per coin at once (the live bot: 1 and 2)
+//   OWNW=w: the setups the bot itself traded count w x in the training
 // Common: FROM=2021 RISK=0.025 MAXX=2 MAX_OPEN=2
 'use strict';
 const H = require('../src/history'), L = require('../src/learner'), M = require('../src/model'), G = require('../src/gbm');
@@ -38,6 +39,8 @@ const TF = 144e5;
   const all = lists[TRAILS.indexOf(o.trailAtr) >= 0 ? TRAILS.indexOf(o.trailAtr) : 0];
   const RANDOM = num('RANDOM', 0); let seed = RANDOM; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
   const RECENT = num('RECENT', 0) * 864e5, RBOOST = num('RBOOST', 1);
+  // OWNW=w: the setups the bot itself traded count w x in the training (it learns more from its own trades)
+  const OWNW = num('OWNW', 1), taken = new Set();
 
   // MODEL=ridge (live) | inter (ridge + every pairwise product of the features) | gbm (boosted trees, src/gbm.js)
   // RETRAIN=days: retrain at most every N days (the live bot retrains every 4H; gbm is slow, so compare at equal N)
@@ -53,7 +56,7 @@ const TF = 144e5;
   const train = (list, now) => {
     const done = list.filter(q => !q.open && q.t1 <= now);
     if (done.length < o.warm) return null;
-    const w = done.map(q => Math.pow(0.5, (now - q.t1) / (o.halfLife * TF)) * (RECENT && now - q.t1 < RECENT ? RBOOST : 1));
+    const w = done.map(q => Math.pow(0.5, (now - q.t1) / (o.halfLife * TF)) * (RECENT && now - q.t1 < RECENT ? RBOOST : 1) * (OWNW !== 1 && taken.has(key(q)) ? OWNW : 1));
     const y = done.map(q => Math.max(-1.5, Math.min(6, q.R)));
     if (MODEL === 'gbm') return G.fit(done.map(q => q.x), y, w, GB);
     return M.fit(done.map(xOf), y, w, MODEL === 'inter' ? num('IL', 30) : o.lambda);
@@ -115,6 +118,7 @@ const TF = 144e5;
     trailUse[TRAILS[bestK]] = (trailUse[TRAILS[bestK]] || 0) + 1;
     let slot = 0; while (busy[cd.coin + '#' + slot]) slot++;
     busy[cd.coin + '#' + slot] = { ...q, pnl: qty * dist * q.R, mult };
+    taken.add(key(q));
   }
   settle(Infinity);
   const wins = done.filter(x => x.pnl > 0), gw = wins.reduce((s, x) => s + x.pnl, 0), gl = -done.filter(x => x.pnl <= 0).reduce((s, x) => s + x.pnl, 0);
