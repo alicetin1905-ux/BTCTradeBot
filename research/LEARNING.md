@@ -279,6 +279,20 @@ Same harness as sections 9 - 10 (`node research/hourly.js TF=2h|8h|12h ...`, 202
 
 Everything that changes the learner is worse than the 4H learner alone. Alone, 4H beats every other timeframe by far (1H $1,885, 2H $4,764, 8H $5,424, 12H $5,724, 1D $3,879). Side by side, 12H adds profit but makes the worst drop much deeper (58%). The daily bot (section 10: $37,358 at a 47% drop) remains the only addition that didn't worsen the drop. 4H stays the bot's timeframe.
 
+## 12. 15-minute candles? No (2026-11-14)
+
+Same harness (`node research/hourly.js TF=15m ...`; Binance spot 15m since 2017, about 106,000 setups). Reference, the live 4H bot: $2,000 → $29,610, worst drop 46%.
+
+| Variant | Trades | PF-R | $2,000 → | Worst drop |
+|---|---|---|---|---|
+| Extra examples for the 4H learner (weight 0.25) | 415 | 1.54 | $16,253 | 48% |
+| 15m indicators as extra inputs | 384 | 1.60 | $19,361 | 47% |
+| 15m alone, without the learner | 8,069 | 0.83 | $0 (account gone) | 100% |
+| 15m alone, with the learner | 1,606 | 1.05 | $1,231 | 74% |
+| One bot trading 4H and 15m | 1,325 | 1.25 | $36,051 | 74% |
+
+On 15m the costs (0.12% a trade) eat a stop that is about a tenth of the 4H one. The learner turns -1,128 R into +63 R, so it learns something real, but not enough to beat the costs. Next to 4H it adds profit only with a 74% worst drop. 4H stays.
+
 ## Honest limits
 
 - **Winners and losers:** about 70% of trades lose, and the winners pay for them. Runs of 8-10 losses happen.
