@@ -874,5 +874,10 @@
     "side": 0,
     "expR": null,
     "decision": "no setup on the last 4H close"
+  },
+  {
+    "at": 1794731525439,
+    "kind": "trail",
+    "text": "stop trailed 68,105.6 → 67,968.2 (OKX safety stop 69,053.3)"
   }
 ]
