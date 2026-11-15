@@ -839,5 +839,16 @@
     "at": 1794688322116,
     "kind": "trail",
     "text": "stop trailed 2,009.7 → 2,003.6 (OKX safety stop 2,083.7)"
+  },
+  {
+    "at": 1794700921224,
+    "kind": "scan",
+    "candleT": 1794686400000,
+    "close": 1769.2,
+    "trend": -1,
+    "setup": "breakout",
+    "side": -1,
+    "expR": -0.176,
+    "decision": "breakout short setup, but the learner expects -0.18 R (needs +0) — skipped"
   }
 ]
