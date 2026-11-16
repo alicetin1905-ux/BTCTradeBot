@@ -30,10 +30,10 @@
   "trend": -1,
   "setup": "breakout",
   "expR": 0.11306906589965421,
-  "markPrice": 1810.5,
-  "unrealisedPnl": 52.45647999999997,
+  "markPrice": 1806.75,
+  "unrealisedPnl": 53.356479999999976,
   "exchangeStop": 2017.8,
-  "lastSoftCheckT": 1794792001350,
+  "lastSoftCheckT": 1794792301556,
   "emergencyGap": 80.08999999999969,
-  "realPrice": 1811.76
+  "realPrice": 1807.12
 }
