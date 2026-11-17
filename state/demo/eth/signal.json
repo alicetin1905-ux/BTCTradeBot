@@ -82,7 +82,7 @@
   "guard": null,
   "closeT": 1794902400000,
   "source": "binance",
-  "at": 1794911522385,
+  "at": 1794913321537,
   "wait": "no setup on the last 4H close",
   "strategy": "learning",
   "chart": [
