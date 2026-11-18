@@ -1120,5 +1120,10 @@
     "side": -1,
     "expR": -0.514,
     "decision": "breakout short setup, but the learner expects -0.51 R (needs +0) — skipped"
+  },
+  {
+    "at": 1795033926038,
+    "kind": "trail",
+    "text": "stop trailed 67,078.2 → 66,702.8 (OKX safety stop 67,787.9)"
   }
 ]
