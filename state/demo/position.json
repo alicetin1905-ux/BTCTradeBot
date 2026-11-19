@@ -12,7 +12,7 @@
   "ext": 62747.22,
   "trailed": true,
   "entryCandleT": 1794168000000,
-  "lastExitCheckT": 1795060800000,
+  "lastExitCheckT": 1795075200000,
   "openedAt": 1794182525503,
   "orders": {
     "entry": "4082907572800712705"
@@ -30,10 +30,10 @@
   "trend": -1,
   "setup": "breakout",
   "expR": 0.03790220389712251,
-  "markPrice": 63496.9,
-  "unrealisedPnl": 141.02007000000003,
+  "markPrice": 63499.9,
+  "unrealisedPnl": 140.98197000000005,
   "exchangeStop": 67787.9,
   "emergencyGap": 1085.1000000000058,
-  "lastSoftCheckT": 1795089605413,
-  "realPrice": 63925.44
+  "lastSoftCheckT": 1795089725325,
+  "realPrice": 63781.41
 }
