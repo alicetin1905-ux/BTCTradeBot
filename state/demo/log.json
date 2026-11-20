@@ -1217,5 +1217,16 @@
     "at": 1795136525171,
     "kind": "trail",
     "text": "stop trailed 66,327.6 → 65,942.4 (OKX safety stop 67,027.5)"
+  },
+  {
+    "at": 1795147325717,
+    "kind": "scan",
+    "candleT": 1795132800000,
+    "close": 62156.32,
+    "trend": -1,
+    "setup": null,
+    "side": 0,
+    "expR": null,
+    "decision": "no setup on the last 4H close"
   }
 ]
