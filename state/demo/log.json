@@ -1212,5 +1212,10 @@
     "at": 1795134724674,
     "kind": "error",
     "text": "couldn't trail the stop to 65,942.4 (stop 67027.5 is on the wrong side of the mark price 68081.6) — retrying next run"
+  },
+  {
+    "at": 1795136525171,
+    "kind": "trail",
+    "text": "stop trailed 66,327.6 → 65,942.4 (OKX safety stop 67,027.5)"
   }
 ]
