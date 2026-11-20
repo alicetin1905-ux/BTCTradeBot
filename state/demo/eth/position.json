@@ -5,7 +5,7 @@
   "entry": 2029.0686666666666,
   "qty": 0.24,
   "qtyTotal": 0.24,
-  "stop": 1924.53,
+  "stop": 1914.68,
   "initialStop": 2109.15,
   "takeProfit": null,
   "fixed": false,
@@ -30,10 +30,10 @@
   "trend": -1,
   "setup": "breakout",
   "expR": 0.11306906589965421,
-  "markPrice": 1910.63,
-  "unrealisedPnl": 28.42527999999995,
-  "exchangeStop": 2004.62,
-  "lastSoftCheckT": 1795149001706,
+  "markPrice": 1901.48,
+  "unrealisedPnl": 30.62127999999997,
+  "exchangeStop": 1994.77,
+  "lastSoftCheckT": 1795149121654,
   "emergencyGap": 80.08999999999969,
-  "realPrice": 1730.01
+  "realPrice": 1725.43
 }
