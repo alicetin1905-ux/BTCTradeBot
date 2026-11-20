@@ -339,7 +339,14 @@ async function managePart({ client, st, live, sig, events, now, pos, multi = fal
     pos.stop = next;
     pos.trailed = true;
   } catch (err) {
-    events.push({ type: 'error', reason: `couldn't trail the stop to ${px(next)} (${err.message}) — retrying next run` });
+    if (soft(pos)) {
+      // the stop the bot watches on the real price moves anyway; only the OKX safety stop behind it is retried
+      events.push({ type: 'info', reason: `stop trailed ${px(pos.stop)} → ${px(next)} (OKX safety stop not moved: ${err.message} — retrying next run)` });
+      pos.stop = next;
+      pos.trailed = true;
+    } else {
+      events.push({ type: 'error', reason: `couldn't trail the stop to ${px(next)} (${err.message}) — retrying next run` });
+    }
   }
   return false;
 }

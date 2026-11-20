@@ -478,8 +478,9 @@ function fakeOkx(state = {}) {
     const u = new URL(url), path = u.pathname, body = opts.body ? JSON.parse(opts.body) : null;
     S.calls.push({ method: opts.method, path, query: Object.fromEntries(u.searchParams), body, headers: opts.headers || {} });
     switch (path) {
-      case '/api/v5/public/instruments': return ok([{ instId: 'BTC-USDT-SWAP', ctVal: '0.01', lotSz: '0.01', minSz: '0.01', tickSz: '0.1' }]);
+      case '/api/v5/public/instruments': return ok([{ instId: 'BTC-USDT-SWAP', ctVal: '0.01', lotSz: '0.01', minSz: '0.01', tickSz: '0.1', ...(S.uly ? { uly: S.uly } : {}) }]);
       case '/api/v5/public/mark-price': return ok([{ markPx: String(S.mark || 100000) }]);
+      case '/api/v5/market/index-tickers': return ok(S.index ? [{ instId: u.searchParams.get('instId'), idxPx: String(S.index) }] : []);
       case '/api/v5/account/config': return ok([{ posMode: S.posMode, acctLv: S.acctLv || '2' }]);
       case '/api/v5/account/balance': return ok(S.balance || [{ totalEq: '5000', details: [{ ccy: 'USDT', eq: '5000.5', availEq: '4800' }] }]);
       case '/api/v5/account/positions': return ok(S.positions);
@@ -1474,5 +1475,35 @@ test('two per coin: OKX settles the whole position once, over both parts; a part
     ];
     await exchange.runExchange({ client, st, events: [], now: closeT + 15 * 60000 });
     assert.ok(Math.abs(st.account.balance - (balance - 1.2)) < 1e-6); // the full close: both parts' trades counted, once
+  });
+});
+
+test('OKX: a new stop is checked against the price it triggers on (index), not the drifting demo mark', async () => {
+  // a short; the demo mark drifted 10% above the real market (index)
+  const f = fakeOkx({
+    mark: 68000, index: 62000, uly: 'BTC-USD',
+    positions: [{ instId: 'BTC-USDT-SWAP', pos: '-2', posSide: 'net', avgPx: '74600', markPx: '68000', upl: '120' }],
+    algos: [{ ordType: 'conditional', algoId: 'a1', instId: 'BTC-USDT-SWAP', slTriggerPx: '67400' }],
+  });
+  const c = okxClient(f);
+  await c.setStopLoss('BTCUSDT', 67000);  // below the mark but above the index: valid for an index-triggered stop
+  assert.equal(f.S.calls.find(x => x.path === '/api/v5/trade/amend-algos').body.newSlTriggerPx, '67000');
+  await assert.rejects(c.setStopLoss('BTCUSDT', 61500), /wrong side of the index price 62000/);
+});
+
+test('real-price stop: the bot\'s own stop still trails when OKX refuses the safety stop move', async () => {
+  await withRealStop([{ high: 104200, low: 100000, last: 104000 }], async () => {
+    const { ex, client } = fakeBybit();
+    ex.liq = { BTCUSDT: 91000 };
+    const st = freshState();
+    await enterLong(client, st);
+    ex.marks.BTCUSDT = 104000;
+    client.setStopLoss = async () => { throw new Error('stop is on the wrong side of the mark price'); };
+    const events = [];
+    await exchange.runExchange({ client, st, sig: [S(T0, 100000), S(T0 + TF, 104000)], events, now: after(T0 + TF) });
+    assert.equal(st.position.stop, 101000);   // 104,000 - 3 ATR: trailed
+    assert.equal(st.position.exchangeStop, 96000); // the safety stop stayed
+    assert.ok(!events.some(e => e.type === 'error'));
+    assert.match(events.map(e => e.reason).join('\n'), /OKX safety stop not moved/);
   });
 });

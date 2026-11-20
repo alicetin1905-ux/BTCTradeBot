@@ -162,9 +162,24 @@ function createSwapClient(opts) {
     if (!instCache[symbol]) {
       const i = (await publicGet('/api/v5/public/instruments', { instType: TYPE, instId: idOf(symbol) }))[0];
       if (!i) throw new Error(`${symbol} is not listed on OKX`);
-      instCache[symbol] = { ctVal: num(i.ctVal), lotSz: num(i.lotSz), minSz: num(i.minSz), tickSz: num(i.tickSz), settleCcy: i.settleCcy };
+      instCache[symbol] = { ctVal: num(i.ctVal), lotSz: num(i.lotSz), minSz: num(i.minSz), tickSz: num(i.tickSz), settleCcy: i.settleCcy, uly: i.uly || i.instFamily || null };
     }
     return instCache[symbol];
+  }
+  // The price the stop triggers on (TRIG), to check a new stop is on the right side of it. With 'index' that is the
+  // index (the big exchanges' spot price), not the contract's own mark: on the demo the mark drifted ~10% away from the
+  // real market (BTC 2026-11-20: mark 68,082, index 61,980), and checking against it refused a stop that was valid.
+  async function triggerRef(symbol) {
+    if (TRIG === 'index') {
+      const uly = (await inst(symbol)).uly;
+      if (uly) {
+        try {
+          const r = (await publicGet('/api/v5/market/index-tickers', { instId: uly }))[0];
+          if (r && num(r.idxPx)) return { px: num(r.idxPx), name: 'index' };
+        } catch (e) { /* the mark price below */ }
+      }
+    }
+    return { px: await this_.getMarkPrice(symbol), name: 'mark' };
   }
   // BTC -> contracts string on the lot step.
   async function contracts(symbol, qty) {
@@ -211,7 +226,7 @@ function createSwapClient(opts) {
     });
   }
 
-  return {
+  const this_ = {
     name: 'okx-demo',
     label: 'OKX',
     instrument: INST,
@@ -317,8 +332,8 @@ function createSwapClient(opts) {
     async setStopLoss(symbol, stopLoss) {
       const live = (await this.getPositions())[symbol];
       if (!live) throw new Error(`no ${symbol} position on OKX`);
-      const mark = await this.getMarkPrice(symbol);
-      if ((mark - stopLoss) * live.bias <= 0) throw new Error(`stop ${stopLoss} is on the wrong side of the mark price ${mark}`);
+      const ref = await triggerRef(symbol);
+      if ((ref.px - stopLoss) * live.bias <= 0) throw new Error(`stop ${stopLoss} is on the wrong side of the ${ref.name} price ${ref.px}`);
       const current = await stopOrders(symbol);
       if (!current.length) return placeStop(symbol, live.bias, stopLoss);
       try {
@@ -345,8 +360,8 @@ function createSwapClient(opts) {
     async ensureWholeStop(symbol, stopLoss) {
       const live = (await this.getPositions())[symbol];
       if (!live) throw new Error(`no ${symbol} position on OKX`);
-      const mark = await this.getMarkPrice(symbol);
-      if ((mark - stopLoss) * live.bias <= 0) throw new Error(`stop ${stopLoss} is on the wrong side of the mark price ${mark}`);
+      const ref = await triggerRef(symbol);
+      if ((ref.px - stopLoss) * live.bias <= 0) throw new Error(`stop ${stopLoss} is on the wrong side of the ${ref.name} price ${ref.px}`);
       const current = await stopOrders(symbol);
       const partial = current.filter(o => String(o.closeFraction) !== '1');
       if (current.length && !partial.length) return this.setStopLoss(symbol, stopLoss);
@@ -374,9 +389,9 @@ function createSwapClient(opts) {
     async setExits(symbol, { stopLoss, takeProfit }) {
       const live = (await this.getPositions())[symbol];
       if (!live) throw new Error(`no ${symbol} position on OKX`);
-      const mark = await this.getMarkPrice(symbol);
-      if ((mark - stopLoss) * live.bias <= 0) throw new Error(`stop ${stopLoss} is on the wrong side of the mark price ${mark}`);
-      if ((takeProfit - mark) * live.bias <= 0) throw new Error(`take-profit ${takeProfit} is on the wrong side of the mark price ${mark}`);
+      const ref = await triggerRef(symbol), mark = ref.px;
+      if ((mark - stopLoss) * live.bias <= 0) throw new Error(`stop ${stopLoss} is on the wrong side of the ${ref.name} price ${mark}`);
+      if ((takeProfit - mark) * live.bias <= 0) throw new Error(`take-profit ${takeProfit} is on the wrong side of the ${ref.name} price ${mark}`);
       const current = await stopOrders(symbol);
       // 1. A single existing stop / pair: change it in place (OKX allows only one whole-position TP/SL order, so a
       //    second one can't be placed beside it — error 51088).
@@ -487,6 +502,7 @@ function createSwapClient(opts) {
       return [...byOrder.values()].map(o => ({ orderId: o.orderId, qty: +o.qty.toFixed(8), exit: o.notional / o.qty, pnl: o.pnl, at: o.at }));
     },
   };
+  return this_;
 }
 
 // ---------------------------------------------------------------------------
