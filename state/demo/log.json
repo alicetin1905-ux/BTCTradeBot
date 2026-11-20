@@ -1207,5 +1207,10 @@
     "side": -1,
     "expR": -0.556,
     "decision": "breakout short setup, but the learner expects -0.56 R (needs +0) — skipped"
+  },
+  {
+    "at": 1795134724674,
+    "kind": "error",
+    "text": "couldn't trail the stop to 65,942.4 (stop 67027.5 is on the wrong side of the mark price 68081.6) — retrying next run"
   }
 ]
