@@ -1255,5 +1255,12 @@
     "side": 0,
     "expR": null,
     "decision": "no setup on the last 4H close"
+  },
+  {
+    "at": 1795269904012,
+    "kind": "exit",
+    "pnl": 176.24316032,
+    "price": 60655.8,
+    "reason": "trailing stop 60,696.1 already passed"
   }
 ]
