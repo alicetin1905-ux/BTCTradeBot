@@ -4,7 +4,9 @@ name: BTC-ETH-BOT
 # The Mac runs the bot (cron, scripts/setup-mac.sh); since 2026-11-21 this workflow is its BACK-UP: the scheduled
 # runs only go ahead when the Mac has been quiet for 20 minutes (scripts/backup-guard.js: its newest "Demo …"
 # commit), so a sleeping or switched-off Mac doesn't stop the bot. ntfy says when GitHub takes over and when the
-# Mac is back.
+# Mac is back. GitHub starts scheduled runs late or skips them under load (this repo: the watchdog's half-hourly
+# schedule ran about every 7 hours), so an outside timer can call "Run workflow" with action = auto every 15 minutes
+# instead (README: Back-up timer): same guard, full run in minutes 0-14 and 30-44 of the hour, sync otherwise.
 #   :07 and :37  full run: exits, trailing stop, new entries after a 4H close
 #   :22 and :52  sync: books fills / stop-outs, real-price stop check
 # Two full runs an hour so a late or skipped scheduled start (GitHub delays them under load) still enters inside
@@ -22,9 +24,9 @@ on:
   workflow_dispatch:
     inputs:
       action:
-        description: 'run = full run, sync = fills only, check = test OKX connection and keys (no trading), testtrade = open + close the smallest position (real demo order), parts = test two positions on one instrument (real demo orders, default BTC-USD_UM-261225)'
+        description: 'auto = back-up (runs only when the Mac is quiet; full run in minutes 0-14 and 30-44, else sync), run = full run, sync = fills only, check = test OKX connection and keys (no trading), testtrade = open + close the smallest position (real demo order), parts = test two positions on one instrument (real demo orders, default BTC-USD_UM-261225)'
         type: choice
-        options: [check, run, sync, testtrade, probe, bills, parts]
+        options: [check, run, sync, auto, testtrade, probe, bills, parts]
         default: check
       instrument:
         description: 'testtrade / check only: another OKX instrument to try (e.g. BTC-USDC); empty = the coin''s own'
@@ -60,7 +62,7 @@ jobs:
       # Scheduled runs: only when the Mac has been quiet for 20 minutes. Manual runs always go ahead.
       - name: Is the Mac running?
         id: guard
-        if: github.event_name == 'schedule'
+        if: github.event_name == 'schedule' || inputs.action == 'auto'
         env:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
         run: |
@@ -73,7 +75,7 @@ jobs:
           fi
 
       - name: Run the bot
-        if: github.event_name != 'schedule' || steps.guard.outputs.go == 'true'
+        if: (github.event_name != 'schedule' && inputs.action != 'auto') || steps.guard.outputs.go == 'true'
         env:
           EXCHANGE: okx
           OKX_API_KEY: ${{ secrets.OKX_API_KEY }}
@@ -94,7 +96,8 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           TRADEBOT_HALT: ${{ vars.TRADEBOT_HALT }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then MODE="${{ inputs.action }}";
+          if [ "${{ inputs.action }}" = "auto" ]; then M=$(( 10#$(date -u +%M) % 30 )); [ "$M" -lt 15 ] && MODE=run || MODE=sync;
+          elif [ "${{ github.event_name }}" = "workflow_dispatch" ]; then MODE="${{ inputs.action }}";
           elif [ "${{ github.event.schedule }}" = "22,52 * * * *" ]; then MODE=sync;
           else MODE=run; fi
           echo "mode: $MODE"

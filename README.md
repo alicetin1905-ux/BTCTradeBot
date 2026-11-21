@@ -84,6 +84,14 @@ It needs Node 18+ and no dependencies.
   Mac's newest "Demo …" commit is more than 20 minutes old (`scripts/backup-guard.js`). ntfy says when GitHub takes
   over and when the Mac is back; `state/backup.json` remembers it. The Mac pulls before every run, so it carries on
   from GitHub's state.
+- **Back-up timer:** GitHub starts scheduled runs late or not at all under load, so an outside timer starts the
+  back-up instead, every 15 minutes (it only runs when the Mac is quiet). On cron-job.org (free):
+  1. GitHub → Settings → Developer settings → Fine-grained tokens → new token: only this repository, permission
+     *Actions: Read and write*. Keep it to yourself (paste it only into cron-job.org).
+  2. cron-job.org → new cron job: URL `https://api.github.com/repos/alicetin1905-ux/BTCTradeBot/actions/workflows/bot.yml/dispatches`,
+     method POST, schedule minutes 7, 22, 37, 52 of every hour; headers `Authorization: Bearer <token>`,
+     `Accept: application/vnd.github+json`; body `{"ref":"main","inputs":{"action":"auto"}}`.
+  A GitHub answer of 204 means it started.
 
 ## OKX EEA accounts: USD-settled futures, USDC margin, 5x
 
