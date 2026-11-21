@@ -79,6 +79,11 @@ It needs Node 18+ and no dependencies.
 - **History:** the full history (Binance spot 4H and daily since 2017, OKX spot as a fallback) is cached in
   `cache/` (not committed) and topped up every run.
 - **Model:** what it learned goes to `state/demo/model.json`; the dashboard shows it under *What the bot learned*.
+- **Where it runs:** the Mac (cron, `scripts/setup-mac.sh`). **GitHub Actions is the back-up** (since 2026-11-21):
+  `.github/workflows/bot.yml` is scheduled at :07/:37 (full run) and :22/:52 (sync), but only goes ahead when the
+  Mac's newest "Demo …" commit is more than 20 minutes old (`scripts/backup-guard.js`). ntfy says when GitHub takes
+  over and when the Mac is back; `state/backup.json` remembers it. The Mac pulls before every run, so it carries on
+  from GitHub's state.
 
 ## OKX EEA accounts: USD-settled futures, USDC margin, 5x
 

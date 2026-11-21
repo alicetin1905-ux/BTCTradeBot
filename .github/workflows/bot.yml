@@ -1,26 +1,24 @@
 name: BTC-ETH-BOT
 
-# Runs the bot on GitHub's servers — no Mac needed (scripts/actions-run.sh),
-# for every coin in config.js COINS (BTC, ETH and HYPE).
-#   :03 and :33  full run: exits, trailing stop, new entries after a 4H close
-#   :18 and :48  sync: books fills / stop-outs for the dashboard
-# Two full runs an hour so a late or skipped scheduled start (GitHub delays
-# them under load) still entered inside the entry window (ENTRY_FRESH_MIN) after a
-# 4H close. The stop itself lives on OKX and doesn't depend on these runs.
+# Runs the bot on GitHub's servers (scripts/actions-run.sh), for every coin in config.js COINS.
+# The Mac runs the bot (cron, scripts/setup-mac.sh); since 2026-11-21 this workflow is its BACK-UP: the scheduled
+# runs only go ahead when the Mac has been quiet for 20 minutes (scripts/backup-guard.js: its newest "Demo …"
+# commit), so a sleeping or switched-off Mac doesn't stop the bot. ntfy says when GitHub takes over and when the
+# Mac is back.
+#   :07 and :37  full run: exits, trailing stop, new entries after a 4H close
+#   :22 and :52  sync: books fills / stop-outs, real-price stop check
+# Two full runs an hour so a late or skipped scheduled start (GitHub delays them under load) still enters inside
+# the entry window (ENTRY_FRESH_MIN) after a 4H close. The safety stop lives on OKX and doesn't depend on these runs.
 #
 # Keys: repository Settings → Secrets and variables → Actions →
 # OKX_API_KEY, OKX_API_SECRET, OKX_API_PASSPHRASE. Until they exist, runs
 # only check the connection to OKX. "Run workflow" with action = check tests
 # the keys without trading.
 #
-# Use this OR the Mac's cron (scripts/setup-mac.sh), not both. Right now the Mac runs the bot; this workflow is manual only.
-
 on:
-  # Scheduled runs are OFF since 2026-10-03: the bot runs from the Mac's cron (scripts/setup-mac.sh) because
-  # GitHub skipped scheduled runs for hours. To go back to GitHub, restore these two lines and stop the Mac:
-  #   schedule:
-  #     - cron: '3,33 * * * *'    full run
-  #     - cron: '18,48 * * * *'   sync
+  schedule:
+    - cron: '7,37 * * * *'    # full run (only when the Mac is quiet)
+    - cron: '22,52 * * * *'   # sync (only when the Mac is quiet)
   workflow_dispatch:
     inputs:
       action:
@@ -52,12 +50,30 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 400   # the back-up guard looks for the Mac's newest commit
 
       - uses: actions/setup-node@v5
         with:
           node-version: '22'
 
+      # Scheduled runs: only when the Mac has been quiet for 20 minutes. Manual runs always go ahead.
+      - name: Is the Mac running?
+        id: guard
+        if: github.event_name == 'schedule'
+        env:
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+        run: |
+          node scripts/backup-guard.js
+          if [ "$(grep -c '^changed=true' "$GITHUB_OUTPUT")" != 0 ] && grep -q '^go=false' "$GITHUB_OUTPUT"; then
+            # the Mac is back: remember it (the bot itself doesn't run, so nothing else commits)
+            git config user.name "btc-eth-bot"
+            git config user.email "actions@users.noreply.github.com"
+            git add state/backup.json && git commit -q -m "Back-up off: the Mac is back" && { git pull --rebase -q && git push -q; } || true
+          fi
+
       - name: Run the bot
+        if: github.event_name != 'schedule' || steps.guard.outputs.go == 'true'
         env:
           EXCHANGE: okx
           OKX_API_KEY: ${{ secrets.OKX_API_KEY }}
@@ -79,7 +95,7 @@ jobs:
           TRADEBOT_HALT: ${{ vars.TRADEBOT_HALT }}
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then MODE="${{ inputs.action }}";
-          elif [ "${{ github.event.schedule }}" = "18,48 * * * *" ]; then MODE=sync;
+          elif [ "${{ github.event.schedule }}" = "22,52 * * * *" ]; then MODE=sync;
           else MODE=run; fi
           echo "mode: $MODE"
           if [ -n "${{ inputs.instrument }}" ] && [ "$MODE" = check ]; then export OKX_INSTRUMENT="${{ inputs.instrument }}"; fi
