@@ -1,5 +1,5 @@
 {
-  "balance": 2074.043821265,
+  "balance": 2096.2675982650003,
   "startingBalance": 2000,
   "fundingSince": 1793715002577,
   "funding": {
@@ -7,7 +7,7 @@
   },
   "startedAt": 1793715002577,
   "fundingError": null,
-  "exchangeEquity": 2195.3376943300404,
+  "exchangeEquity": 2196.4128943300407,
   "settings": {
     "RISK_PCT": 1.5,
     "COIN_RISK_PCT": {},
@@ -83,7 +83,7 @@
     "ETH",
     "BTC"
   ],
-  "updatedAt": 1795270203917,
+  "updatedAt": 1795270504520,
   "lastRunAt": 1795269731114,
   "instrument": "BTC-USD_UM_XPERP-310328"
 }
