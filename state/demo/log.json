@@ -1262,5 +1262,16 @@
     "pnl": 176.24316032,
     "price": 60655.8,
     "reason": "trailing stop 60,696.1 already passed"
+  },
+  {
+    "at": 1795276925606,
+    "kind": "scan",
+    "candleT": 1795262400000,
+    "close": 59943.7,
+    "trend": -1,
+    "setup": "pullback",
+    "side": -1,
+    "expR": -0.794,
+    "decision": "pullback short setup, but the learner expects -0.79 R (needs +0) — skipped"
   }
 ]
