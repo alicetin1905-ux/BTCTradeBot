@@ -35,5 +35,17 @@
     "openedAt": 1794182521830,
     "closedAt": 1794190827087,
     "initialStop": 2190.79
+  },
+  {
+    "symbol": "ETHUSDT",
+    "bias": -1,
+    "entry": 2029.0686666666666,
+    "exit": 1740.69,
+    "qty": 0.24,
+    "pnl": 68.75850896,
+    "reason": "trailing stop 1,740.8 reached on the real price (high 1,752.4)",
+    "openedAt": 1794326522251,
+    "closedAt": 1795404304136,
+    "initialStop": 2109.15
   }
 ]

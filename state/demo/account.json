@@ -1,5 +1,5 @@
 {
-  "balance": 2096.2675982650003,
+  "balance": 2165.0261072250005,
   "startingBalance": 2000,
   "fundingSince": 1793715002577,
   "funding": {
@@ -83,7 +83,7 @@
     "ETH",
     "BTC"
   ],
-  "updatedAt": 1795404304432,
+  "updatedAt": 1795404602416,
   "lastRunAt": 1795402927051,
   "instrument": "BTC-USD_UM_XPERP-310328"
 }

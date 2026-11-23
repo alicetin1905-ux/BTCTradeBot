@@ -1342,5 +1342,12 @@
     "side": 0,
     "expR": null,
     "decision": "no setup on the last 4H close"
+  },
+  {
+    "at": 1795404602414,
+    "kind": "exit",
+    "pnl": 68.75850896,
+    "price": 1740.69,
+    "reason": "trailing stop 1,740.8 reached on the real price (high 1,752.4)"
   }
 ]
