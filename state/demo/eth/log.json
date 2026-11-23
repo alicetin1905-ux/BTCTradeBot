@@ -1349,5 +1349,16 @@
     "pnl": 68.75850896,
     "price": 1740.69,
     "reason": "trailing stop 1,740.8 reached on the real price (high 1,752.4)"
+  },
+  {
+    "at": 1795406521912,
+    "kind": "scan",
+    "candleT": 1795392000000,
+    "close": 1732.42,
+    "trend": -1,
+    "setup": null,
+    "side": 0,
+    "expR": null,
+    "decision": "no setup on the last 4H close"
   }
 ]
