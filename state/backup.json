@@ -1,5 +1,7 @@
 {
-  "active": true,
-  "since": 1795525070357,
-  "macLastSeen": 1795523526000
+  "active": false,
+  "lastBackup": {
+    "from": 1795525070357,
+    "to": 1795533049728
+  }
 }
