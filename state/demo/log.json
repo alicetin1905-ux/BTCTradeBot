@@ -1526,5 +1526,16 @@
     "side": 0,
     "expR": null,
     "decision": "no setup on the last 4H close"
+  },
+  {
+    "at": 1795622524608,
+    "kind": "scan",
+    "candleT": 1795608000000,
+    "close": 58344.01,
+    "trend": -1,
+    "setup": "breakout",
+    "side": -1,
+    "expR": -0.564,
+    "decision": "breakout short setup, but the learner expects -0.56 R (needs +0) — skipped"
   }
 ]
