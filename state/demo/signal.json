@@ -82,7 +82,7 @@
   "guard": null,
   "closeT": 1795593600000,
   "source": "binance",
-  "at": 1795604524098,
+  "at": 1795606323322,
   "wait": "breakout short setup, but the learner expects -0.55 R (needs +0) — skipped",
   "strategy": "learning",
   "chart": [
