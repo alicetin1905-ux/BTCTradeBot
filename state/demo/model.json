@@ -1,6 +1,6 @@
 {
  "trainedOn": 7031,
- "at": 1795665600000,
+ "at": 1795680000000,
  "minR": 0,
  "halfLifeDays": 1460,
  "weights": {
@@ -45,9 +45,9 @@
   "gap": -0.037,
   "takenWon": 12
  },
- "updatedAt": 1795678323807,
- "learnedAt": 1795665725465,
- "newSetups": 3,
+ "updatedAt": 1795680125373,
+ "learnedAt": 1795680125373,
+ "newSetups": 0,
  "history": [
   {
    "at": 1793808000000,
@@ -3258,6 +3258,33 @@
   },
   {
    "at": 1795665600000,
+   "n": 7031,
+   "w": {
+    "ema_stack": 0.0663,
+    "px_vs_ema200": -0.4983,
+    "supertrend": 0.0962,
+    "adx_di": 0.0827,
+    "adx_level": 0.0678,
+    "rsi": 0.2832,
+    "macd_hist": 0.0109,
+    "stoch_rsi": 0.0466,
+    "obv_slope": 0.0021,
+    "bb_pos": -0.0256,
+    "ret_1d": 0.0402,
+    "ret_1w": 0.125,
+    "wma200_ratio": -0.0432,
+    "cycle_sin": 0.0326,
+    "cycle_cos": 0.5311,
+    "atr_regime": -0.4649,
+    "setup_pullback": -0.0314,
+    "setup_breakout": 0.0065,
+    "setup_emacross": 0.0249,
+    "coin_btc": -0.1442,
+    "side_long": 0.1822
+   }
+  },
+  {
+   "at": 1795680000000,
    "n": 7031,
    "w": {
     "ema_stack": 0.0663,
