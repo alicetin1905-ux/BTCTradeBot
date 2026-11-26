@@ -2,7 +2,7 @@ name: BTC-ETH-BOT
 
 # Runs the bot on GitHub's servers (scripts/actions-run.sh), for every coin in config.js COINS.
 # The Mac runs the bot (cron, scripts/setup-mac.sh); since 2026-11-21 this workflow is its BACK-UP: the scheduled
-# runs only go ahead when the Mac has been quiet for 20 minutes (scripts/backup-guard.js: its newest "Demo …"
+# runs only go ahead when the Mac has been quiet for 45 minutes (scripts/backup-guard.js: its newest "Demo …"
 # commit), so a sleeping or switched-off Mac doesn't stop the bot. ntfy says when GitHub takes over and when the
 # Mac is back. GitHub starts scheduled runs late or skips them under load (this repo: the watchdog's half-hourly
 # schedule ran about every 7 hours), so an outside timer can call "Run workflow" with action = auto every 15 minutes
@@ -59,7 +59,7 @@ jobs:
         with:
           node-version: '22'
 
-      # Scheduled runs: only when the Mac has been quiet for 20 minutes. Manual runs always go ahead.
+      # Scheduled runs: only when the Mac has been quiet for 45 minutes. Manual runs always go ahead.
       - name: Is the Mac running?
         id: guard
         if: github.event_name == 'schedule' || inputs.action == 'auto'

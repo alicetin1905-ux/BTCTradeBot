@@ -1,5 +1,8 @@
 {
-  "active": true,
-  "since": 1795724898244,
-  "macLastSeen": 1795723328000
+  "active": false,
+  "lastBackup": {
+    "from": 1795724898244,
+    "to": 1795734297421
+  },
+  "note": "false takeover (20-min limit) reset by hand"
 }

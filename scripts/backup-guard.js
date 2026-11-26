@@ -12,7 +12,9 @@ const { execSync } = require('child_process');
 
 const ROOT = path.join(__dirname, '..');
 const FILE = path.join(ROOT, 'state', 'backup.json');
-const MAC_STALE_MIN = +(process.env.MAC_STALE_MIN || 20);
+// 45: with no position open the Mac only commits on its full runs (every 30 min; a sync without changes commits nothing),
+// so 20 min took over while the Mac was running (2026-11-23 - 26, every day).
+const MAC_STALE_MIN = +(process.env.MAC_STALE_MIN || 45);
 
 // The newest Mac commit (subject "Demo …"), in ms, or 0 if none in the fetched history.
 function lastMacCommit(log) {

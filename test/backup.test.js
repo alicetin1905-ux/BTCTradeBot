@@ -12,10 +12,11 @@ test('back-up guard: the newest Mac commit ("Demo …") is found; GitHub\'s own 
   assert.equal(lastMacCommit('123\tWatchdog state'), 0);
 });
 
-test('back-up guard: runs when the Mac is quiet 20+ min, says so once, and once when the Mac is back', () => {
+test('back-up guard: runs when the Mac is quiet 45+ min, says so once, and once when the Mac is back', () => {
   let d = decide({ macAt: now - 5 * M, now, state: {} });
   assert.deepEqual([d.go, d.message], [false, null]);
-  d = decide({ macAt: now - 25 * M, now, state: {} });
+  assert.equal(decide({ macAt: now - 35 * M, now, state: {} }).go, false); // between two full runs (no syncs commit while flat)
+  d = decide({ macAt: now - 50 * M, now, state: {} });
   assert.equal(d.go, true);
   assert.match(d.message.title, /GitHub takes over/);
   assert.equal(d.state.active, true);
