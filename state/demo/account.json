@@ -35,7 +35,7 @@
     "TRAIL_ATR": 5,
     "STOP_ON_REAL_PRICE": true,
     "EMERGENCY_STOP_X": 2,
-    "LEARN_MIN_R": 0,
+    "LEARN_MIN_R": -0.1,
     "ENTRY_FRESH_MIN": 45,
     "MARKET_DATA": null,
     "STATUS_EVERY_H": 4
@@ -67,7 +67,7 @@
     "TRAIL_ATR": 5,
     "STOP_ON_REAL_PRICE": true,
     "EMERGENCY_STOP_X": 2,
-    "LEARN_MIN_R": 0,
+    "LEARN_MIN_R": -0.1,
     "ENTRY_FRESH_MIN": 45,
     "MARKET_DATA": null,
     "STATUS_EVERY_H": 4
@@ -83,7 +83,7 @@
     "ETH",
     "BTC"
   ],
-  "updatedAt": 1795809726739,
+  "updatedAt": 1795811402832,
   "lastRunAt": 1795809726739,
   "instrument": "BTC-USD_UM_XPERP-310328"
 }
