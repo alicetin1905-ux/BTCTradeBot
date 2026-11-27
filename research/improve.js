@@ -15,6 +15,7 @@
 //   PER_COIN=2 MAX_OPEN=4: up to 2 positions per coin at once (the live bot: 1 and 2)
 //   OWNW=w: the setups the bot itself traded count w x in the training
 //   EXTRA=atrpct,volz,dist,rel,peer,dly · YLO/YHI/YMODE=log|win (THR) · L=lambda · PERSETUP=1: see the code
+//   LONGBTC=2013: BTC's learning history from 2013 (Bitstamp, research/bitstamp.js) instead of 2017
 // Common: FROM=2021 RISK=0.025 MAXX=2 MAX_OPEN=2
 'use strict';
 const H = require('../src/history'), L = require('../src/learner'), M = require('../src/model'), G = require('../src/gbm');
@@ -30,6 +31,15 @@ const TF = 144e5;
   const base = { ...config.LEARN, STOP_ATR: config.STOP_ATR, TRAIL_ATR: config.TRAIL_ATR, HALF_LIFE_BARS: num('HL', config.LEARN.HALF_LIFE_BARS), MIN_R: num('MINR', config.LEARN.MIN_R), BREAKOUT_N: num('BN', config.LEARN.BREAKOUT_N), ...(arg('SETUPS') ? { SETUPS: arg('SETUPS').split(',') } : {}) };
   const o = L.defaults(base);
   const data = await H.loadAll(config.COINS);
+  // LONGBTC=<year>: BTC's history starts in that year (Bitstamp before 2017-08-17, research/bitstamp.js), so the learner
+  // has more examples; trading still starts at FROM.
+  if (num('LONGBTC', 0)) {
+    const fs = require('fs'), path = require('path'), from = Date.UTC(num('LONGBTC', 0), 0, 1);
+    const read = (n) => JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'cache', `BTC-${n}-bitstamp.json`), 'utf8'));
+    const c0 = data.BTC.candles[0].t, d0 = data.BTC.daily[0].t;
+    data.BTC.candles = [...read('4h').filter(k => k.t >= from && k.t < c0), ...data.BTC.candles];
+    data.BTC.daily = [...read('1d').filter(k => k.t < d0).map(k => ({ t: k.t, c: k.c })), ...data.BTC.daily]; // all daily closes (200-week average)
+  }
   const TRAILS = MODE === 'exit' ? arg('TRAILS', '3,4,5,7').split(',').map(Number) : [o.trailAtr];
   // one candidate list per trailing distance; the setups are the same, only the exit (R, t1) differs
   const sets = TRAILS.map(tr => L.candidates(data, { ...o, trailAtr: tr }));

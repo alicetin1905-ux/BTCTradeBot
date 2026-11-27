@@ -362,6 +362,21 @@ Both gains are of the size that small rule changes alone cause in these tests (s
 
 **Live since 2026-11-14 anyway (owner's choice): both.** `LEARN.VOL_REGIME` true, `LEARN.LAMBDA` 1. Together: $69,470 (PF-R 1.88, drop 51%) vs $67,461; from 2023 $28,283 vs $30,012; from 2025 $6,598 vs $6,196. In effect the same as before. With about 6,700 noisy setups the learner is near what this data can teach: the inputs it has carry the signal, the rest is noise. What improves it from here is time: every finished setup is one more example.
 
+## 16. A longer BTC history (from 2011)? No (2026-11-27)
+
+**Question (owner).** Would more history help the learner? Binance's BTC data starts on 2017-08-17. Bitstamp's BTC/USD goes back to 2011 (`node research/bitstamp.js`, cached in `cache/`). It was put in front of it, so the learner has up to ~1,000 more BTC setups; trading still starts in 2021 (`node research/improve.js PER_COIN=2 MAX_OPEN=4 LONGBTC=<year>`, live settings, data to 2026-11-27).
+
+| BTC learning history from | Trades | PF-R | $2,000 → | Worst drop |
+|---|---|---|---|---|
+| **2017 (live, Binance)** | 663 | **1.90** | **$77,666** | 51% |
+| 2012 | 674 | 1.78 | $46,605 | 49% |
+| 2013 | 675 | 1.79 | $47,629 | 50% |
+| 2014 | 671 | 1.80 | $50,012 | 51% |
+| 2015 | 657 | 1.89 | $69,135 | 51% |
+| 2016 | 659 | 1.85 | $58,256 | 53% |
+
+Every start before 2017 is worse. The early market (thin, one exchange, a few dollars a coin) behaved differently, and its setups teach the model lessons that no longer hold. With a 4-year half-life they still weigh in noticeably. The live learner keeps Binance from 2017.
+
 ## Honest limits
 
 - **Winners and losers:** about 70% of trades lose, and the winners pay for them. Runs of 8-10 losses happen.
