@@ -12,7 +12,7 @@
   "learning": true,
   "setup": "pullback",
   "setupSide": -1,
-  "expR": -0.7676125549250886,
+  "expR": -0.4569658156954305,
   "upper": null,
   "lower": null,
   "exitUpper": null,
@@ -65,16 +65,16 @@
   },
   "hypo": {
     "pullback": {
-      "long": 0.296,
-      "short": -0.768
+      "long": 0.409,
+      "short": -0.457
     },
     "breakout": {
-      "long": 0.334,
-      "short": -0.73
+      "long": 0.462,
+      "short": -0.404
     },
     "emacross": {
-      "long": 0.352,
-      "short": -0.711
+      "long": 0.336,
+      "short": -0.53
     }
   },
   "minR": -0.1,
@@ -82,8 +82,8 @@
   "guard": null,
   "closeT": 1795809600000,
   "source": "binance",
-  "at": 1795811524384,
-  "wait": "pullback short setup, but the learner expects -0.77 R (needs -0.1) — skipped",
+  "at": 1795813340782,
+  "wait": "pullback short setup, but the learner expects -0.46 R (needs -0.1) — skipped",
   "strategy": "learning",
   "chart": [
     [

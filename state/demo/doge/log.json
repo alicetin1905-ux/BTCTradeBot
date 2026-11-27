@@ -1,0 +1,13 @@
+[
+  {
+    "at": 1795813338371,
+    "kind": "scan",
+    "candleT": 1795795200000,
+    "close": 0.05778,
+    "trend": -1,
+    "setup": null,
+    "side": 0,
+    "expR": null,
+    "decision": "no setup on the last 4H close"
+  }
+]

@@ -1,0 +1,13 @@
+[
+  {
+    "at": 1795813335972,
+    "kind": "scan",
+    "candleT": 1795795200000,
+    "close": 6.655,
+    "trend": -1,
+    "setup": "pullback",
+    "side": -1,
+    "expR": -0.314,
+    "decision": "pullback short setup, but the learner expects -0.31 R (needs -0.1) — skipped"
+  }
+]

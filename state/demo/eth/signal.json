@@ -65,16 +65,16 @@
   },
   "hypo": {
     "pullback": {
-      "long": 0.334,
-      "short": -0.38
+      "long": 0.365,
+      "short": -0.244
     },
     "breakout": {
-      "long": 0.372,
-      "short": -0.342
+      "long": 0.418,
+      "short": -0.191
     },
     "emacross": {
-      "long": 0.39,
-      "short": -0.324
+      "long": 0.292,
+      "short": -0.317
     }
   },
   "minR": -0.1,
@@ -82,7 +82,7 @@
   "guard": null,
   "closeT": 1795809600000,
   "source": "binance",
-  "at": 1795811522162,
+  "at": 1795813321602,
   "wait": "no setup on the last 4H close",
   "strategy": "learning",
   "chart": [

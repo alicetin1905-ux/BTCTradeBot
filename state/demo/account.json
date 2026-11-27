@@ -7,7 +7,7 @@
   },
   "startedAt": 1793715002577,
   "fundingError": null,
-  "exchangeEquity": 2186.1737814293374,
+  "exchangeEquity": 2186.1728159793374,
   "settings": {
     "RISK_PCT": 1.5,
     "COIN_RISK_PCT": {},
@@ -77,7 +77,9 @@
   "exchange": "okx",
   "instruments": {
     "ETH": "ETH-USD_UM_XPERP-310328",
-    "BTC": "BTC-USD_UM_XPERP-310328"
+    "BTC": "BTC-USD_UM_XPERP-310328",
+    "AVAX": "AVAX-USD_UM_XPERP-310801",
+    "DOGE": "DOGE-USD_UM_XPERP-310516"
   },
   "coins": [
     "ETH",
@@ -85,7 +87,7 @@
     "DOGE",
     "BTC"
   ],
-  "updatedAt": 1795812002431,
-  "lastRunAt": 1795811526353,
+  "updatedAt": 1795813343034,
+  "lastRunAt": 1795813343034,
   "instrument": "BTC-USD_UM_XPERP-310328"
 }
