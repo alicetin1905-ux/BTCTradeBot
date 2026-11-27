@@ -17,6 +17,8 @@ inst_for() {
   elif [ "$coin" = "NEAR" ]; then echo "NEAR-USDC"
   elif [ "$coin" = "UNI" ]; then echo "UNI-USD_UM_XPERP-310718"
   elif [ "$coin" = "HYPE" ]; then echo "HYPE-USD_UM_XPERP-310801"
+  elif [ "$coin" = "AVAX" ]; then echo "AVAX-USD_UM_XPERP-310801"
+  elif [ "$coin" = "DOGE" ]; then echo "DOGE-USD_UM_XPERP-310516"
   else echo "$coin-USD_UM_XPERP-310328"; fi
 }
 

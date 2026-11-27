@@ -8,7 +8,7 @@ const config = module.exports = {
   // scripts/actions-run.sh runs `COIN=<coin> node src/run.js` for each, and
   // the last one also sends the combined daily / status pushes.
   // 2026-11-03: the learning bot trades BTC and ETH (SOL has no usable contract on the OKX EEA demo).
-  COINS: ['ETH', 'BTC'],
+  COINS: ['ETH', 'AVAX', 'DOGE', 'BTC'], // AVAX and DOGE since 2026-11-27 (owner: more trades; research/LEARNING.md section 17)
   // Where each coin trades. BTC and ETH: the USD-settled futures (long + short,
   // 10x). NEAR: its futures are refused on the EEA site (OKX 51155, local
   // compliance), so it trades the SPOT pair NEAR-USDC: long only, no leverage,
@@ -162,7 +162,7 @@ const config = module.exports = {
   // (OKX nets them into one position; the bot keeps each part's own entry, size and stop). Walk-forward 2021-26 with
   // the EMA cross setup at 1.5% risk: 677 trades instead of 356, PF-R 1.86 both, $2,000 -> $67,461, worst drop 50%
   // (research/LEARNING.md section 13). Needs STOP_ON_REAL_PRICE (each part's stop is watched by the bot).
-  MAX_OPEN_POSITIONS: 4,
+  MAX_OPEN_POSITIONS: 6, // 6 since 2026-11-27 with AVAX and DOGE (4 coins x up to 2)
   MAX_POSITIONS_PER_COIN: 2,
 
   // Money rules.

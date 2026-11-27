@@ -394,6 +394,17 @@ Every start before 2017 is worse. The early market (thin, one exchange, a few do
 
 Every extra trade is, on average, worse than the ones the learner picks. Late in a long fall (as in November 2026) the learner rates new shorts at −0.4 to −0.8 R, so only "no filter" would have traded then. **Live since 2026-11-27 (owner's choice): ≥ −0.1** — the smallest step, ~5% more trades for ~10% less end balance.
 
+**About 300 trades a year (owner).** BTC and ETH give at most ~140 a year in any variant, so only more coins get there (`COINS=...`, threshold −0.1, 2 per coin; the demo contracts of AVAX, DOGE, ETC and BCH follow the real price):
+
+| Coins | Since 2021: trades, $2,000 → , drop | Since 2025: trades a year, $2,000 → , drop |
+|---|---|---|
+| BTC, ETH | 693, $69,664, 50% | ~126, $7,049, 27% |
+| + AVAX, DOGE (max 6 open) | 1,203, $1.2 m, 57% | ~235, $4,417, 57% |
+| + AVAX, DOGE, ETC, BCH (max 8) | 1,680, $1.1 m, 74% | ~326, $2,374, 74% |
+| + FIL too (max 10, 1% risk) | 2,101, $614 k, 76% | (since 2024: $2,787, 76%) |
+
+The altcoins made a fortune in 2021 and add mostly losers since 2024 (as in section 5). **Live since 2026-11-27 (owner's choice): BTC, ETH, AVAX, DOGE, at most 6 open** — about 235 trades a year, at a deeper drop (57% vs 27% since 2025) and less profit per trade.
+
 ## Honest limits
 
 - **Winners and losers:** about 70% of trades lose, and the winners pay for them. Runs of 8-10 losses happen.

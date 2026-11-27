@@ -2,7 +2,7 @@
 
 (The repository and the dashboard address keep the old name `BTCTradeBot`.)
 
-A trading bot for **BTC and ETH** on the **OKX demo account** (EEA site): 2000 USDC, 5x leverage, isolated margin (10x until 2026-11-09).
+A trading bot for **BTC, ETH, AVAX and DOGE** (AVAX and DOGE since 2026-11-27) on the **OKX demo account** (EEA site): 2000 USDC, 5x leverage, isolated margin (10x until 2026-11-09).
 It started on 2026-11-03.
 
 ## What it does
@@ -24,7 +24,7 @@ setup work. Its inputs are:
 
 The **GlassSphere** order-flow inputs (funding, taker flow) were tested and made it worse, so they are left out.
 
-On every full run the model is **retrained on every setup that has finished**, BTC and ETH together, whether the
+On every full run the model is **retrained on every setup that has finished**, all coins together, whether the
 bot took it or not. Older results count half after 4 years. The bot only trades a setup the model expects to win
 (`LEARN.MIN_R` −0.1 since 2026-11-27, 0 before: a little more trades for a little less profit). So every finished setup is something it learns from.
 
