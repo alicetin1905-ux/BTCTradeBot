@@ -16,6 +16,7 @@
 //   OWNW=w: the setups the bot itself traded count w x in the training
 //   EXTRA=atrpct,volz,dist,rel,peer,dly · YLO/YHI/YMODE=log|win (THR) · L=lambda · PERSETUP=1: see the code
 //   LONGBTC=2013: BTC's learning history from 2013 (Bitstamp, research/bitstamp.js) instead of 2017
+//   SETUPS=...,rsirev,stany: counter-trend setups (src/learner.js), research only
 // Common: FROM=2021 RISK=0.025 MAXX=2 MAX_OPEN=2
 'use strict';
 const H = require('../src/history'), L = require('../src/learner'), M = require('../src/model'), G = require('../src/gbm');
@@ -30,7 +31,7 @@ const TF = 144e5;
 (async () => {
   const base = { ...config.LEARN, STOP_ATR: config.STOP_ATR, TRAIL_ATR: config.TRAIL_ATR, HALF_LIFE_BARS: num('HL', config.LEARN.HALF_LIFE_BARS), MIN_R: num('MINR', config.LEARN.MIN_R), BREAKOUT_N: num('BN', config.LEARN.BREAKOUT_N), ...(arg('SETUPS') ? { SETUPS: arg('SETUPS').split(',') } : {}) };
   const o = L.defaults(base);
-  const data = await H.loadAll(config.COINS);
+  const data = await H.loadAll(arg('COINS') ? arg('COINS').split(',') : config.COINS); // COINS=BTC,ETH,AVAX,...: more coins
   // LONGBTC=<year>: BTC's history starts in that year (Bitstamp before 2017-08-17, research/bitstamp.js), so the learner
   // has more examples; trading still starts at FROM.
   if (num('LONGBTC', 0)) {

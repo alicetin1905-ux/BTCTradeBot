@@ -69,7 +69,8 @@ const config = module.exports = {
 
   // The learner (src/learner.js).
   LEARN: {
-    MIN_R: 0,              // take a setup only when the model expects at least this many R (R = the initial risk)
+    MIN_R: -0.1,           // take a setup only when the model expects at least this many R (R = the initial risk). -0.1 since
+                           // 2026-11-27 (owner: more trades; was 0): walk-forward ~5% more trades, end balance -10% (research/LEARNING.md section 17)
     HALF_LIFE_BARS: 8760,  // older setups count half after this many 4H candles (4 years): it adapts slowly
     LAMBDA: 1,             // ridge penalty (weaker damping): 1 since 2026-11-14 (owner's choice), was 3 (research/LEARNING.md section 15)
     VOL_REGIME: true,      // input: the volatility regime (ATR % vs its 1-year median), since 2026-11-14 (owner's choice, section 15)

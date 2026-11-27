@@ -377,6 +377,23 @@ Both gains are of the size that small rule changes alone cause in these tests (s
 
 Every start before 2017 is worse. The early market (thin, one exchange, a few dollars a coin) behaved differently, and its setups teach the model lessons that no longer hold. With a 4-year half-life they still weigh in noticeably. The live learner keeps Binance from 2017.
 
+## 17. More trades, again (2026-11-27)
+
+**Question (owner).** Far too few trades. Live settings (2 per coin, EMA cross, 1.5%), 2021 - 2026-11-27, `node research/improve.js PER_COIN=2 MAX_OPEN=4 ...`:
+
+| Variant | Trades (a year) | PF-R | $2,000 → | Worst drop |
+|---|---|---|---|---|
+| **Expected R ≥ 0 (live until now)** | 663 (~112) | 1.90 | $77,666 | 51% |
+| ≥ −0.1 | 693 (~117) | 1.85 | $69,664 | 50% |
+| ≥ −0.2 | 735 (~125) | 1.75 | $53,722 | 50% |
+| ≥ −0.4 | 776 (~131) | 1.70 | $46,937 | 49% |
+| every setup (no filter) | 830 (~140) | 1.61 | $32,952 | 50% |
+| + counter-trend: RSI back over 30 / under 70 | 778 | 1.65 | $41,224 | 49% |
+| + counter-trend: any Supertrend flip | 799 | 1.70 | $53,340 | 50% |
+| + both counter-trend setups | 909 | 1.54 | $30,513 | 47% |
+
+Every extra trade is, on average, worse than the ones the learner picks. Late in a long fall (as in November 2026) the learner rates new shorts at −0.4 to −0.8 R, so only "no filter" would have traded then. **Live since 2026-11-27 (owner's choice): ≥ −0.1** — the smallest step, ~5% more trades for ~10% less end balance.
+
 ## Honest limits
 
 - **Winners and losers:** about 70% of trades lose, and the winners pay for them. Runs of 8-10 losses happen.

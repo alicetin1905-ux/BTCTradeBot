@@ -40,6 +40,17 @@ function trendAt(c, f, i) {
   return 0;
 }
 function setupAt(name, c, f, i, o) {
+  // counter-trend setups (research only so far): they don't need the trend filter
+  if (name === 'rsirev') { // RSI(14) back above 30 (long) / below 70 (short): a stretched move turns
+    if (!f.X[i] || !f.X[i - 1]) return 0;
+    const r = f.X[i][5], rp = f.X[i - 1][5]; // (RSI - 50) / 20: 30 -> -1, 70 -> +1
+    return r > -1 && rp <= -1 ? 1 : r < 1 && rp >= 1 ? -1 : 0;
+  }
+  if (name === 'stany') { // Supertrend (10, 3) flips, either way, whatever the trend
+    if (!f.X[i] || !f.X[i - 1]) return 0;
+    const d = f.X[i][2], dp = f.X[i - 1][2];
+    return d !== dp ? d : 0;
+  }
   const t = trendAt(c, f, i);
   if (!t || i < o.breakoutN + 1) return 0;
   if (name === 'pullback') {

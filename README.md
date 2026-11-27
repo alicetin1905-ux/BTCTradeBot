@@ -26,7 +26,7 @@ The **GlassSphere** order-flow inputs (funding, taker flow) were tested and made
 
 On every full run the model is **retrained on every setup that has finished**, BTC and ETH together, whether the
 bot took it or not. Older results count half after 4 years. The bot only trades a setup the model expects to win
-(`LEARN.MIN_R` 0). So every finished setup is something it learns from.
+(`LEARN.MIN_R` −0.1 since 2026-11-27, 0 before: a little more trades for a little less profit). So every finished setup is something it learns from.
 
 **Money rules:**
 - 1.5% of the balance at risk per position (since 2026-11-14; 2.5% before, 1% until 2026-11-13). A risk guard that halves it
