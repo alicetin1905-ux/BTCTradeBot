@@ -9,6 +9,7 @@
 //   node research/hourly.js MODE=parallel TF=1d   two bots side by side on one balance: the live 4H learner and a 1D learner
 //                                                     (its own model and its own slot per coin; at most 4 positions)
 //   TF=1d: the same modes with daily candles instead of 1H ("only1h" then means daily alone)
+//   PER_COIN=2 MAX_OPEN=6: as live (2 positions per coin, same side)
 // Common: FROM=2021 RISK=0.025 RETRAIN=7 (days; the live bot retrains every 4H, RETRAIN=7 gave the same result there)
 'use strict';
 const H = require('../src/history'), L = require('../src/learner'), M = require('../src/model'), F = require('../src/features');
@@ -16,7 +17,7 @@ const config = require('../config');
 const arg = (k, d) => { const a = process.argv.find(x => x.startsWith(k + '=')); return a ? a.split('=')[1] : d; };
 const num = (k, d) => +arg(k, d);
 const MODE = arg('MODE', 'base'), FROM = Date.UTC(num('FROM', 2021), 0, 1), RISK = num('RISK', config.PORTFOLIO.RISK_PCT / 100);
-const RETRAIN = num('RETRAIN', 7) * 864e5, W1 = num('W', 0.5), MAXX = config.PORTFOLIO.MAX_POSITION_X, MAX_OPEN = 2;
+const RETRAIN = num('RETRAIN', 7) * 864e5, W1 = num('W', 0.5), MAXX = config.PORTFOLIO.MAX_POSITION_X, MAX_OPEN = num('MAX_OPEN', 2), PER_COIN = num('PER_COIN', 1);
 const H4 = 144e5, OTHER = arg('TF', '1h'), H1 = { '15m': 9e5, '1h': 36e5, '2h': 72e5, '8h': 288e5, '12h': 432e5, '1d': 864e5 }[OTHER];
 
 (async () => {
@@ -58,8 +59,12 @@ const H4 = 144e5, OTHER = arg('TF', '1h'), H1 = { '15m': 9e5, '1h': 36e5, '2h': 
   for (const cd of tradeOn) {
     const now = cd.t0 + cd.tf;
     settle(now);
-    const slot = MODE === 'parallel' ? cd.tf + cd.coin : cd.coin;
-    if (cd.t0 < FROM || busy[slot] || Object.keys(busy).length >= (MODE === 'parallel' ? 4 : MAX_OPEN)) continue;
+    const base = MODE === 'parallel' ? cd.tf + cd.coin : cd.coin;
+    const mine = Object.keys(busy).filter(k => k.split('#')[0] === base);
+    // PER_COIN=2: a second position on a coin, same side only (as live)
+    if (cd.t0 < FROM || mine.length >= PER_COIN || mine.some(k => busy[k].side !== cd.side) || Object.keys(busy).length >= (MODE === 'parallel' ? 4 : MAX_OPEN)) continue;
+    let n = 0; while (busy[base + '#' + n]) n++;
+    const slot = base + '#' + n;
     const at = Math.floor(now / RETRAIN) * RETRAIN, ck = at + (MODE === 'parallel' ? ':' + cd.tf : '');
     if (!cache.has(ck)) cache.set(ck, train(at, cd.tf));
     const m = cache.get(ck);

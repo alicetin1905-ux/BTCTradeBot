@@ -243,6 +243,16 @@ The richer models fit the past better but pick worse going forward: with ~6,700 
 | Learn from both and also trade the 1H setups | 33,760 | 970 - 992 | 1.27 - 1.29 | $8,118 - $9,383 | 61 - 63% |
 | 1H alone | 27,046 | 1,277 | 1.16 | $1,885 | 85% |
 
+**Re-test 2026-11-27 with the live settings** (BTC, ETH, AVAX, DOGE; 2 per coin, 6 open; 1.5% risk; threshold −0.1; `node research/hourly.js PER_COIN=2 MAX_OPEN=6 ...`):
+
+| Variant | Since 2021: trades, $2,000 → , drop | Since 2025: trades, $2,000 → , drop |
+|---|---|---|
+| **4H (live)** | 1,245, $661,716, 61% | 455, $3,789, 61% |
+| 1H instead | 5,219, $1,880, 99% | 1,869, $90, 98% |
+| 4H and 1H | 3,340, $49,598, 97% | 1,330, $264, 97% |
+
+1H all but empties the account. 4H stays.
+
 1H setups behave differently: more noise, costs weigh 4x heavier against a stop a quarter as wide, and they win less. As extra examples they teach the 4H model the wrong lessons. As inputs they add no information the 4H indicators don't already carry. Traded, they cost money. The live bot stays on 4H.
 
 ## 10. Daily candles? Not in the learning; maybe as a second bot (2026-11-14)
