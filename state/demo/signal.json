@@ -77,13 +77,13 @@
       "short": -0.711
     }
   },
-  "minR": 0,
+  "minR": -0.1,
   "riskMult": 1,
   "guard": null,
   "closeT": 1795809600000,
   "source": "binance",
-  "at": 1795809724752,
-  "wait": "pullback short setup, but the learner expects -0.77 R (needs +0) — skipped",
+  "at": 1795811524384,
+  "wait": "pullback short setup, but the learner expects -0.77 R (needs -0.1) — skipped",
   "strategy": "learning",
   "chart": [
     [

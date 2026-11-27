@@ -77,12 +77,12 @@
       "short": -0.324
     }
   },
-  "minR": 0,
+  "minR": -0.1,
   "riskMult": 1,
   "guard": null,
   "closeT": 1795809600000,
   "source": "binance",
-  "at": 1795809721300,
+  "at": 1795811522162,
   "wait": "no setup on the last 4H close",
   "strategy": "learning",
   "chart": [

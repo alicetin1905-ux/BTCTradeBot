@@ -1,7 +1,7 @@
 {
  "trainedOn": 7031,
  "at": 1795809600000,
- "minR": 0,
+ "minR": -0.1,
  "halfLifeDays": 1460,
  "weights": {
   "ema_stack": 0.0663,
@@ -29,23 +29,23 @@
  "bias": 0.189,
  "lastYear": {
   "candidates": 680,
-  "wouldTake": 365,
-  "avgRTaken": 1.09,
-  "avgRSkipped": -0.67
+  "wouldTake": 411,
+  "avgRTaken": 0.91,
+  "avgRSkipped": -0.68
  },
  "selfCheck": {
   "n": 150,
   "from": 1789300800000,
   "to": 1795651200000,
-  "status": "watch",
-  "taken": 63,
-  "takenAvgR": -0.315,
-  "skipped": 87,
-  "skippedAvgR": -0.278,
-  "gap": -0.037,
-  "takenWon": 12
+  "status": "ok",
+  "taken": 72,
+  "takenAvgR": 0.079,
+  "skipped": 78,
+  "skippedAvgR": -0.637,
+  "gap": 0.716,
+  "takenWon": 19
  },
- "updatedAt": 1795809724752,
+ "updatedAt": 1795811524384,
  "learnedAt": 1795809724752,
  "newSetups": 0,
  "history": [
