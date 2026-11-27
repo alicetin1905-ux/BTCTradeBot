@@ -35,7 +35,7 @@ on:
       coin:
         description: 'testtrade only: which coin'
         type: choice
-        options: [BTC, ETH, NEAR, UNI, HYPE]
+        options: [BTC, ETH, AVAX, DOGE, NEAR, UNI, HYPE]
         default: BTC
 
 permissions:
