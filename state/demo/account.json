@@ -7,7 +7,7 @@
   },
   "startedAt": 1793715002577,
   "fundingError": null,
-  "exchangeEquity": 2186.1864693793377,
+  "exchangeEquity": 2186.1737814293374,
   "settings": {
     "RISK_PCT": 1.5,
     "COIN_RISK_PCT": {},
@@ -30,7 +30,7 @@
     "DIRECTION": "both",
     "CHANNEL_N": 15,
     "EXIT_N": 15,
-    "MAX_OPEN_POSITIONS": 4,
+    "MAX_OPEN_POSITIONS": 6,
     "STOP_ATR": 2,
     "TRAIL_ATR": 5,
     "STOP_ON_REAL_PRICE": true,
@@ -62,7 +62,7 @@
     "DIRECTION": "both",
     "CHANNEL_N": 15,
     "EXIT_N": 15,
-    "MAX_OPEN_POSITIONS": 4,
+    "MAX_OPEN_POSITIONS": 6,
     "STOP_ATR": 2,
     "TRAIL_ATR": 5,
     "STOP_ON_REAL_PRICE": true,
@@ -81,9 +81,11 @@
   },
   "coins": [
     "ETH",
+    "AVAX",
+    "DOGE",
     "BTC"
   ],
-  "updatedAt": 1795811526353,
+  "updatedAt": 1795812002431,
   "lastRunAt": 1795811526353,
   "instrument": "BTC-USD_UM_XPERP-310328"
 }
