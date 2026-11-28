@@ -82,7 +82,7 @@
   "guard": null,
   "closeT": 1795867200000,
   "source": "binance",
-  "at": 1795874526660,
+  "at": 1795876326862,
   "wait": "pullback short setup, but the learner expects -0.36 R (needs -0.1) — skipped",
   "strategy": "learning",
   "chart": [
