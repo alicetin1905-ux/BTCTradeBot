@@ -1690,5 +1690,16 @@
     "side": 0,
     "expR": null,
     "decision": "no setup on the last 4H close"
+  },
+  {
+    "at": 1795852921942,
+    "kind": "scan",
+    "candleT": 1795838400000,
+    "close": 1657.87,
+    "trend": -1,
+    "setup": null,
+    "side": 0,
+    "expR": null,
+    "decision": "no setup on the last 4H close"
   }
 ]
